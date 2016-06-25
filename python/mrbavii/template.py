@@ -528,6 +528,10 @@ class Template(object):
 
         if len(expr) == 0:
             code = repr("")
+
+        elif expr[:1] == '"' and expr[-1:] == '"':
+            code = repr(expr[1:-1])
+
         elif "|" in expr:
             pipes = expr.split("|")
             code = self._expr_code(pipes[0])
@@ -580,7 +584,7 @@ class Template(object):
             self._syntax_error("Not a valid name", what, self._line)
     
     def render(self, context=None, result=None):
-        """ Render teh template. """
+        """ Render the template. """
         env = self._env
         env.save_context()
         try:
@@ -640,7 +644,16 @@ if __name__ == "__main__":
         "upper": lambda x: x.upper(),
         "lower": lambda x: x.lower(),
         "join": lambda x, y: y.join(x),
-        "split": lambda x, y: x.split(y)
+        "split": lambda x, y: x.split(y),
+        "list": lambda x: list(),
+        "append": lambda x, y: x.append(y),
+        "insert": lambda x, y, z: x.insert(y, z),
+        "count": lambda x: len(x),
+        "range": lambda x: range(x),
+        "offset": lambda x, y: x[y],
+        "add": lambda x, y: x + y,
+        "sub": lambda x, y: x - y,
+        "util_add": lambda x, y: x + y
     }
 
     e = Environment(context)
