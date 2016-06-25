@@ -42,17 +42,13 @@
 ################################################################################
 
 
-import sys
 import os
-import argparse
 import re
 
 try:
     from codecs import open
 except ImportError:
     pass
-
-
 
 class Error(Exception):
     """ Base template engine error. """
@@ -98,11 +94,56 @@ class CodeBuilder(object):
     def get_globals(self):
         """ Return the globals defined within the code. """
         assert self._indent == 0;
-        print(str(self))
         names = {}
         exec(str(self), names)
 
         return names
+
+
+class Environment(object):
+    """ represent a template environment. """
+
+    def __init__(self, *contexts):
+        """ Initialize the template environment. """
+
+        self._context = {}
+        for context in contexts:
+            self._context.update(context)
+
+        self._saved_contexts = []
+        self._cache = {}
+
+    def load_file(self, filename):
+        """ Load a template from a file. """
+
+        abspath = os.path.abspath(os.path.normpath(filename))
+        if not abspath in self._cache:
+            self._cache[abspath] = Template(self, filename=abspath)
+
+        return self._cache[abspath]
+
+    def load_string(self, string):
+        """ Load a template from a string. """
+        return Template(self, string=string)
+
+    def save_context(self):
+        """ Save the current context. """
+        self._saved_contexts.append(dict(self._context))
+
+    def restore_context(self):
+        """ Restore a saved context. """
+        self._context = self._saved_contexts.pop()
+
+    def do_dots(self, value, *dots):
+        """ Evaluate dotted expressions. """
+        for dot in dots:
+            try:
+                value = getattr(value, dot)
+            except AttributeError:
+                value = value[dot]
+            if callable(value):
+                value = value()
+        return value
 
 
 class Template(object):
@@ -156,30 +197,33 @@ class Template(object):
         {%- ... %}
     """
 
-    def __init__(self, text=None, filename=None, *contexts):
+    def __init__(self, env, string=None, filename=None):
         """ Initialize a template with context variables. """
         
         # Initialize
         self._filename = filename
 
-        if text is None:
+        if string is None:
             if self._filename is None:
                 raise Error("Filename must be specified if text is not.")
-            text = open(self._filename, "rU").read()
+            string = open(self._filename, "rU").read()
 
-        # Copy all contexts into our context
-        self._context = {}
-        for context in contexts:
-            self._context.update(context)
+        # Remember the environment
+        self._env = env
 
         # Stack and line number
         self._ops_stack = []
         self._line = 0
 
+        # Buffer for plain text segments
+        self._buffer = []
+        self._post_strip = False
+
         # Manage the code we are building.
         code = CodeBuilder()
 
-        code.add_line("def render_function(owner, context, outresult=None):")
+
+        code.add_line("def render_function(env, owner, outresult=None):")
         code.indent()
 
         code.add_line("if outresult is None:")
@@ -191,10 +235,10 @@ class Template(object):
         code.add_line("result = outresult")
         code.dedent()
 
-        code.add_line("saved_contexts = []")
         code.add_line("append_result = result.append")
         code.add_line("extend_result = result.extend")
         code.add_line("to_str = str")
+        code.add_line("try_offsets = []")
         body_code = code.add_section()
         
         code.add_line("if outresult is None:")
@@ -204,49 +248,62 @@ class Template(object):
         
         code.dedent()
 
-        self._build_code(text, body_code)
+        self._build_code(string, body_code)
 
         # Extract the render function
-        self._render_function = code.get_globals()["render_function"]
+        self._code = str(code)
+        self._globals = code.get_globals()
+        self._render_function = self._globals["render_function"]
 
-    def _build_code(self, text, code):
+    def _build_code(self, string, code):
         """ Build the code for the template. """
 
         # Split tokens
-        for linetext in text.splitlines():
+        for linetext in string.splitlines():
             if self._line > 0:
-                code.add_line("append_result('\\n')")
+                self._buffer.append("\n")
             self._line += 1
             self._build_line(linetext, code)
 
         if self._ops_stack:
             self._syntax_error(
                 "Unmatched action tag", 
-                self.ops_stack[-1][0],
+                self._ops_stack[-1][0],
                 self._ops_stack[-1][1]
             )
 
+        self._flush_buffer(code)
 
-    def _build_line(self, text, code):
+
+    def _build_line(self, string, code):
         """ Build code from a single line. """
 
-        for token in re.split(r"(?s)({{.*?}}|{%.*?%}|{#.*?#})", text):
+        for token in re.split(r"(?s)({{.*?}}|{%.*?%}|{#.*?#})", string):
 
             if token.startswith("{#"):
                 # Just a comment
-                self._whitespace_control(token, code)
+                if not token.endswith("#}"):
+                    self._syntax_error("Invalid token syntax", token, self._line)
+                (pre, post, token) = self._read_token(token)
+                self._flush_buffer(code, pre, post)
                 continue
 
             elif token.startswith("{{"):
                 # Output some value
-                token = self._whitespace_control(token, code)
+                if not token.endswith("}}"):
+                    self._syntax_error("Invalid token syntax", token, self._line)
+                (pre, post, token) = self._read_token(token)
+                self._flush_buffer(code, pre, post)
 
                 expr = self._prep_expr([token])
                 code.add_line("append_result(to_str({0}))".format(expr))
             
             elif token.startswith("{%"):
                 # An action
-                token = self._whitespace_control(token, code)
+                if not token.endswith("%}"):
+                    self._syntax_error("Invalid token syntax", token, self._line)
+                (pre, post, token) = self._read_token(token)
+                self._flush_buffer(code, pre, post)
                 
                 words = token.split()
 
@@ -256,7 +313,7 @@ class Template(object):
                         self._syntax_error("Don't understand include", token, self._line)
 
                     filename = words[1] # TODO: CHECK THIS FOR FILENAME SANITY
-                    code.add_line("owner._include({0}, context, result)".format(repr(filename)))
+                    code.add_line("owner._include({0}, result)".format(repr(filename)))
                 
                 elif words[0] == "set":
                     # set <variable> = <condition...>
@@ -264,18 +321,35 @@ class Template(object):
                         self._syntax_error("Don't understand set", token, self._line)
 
                     self._variable(words[1])
-                    code.add_line("context[{0}] = {1}".format(
+                    code.add_line("env._context[{0}] = {1}".format(
                             repr(words[1]),
                             self._prep_expr(words[3:]),
                         )
                     )
+
+                elif words[0] == "unset":
+                    # unset <variable>
+                    if len(words) != 2:
+                        self._syntax_error("Don't understand unset", token, self._line)
+
+                    self._variable(words[1])
+                    code.add_line("env._context.pop({0}, None)".format(repr(words[1])))
+
+                elif words[0] == "try":
+                    # try
+                    if len(words) != 1:
+                        self._syntax_error("Don't understand try", token, self._line)
+                    self._ops_stack.append(["try", self._line])
+                    code.add_line("try_offsets.append(len(result))")
+                    code.add_line("try:")
+                    code.indent()
 
                 elif words[0] == "with":
                     # with
                     if len(words) != 1:
                         self._syntax_error("Don't understand with", token, self._line)
                     self._ops_stack.append(["with", self._line])
-                    code.add_line("saved_contexts.append(dict(context))")
+                    code.add_line("env.save_context()")
 
                 elif words[0] == "if":
                     # if <condition...>
@@ -324,12 +398,38 @@ class Template(object):
                     self._ops_stack.append(["for", self._line])
                     self._variable(words[1])
                     code.add_line(
-                        "for context[{0}] in {1}:".format(
+                        "for env._context[{0}] in {1}:".format(
                             repr(words[1]),
                             self._prep_expr(words[3:])
                         )
                     )
                     code.indent()
+
+                elif words[0] == "continue":
+                    # continue
+                    if len(words) != 1:
+                        self._syntax_error("Don't understand continue", token, self._line)
+                    
+                    if not self._ops_stack:
+                        self._syntax_error("Mismatched continue", token, self._line)
+                    start_what = self._ops_stack[-1]
+                    if start_what[0] != "for":
+                        self._syntax_error("Mismatched continue", token, self._line)
+
+                    code.add_line("continue")
+
+                elif words[0] == "break":
+                    # break
+                    if len(words) != 1:
+                        self._syntax_error("Don't understand break", token, self._line)
+                    
+                    if not self._ops_stack:
+                        self._syntax_error("Mismatched break", token, self._line)
+                    start_what = self._ops_stack[-1]
+                    if start_what[0] != "for":
+                        self._syntax_error("Mismatched break", token, self._line)
+
+                    code.add_line("break")
 
                 elif words[0].startswith("end"):
                     if len(words) != 1:
@@ -343,8 +443,24 @@ class Template(object):
                         self._syntax_error("Mismatched end tag", end_what, self._line)
 
                     if end_what == "with":
-                        code.add_line("context = saved_contexts.pop()")
+                        code.add_line("env.restore_context()")
+                    elif end_what == "try":
+                        code.add_line("pass")
+                        code.dedent()
+                        code.add_line("except (AttributeError, KeyError) as e:")
+                        code.indent()
+                        code.add_line("if result:")
+                        code.indent()
+                        code.add_line("del result[try_offsets[-1]:]")
+                        code.dedent()
+                        code.dedent()
+                        code.add_line("finally:")
+                        code.indent()
+                        code.add_line("try_offsets.pop()")
+                        code.dedent()
+
                     else:
+                        code.add_line("pass")
                         code.dedent()
                 else:
                     self._syntax_error("Don't understand tag", words[0], self._line)
@@ -352,25 +468,54 @@ class Template(object):
             else:
                 #Literal content
                 if token:
-                    code.add_line("append_result(to_str({0}))".format(repr(token)))
+                    self._buffer.append(token)
 
-    def _whitespace_control(self, token, code):
+    def _flush_buffer(self, code, pre=False, post=False):
+        """ Flush the buffer to output. """
+        if self._buffer:
+            expr = "".join(self._buffer)
+
+            if self._post_strip:
+                # If the previous tag had a post-strip {{ ... -}}
+                # trim the start of this buffer up to/including a new line
+                first_nl = expr.find("\n")
+                if first_nl == -1:
+                    expr = expr.lstrip()
+                else:
+                    expr = expr[:first_nl + 1].lstrip() + expr[first_nl + 1:]
+
+            if pre:
+                # If the current tag has a pre-strip {{- ... }}
+                # trim the end of the buffer up to/including a new line
+                last_nl = expr.find("\n")
+                if last_nl == -1:
+                    expr = expr.rstrip()
+                else:
+                    expr = expr[:last_nl] + expr[last_nl:].rstrip()
+            
+            code.add_line("append_result({0})".format(repr(expr)))
+
+        self._buffer = []
+        self._post_strip = post # Store this tag's post-strip for the next flush
+
+    def _read_token(self, token):
+        """ Read a token and whitepsace control. """
+
         if token[2:3] == "-":
-            code.add_line("if len(result) > 0:")
-            code.indent()
-            code.add_line("last_nl = result[-1].rfind('\\n')")
-            code.add_line("if last_nl == -1:")
-            code.indent()
-            code.add_line("result[-1] = result[-1].rstrip()")
-            code.dedent()
-            code.add_line("else:")
-            code.indent()
-            code.add_line("result[-1] = result[-1][:last_nl] + result[-1][last_nl:].rstrip()")
-            code.dedent()
-            code.dedent()
-            return token[3:-2].strip()
+            pre = True
+            start = 3
         else:
-            return token[2:-2].strip()
+            pre = False
+            start = 2
+
+        if token[-3:-2] == "-":
+            post = True
+            end = -3
+        else:
+            post = False
+            end = -2
+
+        return (pre, post, token[start:end].strip())
 
     def _prep_expr(self, expr):
         """ Prepare an expression by stripping whitespace and then parsing it """
@@ -394,22 +539,22 @@ class Template(object):
                 for p in params:
                     params_code.append(self._expr_code(p))
                 if params_code:
-                    code = "context[{0}]({1},{2})".format(repr(func), code, ",".join(params_code))
+                    code = "env._context[{0}]({1},{2})".format(repr(func), code, ",".join(params_code))
                 else:
-                    code = "context[{0}]({1})".format(repr(func), code)
+                    code = "env._context[{0}]({1})".format(repr(func), code)
 
         elif "." in expr:
             dots = expr.split(".")
             code = self._expr_code(dots[0])
             args = ", ".join(repr(d) for d in dots[1:])
-            code = "owner._do_dots({0}, {1})".format(code, args)
+            code = "env.do_dots({0}, {1})".format(code, args)
 
         elif self._isint(expr):
             code = repr(expr)
 
         else:
             self._variable(expr)
-            code = "context[{0}]".format(repr(expr))
+            code = "env._context[{0}]".format(repr(expr))
 
         return code
 
@@ -436,21 +581,15 @@ class Template(object):
     
     def render(self, context=None, result=None):
         """ Render teh template. """
-        render_context = dict(self._context)
-        if context:
-            render_context.update(context)
-        return self._render_function(self, render_context, result)
+        env = self._env
+        env.save_context()
+        try:
+            if context:
+                env._context.update(context)
+            return self._render_function(env, self, result)
+        finally:
+            env.restore_context()
 
-    def _do_dots(self, value, *dots):
-        """ Evaluate dotted expressions. """
-        for dot in dots:
-            try:
-                value = getattr(value, dot)
-            except AttributeError:
-                value = value[dot]
-            if callable(value):
-                value = value()
-        return value
 
     def _parse_pipe(self, pipe):
         """ Parse a pipe """
@@ -469,14 +608,14 @@ class Template(object):
 
         return (func, params)
 
-    def _include(self, filename, context, result):
+    def _include(self, filename, result):
         """ Include another template. """
         if self._filename is None:
             raise Error("Can't include a template if a filename isn't specified.")
 
         newfile = os.path.join(os.path.dirname(self._filename), *(filename.split("/")))
-        t = Template(filename=newfile)
-        t.render(context, result)
+        t = self.env.load_file(filename)
+        t.render(None, result)
 
 
 
@@ -484,4 +623,35 @@ class Template(object):
 ################################################################################
 
 # TODO
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Template Test")
+    parser.add_argument("-c", dest="code", action="store_true", default=False, help="Output the generated code")
+    parser.add_argument("template", help="Location of the template")
+    parser.add_argument("data", nargs="?", help="Location of the data json")
+
+    args = parser.parse_args()
+
+    context = {
+        "first": lambda x: x[0],
+        "last": lambda x: x[-1],
+        "upper": lambda x: x.upper(),
+        "lower": lambda x: x.lower(),
+        "join": lambda x, y: y.join(x),
+        "split": lambda x, y: x.split(y)
+    }
+
+    e = Environment(context)
+    t = e.load_file(args.template)
+    if args.code:
+        print(t._code)
+    else:
+        import json
+        data = json.loads(open(args.data).read())
+        print(t.render(data))
+
+        
+
 
