@@ -532,6 +532,12 @@ class Template(object):
         elif expr[:1] == '"' and expr[-1:] == '"':
             code = repr(expr[1:-1])
 
+        elif expr[:1] == "[" and expr[-1:] == "]":
+            parts = []
+            for part in expr[1:-1].split(","):
+                parts.append(self._expr_code(part))
+            code = "[{0}]".format(",".join(parts))
+
         elif "|" in expr:
             pipes = expr.split("|")
             code = self._expr_code(pipes[0])
