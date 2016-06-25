@@ -274,7 +274,6 @@ class Template(object):
 
         self._flush_buffer(code)
 
-
     def _build_line(self, string, code):
         """ Build code from a single line. """
 
@@ -493,7 +492,8 @@ class Template(object):
                 else:
                     expr = expr[:last_nl] + expr[last_nl:].rstrip()
             
-            code.add_line("append_result({0})".format(repr(expr)))
+            if expr:
+                code.add_line("append_result({0})".format(repr(expr)))
 
         self._buffer = []
         self._post_strip = post # Store this tag's post-strip for the next flush
@@ -550,7 +550,7 @@ class Template(object):
             code = "env.do_dots({0}, {1})".format(code, args)
 
         elif self._isint(expr):
-            code = repr(expr)
+            code = repr(int(expr))
 
         else:
             self._variable(expr)
@@ -614,7 +614,7 @@ class Template(object):
             raise Error("Can't include a template if a filename isn't specified.")
 
         newfile = os.path.join(os.path.dirname(self._filename), *(filename.split("/")))
-        t = self.env.load_file(filename)
+        t = self._env.load_file(newfile)
         t.render(None, result)
 
 
