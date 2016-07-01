@@ -54,60 +54,205 @@ class Error(Exception):
     """ Base template engine error. """
     pass
 
+# Renderers
+################################################################################
 
-class CodeBuilder(object):
-    """ Represent code to be compiled. """
+class Renderer(object):
+    """ A renderer takes content and renders it in some fashion. """
 
-    INDENT_SIZE = 4
+    def __init__(self):
+        """ Initialize the renderer. """
+        pass
 
-    def __init__(self, indent=0):
-        """ Initialize the code fragment with a specific indentation level. """
-        self._code = []
-        self._indent = indent
+    def render(self, content):
+        """ Render the content. """
+        raise NotImplementedError
 
-    def __str__(self):
-        """ Return the single string representation of the code. """
-        return "".join(str(c) for c in self._code)
 
-    def indent(self):
-        """ Increase the indentation level. """
-        self._indent += self.INDENT_SIZE
+class Streamenderer(object):
+    """ Render to a given stream. """
 
-    def dedent(self):
-        """ Decrease the indention level. """
-        if self._indent <= 0:
-            raise Error("Unable to dedent more than indented.")
+    def __init__(self, stream):
+        """ Initialize the stream. """
+        self._stream = stream
 
-        self._indent -= self.INDENT_SIZE
+    def render(self, content):
+        """ Render to the stream. """
+        self._stream.write(content)
 
-    def add_section(self):
-        """ Add a new section to the code.  Additional code can be added
-            to the section later. """
-        code = CodeBuilder(self._indent)
-        self._code.append(code)
-        return code
 
-    def add_line(self, line):
-        """ Add a new line to the code at the current indent level. """
-        self._code.extend([" " * self._indent, line, "\n"])
+# Nodes
+################################################################################
 
-    def get_globals(self):
-        """ Return the globals defined within the code. """
-        assert self._indent == 0;
-        names = {}
-        exec(str(self), names)
+class Node(object):
+    """ A node is a part of the expression that is rendered. """
 
-        return names
+    def __init__(self, template):
+        """ Initialize the node. """
+        self._template = template
+        self._env = template._env
 
+    def render(self, renderer):
+        raise NotImplementedError
+
+
+class TextNode(Node):
+    """ A node that represents a raw block of text. """
+
+    def __init__(self, template, text):
+        """ Initialize a text node. """
+        Node.__init__(self, template)
+        self._text = text
+
+    def render(self, renderer):
+        """ Render content from a text node. """
+        renderer.render(self._text)
+
+
+class IfNode(Node):
+    """ A node that manages if/elif/else. """
+
+    def __init__(self, template, var):
+        """ Initialize the if node. """
+        Node.__init__(self, template)
+        self._var = var
+        self._if = []
+        self._else = None
+
+    def add_else(self):
+        """ Add an else block to the if/elif/else blocks. """
+        self._else = []
+
+    def render(self, renderer):
+        """ Render the if node. """
+        env = self._env
+        if env.get(self._var):
+            for action in self._if:
+                action.render(renderer)
+        elif self._else:
+            for action in self._else:
+                action.render(renderer)
+
+
+class ForNode(Node):
+    """ A node for handling for loops. """
+
+    def __init__(self, template, var1, var2):
+        """ Initialize the for node. """
+        Node.__init__(self, template)
+        self._var1 = var1
+        self._var2 = var2
+        self._actions = []
+
+    def render(self, renderer):
+        """ Render the for node. """
+        env = self._env
+
+        # Iterate over each value
+        var2 = env.get(self._var2)
+        if var2:
+
+            for var1 in var2:
+                env.set(self._var1, var1)
+                                    
+                # Execute each sub-node
+                for action in self._actions:
+                    action.render(renderer)
+
+
+
+class VarNode(Node):
+    """ A node to output some value. """
+
+    def __init__(self, template, var, filters):
+        """ Initialize the node. """
+        Node.__init__(self, template)
+        self._var = var
+        self._filters = filters
+
+    def render(self, renderer):
+        """ Render the output. """
+        env = self._env
+        var = env.get(self._var)
+
+        for filter in self._filters:
+            var = env.filter(var, filter)
+
+        renderer.render(str(var))
+
+
+class IncludeNode(Node):
+    """ A node to include another template. """
+
+    def __init__(self, template, filename):
+        """ Initialize the include node. """
+        Node.__init__(self, template)
+        self._filename = filename
+
+    def render(self, renderer):
+        """ Actually do the work of including the template. """
+        self._template._include(self._filename, renderer)
+
+
+class WithNode(Node):
+    """ Save the state of the context. """
+
+    def __init__(self, template):
+        """ Initialize. """
+        Node.__init__(self, template)
+        self._nodes = []
+
+    def render(self, renderer):
+        """ Render. """
+        self._env.save_context()
+        for i in self._nodes:
+            i.render(renderer)
+        self._env.restore_context()
+
+
+class AssignNode(Node):
+    """ Set a variable to a subvariable. """
+
+    def __init__(self, template, var, var2):
+        """ Initialize. """
+        Node.__init__(self, template)
+        self._var = var
+        self._var2 = var2
+
+    def render(self, renderer):
+        """ Set the value. """
+        self._env.set(self._var, self._env.get(self._var2))
+
+
+class SetNode(Node):
+    """ Set or clear a flag. """
+
+    def __init__(self, template, var, value):
+        """ Initialize. """
+        Node.__init__(self, template)
+        self._var = var
+        self._value = bool(value)
+
+    def render(self, renderer):
+        """ Set or clear the value. """
+        self._env.set(self._var, self._value)
+
+
+# Environment and Template
+################################################################################
 
 class Environment(object):
     """ represent a template environment. """
 
-    def __init__(self, *contexts):
+    def __init__(self, context=None, filters=None):
         """ Initialize the template environment. """
 
+        self._filters = {}
+        if filters:
+            self._filters.update(filters)
+
         self._context = {}
-        for context in contexts:
+        if context:
             self._context.update(context)
 
         self._saved_contexts = []
@@ -134,16 +279,35 @@ class Environment(object):
         """ Restore a saved context. """
         self._context = self._saved_contexts.pop()
 
-    def do_dots(self, value, *dots):
+    def get(self, var):
         """ Evaluate dotted expressions. """
-        for dot in dots:
-            try:
-                value = getattr(value, dot)
-            except AttributeError:
-                value = value[dot]
+        try:
+            value = self._context[var[0]]
             if callable(value):
                 value = value()
-        return value
+
+            for dot in var[1:]:
+                try:
+                    value = value[dot]
+                except (KeyError, IndexError, TypeError):
+                    return None
+                if callable(value):
+                    value = value()
+                    
+            return value
+        except (KeyError, IndexError, TypeError, AttributeError):
+            return None
+
+    def set(self, var1, var2):
+        """ Set a value in the context. """
+        self._context[var1] = var2
+
+    def filter(self, value, filter):
+        """ Filter a value. """
+        if filter in self._filters:
+            return self._filters[filter](value)
+        else:
+            return value
 
 
 class Template(object):
@@ -153,37 +317,24 @@ class Template(object):
 
         {{ expression }}
 
-        Expression:
-
-            [variable or value] [ | function [(variable or value, ...)] ]*
-
         For example:
 
-            {{ value }}
+            {{ value.subvalue }}
 
-            {{ value | upper }}
+            {{ value.subvalue | upper }}
 
-            {{ value | index(12) }}
-
-            {{ value | index(other.value) | upper }}
-
-            {{ | random(1, 10) }} {# No value was used on purpose. #}
 
     Loops:
 
-        {% for var in expression %}
+        {% for var in list %}
         {% endfor %}
 
     Conditions:
 
-        {% if expression %}
-        {% elif expression %}
+        {% if var %}
+        {% elif var %}
         {% else %}
         {% endif %}
-
-    Set a variable
-
-        {% set var = expresssion %}
 
     Comments:
 
@@ -213,57 +364,29 @@ class Template(object):
 
         # Stack and line number
         self._ops_stack = []
+        self._actions = []
+        self._stack = [self._actions]
         self._line = 0
+
+        # Defines
+        self._defines = {}
 
         # Buffer for plain text segments
         self._buffer = []
         self._post_strip = False
 
-        # Manage the code we are building.
-        code = CodeBuilder()
-
-
-        code.add_line("def render_function(env, owner, outresult=None):")
-        code.indent()
-
-        code.add_line("if outresult is None:")
-        code.indent()
-        code.add_line("result = []")
-        code.dedent()
-        code.add_line("else:")
-        code.indent()
-        code.add_line("result = outresult")
-        code.dedent()
-
-        code.add_line("append_result = result.append")
-        code.add_line("extend_result = result.extend")
-        code.add_line("to_str = str")
-        code.add_line("try_offsets = []")
-        body_code = code.add_section()
         
-        code.add_line("if outresult is None:")
-        code.indent()
-        code.add_line("return ''.join(result)")
-        code.dedent()
-        
-        code.dedent()
+        self._build(string)
 
-        self._build_code(string, body_code)
-
-        # Extract the render function
-        self._code = str(code)
-        self._globals = code.get_globals()
-        self._render_function = self._globals["render_function"]
-
-    def _build_code(self, string, code):
-        """ Build the code for the template. """
+    def _build(self, string):
+        """ Build the nodes for the template. """
 
         # Split tokens
         for linetext in string.splitlines():
             if self._line > 0:
                 self._buffer.append("\n")
             self._line += 1
-            self._build_line(linetext, code)
+            self._build_line(linetext)
 
         if self._ops_stack:
             self._syntax_error(
@@ -272,10 +395,10 @@ class Template(object):
                 self._ops_stack[-1][1]
             )
 
-        self._flush_buffer(code)
+        self._flush_buffer()
 
-    def _build_line(self, string, code):
-        """ Build code from a single line. """
+    def _build_line(self, string):
+        """ Build from a single line. """
 
         for token in re.split(r"(?s)({{.*?}}|{%.*?%}|{#.*?#})", string):
 
@@ -284,7 +407,7 @@ class Template(object):
                 if not token.endswith("#}"):
                     self._syntax_error("Invalid token syntax", token, self._line)
                 (pre, post, token) = self._read_token(token)
-                self._flush_buffer(code, pre, post)
+                self._flush_buffer(pre, post)
                 continue
 
             elif token.startswith("{{"):
@@ -292,88 +415,38 @@ class Template(object):
                 if not token.endswith("}}"):
                     self._syntax_error("Invalid token syntax", token, self._line)
                 (pre, post, token) = self._read_token(token)
-                self._flush_buffer(code, pre, post)
+                self._flush_buffer(pre, post)
 
-                expr = self._prep_expr([token])
-                code.add_line("append_result(to_str({0}))".format(expr))
-            
+                # Determine filters if any
+                parts = token.split("|")
+
+                var = self._variable(parts[0])
+                filters = []
+                for part in parts[1:]:
+                    self._variables(part, False)
+                    filters.append(part)
+
+                node = VarNode(self, var, filters)
+                self._stack[-1].append(node)
+
             elif token.startswith("{%"):
                 # An action
                 if not token.endswith("%}"):
                     self._syntax_error("Invalid token syntax", token, self._line)
                 (pre, post, token) = self._read_token(token)
-                self._flush_buffer(code, pre, post)
+                self._flush_buffer(pre, post)
                 
                 words = token.split()
 
-                if words[0] == "include":
-                    # include <filename>
+                if words[0] == "if":
+                    # if <variable>
                     if len(words) != 2:
-                        self._syntax_error("Don't understand include", token, self._line)
-
-                    filename = words[1] # TODO: CHECK THIS FOR FILENAME SANITY
-                    code.add_line("owner._include({0}, result)".format(repr(filename)))
-                
-                elif words[0] == "set":
-                    # set <variable> = <condition...>
-                    if len(words) < 4 or words[2] != "=":
-                        self._syntax_error("Don't understand set", token, self._line)
-
-                    self._variable(words[1])
-                    code.add_line("env._context[{0}] = {1}".format(
-                            repr(words[1]),
-                            self._prep_expr(words[3:]),
-                        )
-                    )
-
-                elif words[0] == "unset":
-                    # unset <variable>
-                    if len(words) != 2:
-                        self._syntax_error("Don't understand unset", token, self._line)
-
-                    self._variable(words[1])
-                    code.add_line("env._context.pop({0}, None)".format(repr(words[1])))
-
-                elif words[0] == "try":
-                    # try
-                    if len(words) != 1:
-                        self._syntax_error("Don't understand try", token, self._line)
-                    self._ops_stack.append(["try", self._line])
-                    code.add_line("try_offsets.append(len(result))")
-                    code.add_line("try:")
-                    code.indent()
-
-                elif words[0] == "with":
-                    # with
-                    if len(words) != 1:
-                        self._syntax_error("Don't understand with", token, self._line)
-                    self._ops_stack.append(["with", self._line])
-                    code.add_line("env.save_context()")
-
-                elif words[0] == "if":
-                    # if <condition...>
-                    if len(words) < 2:
                         self._syntax_error("Don't understand if", token, self._line)
                     self._ops_stack.append(["if", self._line])
-                    expr = self._prep_expr(words[1:])
-                    code.add_line("if {0}:".format(expr))
-                    code.indent()
 
-                elif words[0] == "elif":
-                    # elif <condition...>
-                    if len(words) < 2:
-                        self._syntax_error("Don't understand elif", token, self._line)
-
-                    if not self._ops_stack:
-                        self._syntax_error("Mismatched elif", token, self._line)
-                    start_what = self._ops_stack[-1]
-                    if start_what[0] != "if":
-                        self._syntax_error("Mismatched elif", token, self._line)
-
-                    expr = self._prep_expr(words[1:])
-                    code.dedent()
-                    code.add_line("elif {0}:".format(expr))
-                    code.indent()
+                    node = IfNode(self, self._variable(words[1]))
+                    self._stack[-1].append(node)
+                    self._stack.append(node._if)
 
                 elif words[0] == "else":
                     # else
@@ -386,49 +459,69 @@ class Template(object):
                     if start_what[0] != "if":
                         self._syntax_error("Mismatched else", token, self._line)
 
-                    code.dedent()
-                    code.add_line("else:")
-                    code.indent()
+                    self._stack.pop()
+                    node = self._stack[-1][-1]
+
+                    node.add_else()
+                    self._stack.append(node._else)
 
                 elif words[0] == "for":
-                    # for <variable> in <condition...>
-                    if len(words) < 4 or words[2] != "in":
+                    # for <variable> in <list>
+                    if len(words) != 4 or words[2] != "in":
                         self._syntax_error("Don't understarnd for", token, self._line)
                     self._ops_stack.append(["for", self._line])
-                    self._variable(words[1])
-                    code.add_line(
-                        "for env._context[{0}] in {1}:".format(
-                            repr(words[1]),
-                            self._prep_expr(words[3:])
-                        )
-                    )
-                    code.indent()
 
-                elif words[0] == "continue":
-                    # continue
+                    var1 = self._variable(words[1], False)
+                    var2 = self._variable(words[3])
+
+                    node = ForNode(self, var1, var2)
+                    self._stack[-1].append(node)
+                    self._stack.append(node._actions)
+
+                elif words[0] == "include":
+                    # include <filename>
+                    if len(words) != 2:
+                        self._syntax_error("Don't understand include", token, self._line)
+
+                    filename = words[1]
+                    node = IncludeNode(self, filename)
+                    self._stack[-1].append(node)
+
+                elif words[0] == "with":
+                    # with
                     if len(words) != 1:
-                        self._syntax_error("Don't understand continue", token, self._line)
-                    
-                    if not self._ops_stack:
-                        self._syntax_error("Mismatched continue", token, self._line)
-                    start_what = self._ops_stack[-1]
-                    if start_what[0] != "for":
-                        self._syntax_error("Mismatched continue", token, self._line)
+                        self._syntax_error("Don't understand with", token, self._line)
 
-                    code.add_line("continue")
+                    self._ops_stack.append(["with", self._line])
+                    node = WithNode(self)
+                    self._stack[-1].append(node)
+                    self._stack.append(node._nodes)
 
-                elif words[0] == "break":
-                    # break
-                    if len(words) != 1:
-                        self._syntax_error("Don't understand break", token, self._line)
-                    
-                    if not self._ops_stack:
-                        self._syntax_error("Mismatched break", token, self._line)
-                    start_what = self._ops_stack[-1]
-                    if start_what[0] != "for":
-                        self._syntax_error("Mismatched break", token, self._line)
+                elif words[0] == "set":
+                    # set var = var.subvar.subsubvar, set var
+                    if len(words) == 2:
+                        self._variable(words[1], False)
+                        node = SetNode(self, words[1], True)
+                        self._stack[-1].append(node)
 
-                    code.add_line("break")
+                    elif len(words) != 4 or words[2] != "in":
+                        self._syntax_error("Don't understand set", token, self._line)
+
+                    else:
+                        self._variable(words[1], False)
+                        var = self._variable(words[3])
+
+                        node = AssignNode(self, words[1], var)
+                        self._stack[-1].append(node)
+
+                elif words[0] == "unset":
+                    # unset <var>
+                    if len(words) != 2:
+                        self._syntax_error("Don't understand unset", token, self._line)
+
+                    self._variable(words[1], False)
+                    node = SetNode(self, words[1], False)
+                    self._stack[-1].append(node)
 
                 elif words[0].startswith("end"):
                     if len(words) != 1:
@@ -441,26 +534,9 @@ class Template(object):
                     if start_what[0] != end_what:
                         self._syntax_error("Mismatched end tag", end_what, self._line)
 
-                    if end_what == "with":
-                        code.add_line("env.restore_context()")
-                    elif end_what == "try":
-                        code.add_line("pass")
-                        code.dedent()
-                        code.add_line("except (AttributeError, KeyError) as e:")
-                        code.indent()
-                        code.add_line("if result:")
-                        code.indent()
-                        code.add_line("del result[try_offsets[-1]:]")
-                        code.dedent()
-                        code.dedent()
-                        code.add_line("finally:")
-                        code.indent()
-                        code.add_line("try_offsets.pop()")
-                        code.dedent()
+                    # Next nodes go to the previous level
+                    self._stack.pop()
 
-                    else:
-                        code.add_line("pass")
-                        code.dedent()
                 else:
                     self._syntax_error("Don't understand tag", words[0], self._line)
 
@@ -469,7 +545,7 @@ class Template(object):
                 if token:
                     self._buffer.append(token)
 
-    def _flush_buffer(self, code, pre=False, post=False):
+    def _flush_buffer(self, pre=False, post=False):
         """ Flush the buffer to output. """
         if self._buffer:
             expr = "".join(self._buffer)
@@ -493,7 +569,8 @@ class Template(object):
                     expr = expr[:last_nl] + expr[last_nl:].rstrip()
             
             if expr:
-                code.add_line("append_result({0})".format(repr(expr)))
+                node = TextNode(self, expr)
+                self._stack[-1].append(node)
 
         self._buffer = []
         self._post_strip = post # Store this tag's post-strip for the next flush
@@ -517,65 +594,6 @@ class Template(object):
 
         return (pre, post, token[start:end].strip())
 
-    def _prep_expr(self, expr):
-        """ Prepare an expression by stripping whitespace and then parsing it """
-        # Join all expressions, but each one may have whitespace so split it
-        # into list with no whitespaces, then join them all together
-        return self._expr_code("".join("".join(expr).split()))
-
-    def _expr_code(self, expr):
-        """ Create a python expression for output, if, and for. """
-
-        if len(expr) == 0:
-            code = repr("")
-
-        elif expr[:1] == '"' and expr[-1:] == '"':
-            code = repr(expr[1:-1])
-
-        elif expr[:1] == "[" and expr[-1:] == "]":
-            parts = []
-            for part in expr[1:-1].split(","):
-                parts.append(self._expr_code(part))
-            code = "[{0}]".format(",".join(parts))
-
-        elif "|" in expr:
-            pipes = expr.split("|")
-            code = self._expr_code(pipes[0])
-            for pipe in pipes[1:]:
-                (func, params) = self._parse_pipe(pipe)
-                self._variable(func)
-
-                params_code = []
-                for p in params:
-                    params_code.append(self._expr_code(p))
-                if params_code:
-                    code = "env._context[{0}]({1},{2})".format(repr(func), code, ",".join(params_code))
-                else:
-                    code = "env._context[{0}]({1})".format(repr(func), code)
-
-        elif "." in expr:
-            dots = expr.split(".")
-            code = self._expr_code(dots[0])
-            args = ", ".join(repr(d) for d in dots[1:])
-            code = "env.do_dots({0}, {1})".format(code, args)
-
-        elif self._isint(expr):
-            code = repr(int(expr))
-
-        else:
-            self._variable(expr)
-            code = "env._context[{0}]".format(repr(expr))
-
-        return code
-
-    def _isint(self, expr):
-        """ Test for an integer. """
-        try:
-            value = int(expr)
-            return True
-        except ValueError as e:
-            return False
-
     def _syntax_error(self, msg, thing, where):
         """ Raise an error if something is wrong. """
 
@@ -584,48 +602,40 @@ class Template(object):
         else:
             raise Error("{0} on line {1}: - {2}".format(msg, where, repr(thing)))
 
-    def _variable(self, what):
+    def _variable(self, what, allow_dots=True):
         """ Track a varialbe that is used. """
-        if not re.match(r"[_a-zA-Z][_a-zA-Z0-9]*$", what):
-            self._syntax_error("Not a valid name", what, self._line)
+        if allow_dots:
+            result = []
+            for part in what.split("."):
+                if not re.match(r"[_a-zA-Z][_a-zA-Z0-9]*$", part):
+                    self._syntax_error("Not a valid name", what, self._line)
+                result.append(part)
+            return tuple(result)
+        else:
+            if not re.match(r"[_a-zA-Z][_a-zA-Z0-9]*$", what):
+                self._syntax_error("Not a valid name", what, self._line)
+            return what
     
-    def render(self, context=None, result=None):
+    def render(self, renderer, context=None):
         """ Render the template. """
         env = self._env
         env.save_context()
         try:
             if context:
                 env._context.update(context)
-            return self._render_function(env, self, result)
+            for action in self._actions:
+                action.render(renderer)
         finally:
             env.restore_context()
 
-
-    def _parse_pipe(self, pipe):
-        """ Parse a pipe """
-        pipe = pipe.strip()
-
-        start = pipe.find("(")
-        if start == -1:
-            return (pipe, [])
-        
-        func = pipe[0:start]
-        end = pipe.rfind(")")
-        if end != len(pipe) - 1:
-            raise self._syntax_error("Don't understand pipe", pipe, self._line)
-
-        params = pipe[start + 1:end].split(",")
-
-        return (func, params)
-
-    def _include(self, filename, result):
+    def _include(self, filename, renderer):
         """ Include another template. """
         if self._filename is None:
             raise Error("Can't include a template if a filename isn't specified.")
 
         newfile = os.path.join(os.path.dirname(self._filename), *(filename.split("/")))
         t = self._env.load_file(newfile)
-        t.render(None, result)
+        t.render(renderer)
 
 
 
@@ -635,6 +645,11 @@ class Template(object):
 # TODO
 
 if __name__ == "__main__":
+    import sys
+    class OutputRenderer(Renderer):
+        def render(self, text):
+            sys.stdout.write(text)
+
     import argparse
 
     parser = argparse.ArgumentParser(description="Template Test")
@@ -644,32 +659,18 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    context = {
-        "first": lambda x: x[0],
-        "last": lambda x: x[-1],
-        "upper": lambda x: x.upper(),
-        "lower": lambda x: x.lower(),
-        "join": lambda x, y: y.join(x),
-        "split": lambda x, y: x.split(y),
-        "list": lambda x: list(),
-        "append": lambda x, y: x.append(y),
-        "insert": lambda x, y, z: x.insert(y, z),
-        "count": lambda x: len(x),
-        "range": lambda x: range(x),
-        "offset": lambda x, y: x[y],
-        "add": lambda x, y: x + y,
-        "sub": lambda x, y: x - y,
-        "util_add": lambda x, y: x + y
+    filters = {
     }
 
-    e = Environment(context)
+    e = Environment(None, filters)
     t = e.load_file(args.template)
     if args.code:
         print(t._code)
     else:
         import json
         data = json.loads(open(args.data).read())
-        print(t.render(data))
+        o = OutputRenderer()
+        t.render(o, data)
 
         
 
