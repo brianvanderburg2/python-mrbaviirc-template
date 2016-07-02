@@ -165,19 +165,18 @@ class TextNode(Node):
 class IfNode(Node):
     """ A node that manages if/elif/else. """
 
-    def __init__(self, template, var):
+    def __init__(self, template, expr):
         """ Initialize the if node. """
         Node.__init__(self, template)
-        self._var = var
+        self._expr = expr
         self._if = []
         self._else = []
 
     def render(self, renderer):
         """ Render the if node. """
-        env = self._env
         try:
-            result = env.get(self._var)
-        except _KEY_ERRORS:
+            result = self._expr.eval()
+        except (UnknownVariableError, UnknownFilterError):
             result = False
 
         if result:
@@ -191,30 +190,21 @@ class IfNode(Node):
 class ForNode(Node):
     """ A node for handling for loops. """
 
-    def __init__(self, template, var1, var2):
+    def __init__(self, template, var, expr):
         """ Initialize the for node. """
         Node.__init__(self, template)
-        self._var1 = var1
-        self._var2 = var2
+        self._var = var
+        self._expr = expr
         self._nodes = []
 
     def render(self, renderer):
         """ Render the for node. """
         env = self._env
-
         # Iterate over each value
-        try:
-            var2 = env.get(self._var2)
-        except _KEY_ERRORS:
-            raise UnknownVariableError(
-                ".".join(self._var2),
-                self._template._filename,
-                self._line
-            )
-
-        if var2:
-            for var1 in var2:
-                env.set(self._var1, var1)
+        values = self._expr.eval()
+        if values:
+            for var in values:
+                env.set(self._var, var)
                                     
                 # Execute each sub-node
                 for node in self._nodes:
@@ -224,35 +214,14 @@ class ForNode(Node):
 class VarNode(Node):
     """ A node to output some value. """
 
-    def __init__(self, template, var, filters):
+    def __init__(self, template, expr):
         """ Initialize the node. """
         Node.__init__(self, template)
-        self._var = var
-        self._filters = filters
+        self._expr = expr
 
     def render(self, renderer):
         """ Render the output. """
-        env = self._env
-        try:
-            var = env.get(self._var)
-        except _KEY_ERRORS:
-            raise UnknownVariableError(
-                ".".join(self._var),
-                self._template._filename,
-                self._line
-            )
-
-        for filter in self._filters:
-            try:
-                var = env.filter(var, filter)
-            except KeyError:
-                raise UnknownFilterError(
-                    filter,
-                    self._template._filename,
-                    self._line
-                )
-
-        renderer.render(str(var))
+        renderer.render(str(self._expr.eval()))
 
 
 class IncludeNode(Node):
@@ -294,22 +263,15 @@ class WithNode(Node):
 class AssignNode(Node):
     """ Set a variable to a subvariable. """
 
-    def __init__(self, template, var, var2):
+    def __init__(self, template, var, expr):
         """ Initialize. """
         Node.__init__(self, template)
         self._var = var
-        self._var2 = var2
+        self._expr = expr
 
     def render(self, renderer):
         """ Set the value. """
-        try:
-            self._env.set(self._var, self._env.get(self._var2))
-        except _KEY_ERROR:
-            raise UnknownVariableError(
-                ".".join(self._var2),
-                self._template._filename,
-                self._line
-            )
+        self._env.set(self._var, self._expr.eval())
 
 
 class SetNode(Node):
@@ -325,6 +287,82 @@ class SetNode(Node):
         """ Set or clear the value. """
         self._env.set(self._var, self._value)
 
+
+# Expresssions
+################################################################################
+
+class Expr(object):
+    """ Base for an expression object. """
+
+    def __init__(self, template):
+        """ Initialize the expression object. """
+        self._template = template
+        self._env = template._env
+        self._line = template._line
+
+    def eval(self):
+        """ Evaluate the expression object. """
+        raise NotImplementedError
+
+
+class ValueExpr(Expr):
+    """ An expression that represents a value. """
+
+    def __init__(self, template, value):
+        """ Initialize the value expression. """
+        Expr.__init__(self, template)
+        self._value = value
+
+    def eval(self):
+        """ Evaluate the expression. """
+        return self._value
+
+
+class FilterExpr(Expr):
+    """ An expression that represents a filter to call. """
+
+    def __init__(self, template, node, filter, nodes):
+        """ Initialize the filter expression. """
+        Expr.__init__(self, template)
+        self._node = node
+        self._filter = filter
+        self._nodes = nodes
+
+    def eval(self):
+        """ Evaluate the expression. """
+        value = self._node.eval()
+
+        params = []
+        for node in self._nodes:
+            params.append(node.eval())
+
+        try:
+            return self._env.filter(self._filter, value, *params)
+        except KeyError:
+            raise UnknownFilterError(
+                self._filter,
+                self._template._filename,
+                self._line
+            )
+
+class VarExpr(Expr):
+    """ An expression that represents a variable. """
+
+    def __init__(self, template, var):
+        """ Initialize the variable expression. """
+        Expr.__init__(self, template)
+        self._var = var
+
+    def eval(self):
+        """ Evaluate the expression. """
+        try:
+            return self._env.get(self._var)
+        except _KEY_ERRORS:
+            raise UnknownVariableError(
+                ".".join(self._var),
+                self._template._filename,
+                self._line
+            )
 
 # Environment and Template
 ################################################################################
@@ -384,9 +422,9 @@ class Environment(object):
         """ Set a value in the context. """
         self._context[var1] = var2
 
-    def filter(self, value, filter):
+    def filter(self, filter, value, *params):
         """ Filter a value. """
-        return self._filters[filter](value)
+        return self._filters[filter](value, *params)
 
 
 class Template(object):
@@ -497,15 +535,9 @@ class Template(object):
                 self._flush_buffer(pre, post)
 
                 # Determine filters if any
-                parts = token.split("|")
+                expr = self._prep_expr(token)
+                node = VarNode(self, expr)
 
-                var = self._variable(parts[0].strip())
-                filters = []
-                for part in parts[1:]:
-                    part = self._variable(part.strip(), False)
-                    filters.append(part)
-
-                node = VarNode(self, var, filters)
                 self._stack[-1].append(node)
 
             elif token.startswith("{%"):
@@ -518,12 +550,14 @@ class Template(object):
                 words = token.split()
 
                 if words[0] == "if":
-                    # if <variable>
-                    if len(words) != 2:
+                    # if <expr>
+                    if len(words) < 2:
                         self._syntax_error("Don't understand if", token, self._line)
                     self._ops_stack.append(["if", self._line])
 
-                    node = IfNode(self, self._variable(words[1]))
+                    expr = self._prep_expr("".join(words[1:]))
+                    node = IfNode(self, expr)
+                    
                     self._stack[-1].append(node)
                     self._stack.append(node._if)
 
@@ -543,15 +577,15 @@ class Template(object):
                     self._stack.append(node._else)
 
                 elif words[0] == "for":
-                    # for <variable> in <list>
-                    if len(words) != 4 or words[2] != "in":
+                    # for <variable> in <expr>
+                    if len(words) < 4 or words[2] != "in":
                         self._syntax_error("Don't understarnd for", token, self._line)
                     self._ops_stack.append(["for", self._line])
 
-                    var1 = self._variable(words[1], False)
-                    var2 = self._variable(words[3])
+                    var = self._variable(words[1], False)
+                    expr = self._prep_expr("".join(words[3:]))
+                    node = ForNode(self, var, expr)
 
-                    node = ForNode(self, var1, var2)
                     self._stack[-1].append(node)
                     self._stack.append(node._nodes)
 
@@ -577,18 +611,18 @@ class Template(object):
                 elif words[0] == "set":
                     # set var = var.subvar.subsubvar, set var
                     if len(words) == 2:
-                        self._variable(words[1], False)
-                        node = SetNode(self, words[1], True)
+                        var = self._variable(words[1], False)
+                        node = SetNode(self, var, True)
                         self._stack[-1].append(node)
 
-                    elif len(words) != 4 or words[2] != "in":
+                    elif len(words) < 4 or words[2] != "=":
                         self._syntax_error("Don't understand set", token, self._line)
 
                     else:
-                        self._variable(words[1], False)
-                        var = self._variable(words[3])
+                        var = self._variable(words[1], False)
+                        expr = self._prep_expr("".join(words[3:]))
+                        node = AssignNode(self, var, expr)
 
-                        node = AssignNode(self, words[1], var)
                         self._stack[-1].append(node)
 
                 elif words[0] == "unset":
@@ -596,8 +630,9 @@ class Template(object):
                     if len(words) != 2:
                         self._syntax_error("Don't understand unset", token, self._line)
 
-                    self._variable(words[1], False)
-                    node = SetNode(self, words[1], False)
+                    var = self._variable(words[1], False)
+                    node = SetNode(self, var, False)
+
                     self._stack[-1].append(node)
 
                 elif words[0].startswith("end"):
@@ -671,6 +706,64 @@ class Template(object):
 
         return (pre, post, token[start:end].strip())
 
+    def _prep_expr(self, string):
+        """ Prepare an expression string. """
+        
+        # Strip out whitespace
+        string = "".join(string.split())
+
+        return self._do_expr(string)
+
+    def _do_expr(self, string):
+        """ The real expression parsing is here. """
+
+        if len(string) == 0:
+            self._syntax_error("Expecting an expression", string, self._line)
+
+        elif "|" in string:
+            pipes = string.split("|")
+            expr = self._do_expr(pipes[0])
+            for pipe in pipes[1:]:
+                (filter, params) = self._parse_pipe(pipe)
+                self._variable(filter, False)
+
+                expr = FilterExpr(self, expr, filter, params)
+
+        elif self._is_int(string):
+            expr = ValueExpr(self, int(string))
+
+        else:
+            var = self._variable(string)
+            expr = VarExpr(self, var)
+
+        return expr
+
+    def _parse_pipe(self, pipe):
+        """ Parse a pipe for filters """
+
+        start = pipe.find("(")
+        if start == -1:
+            return (pipe, [])
+
+        func = pipe[0:start]
+        end = pipe.rfind(")")
+        if end != len(pipe) - 1:
+            self._syntax_error("Don't understand pipe", pipe, self._line)
+
+        params = []
+        for param in pipe[start + 1:end].split(","):
+            params.append(self._do_expr(param))
+
+        return (func, params)
+
+    def _is_int(self, string):
+        """ Return true if the string is an integer. """
+        try:
+            value = int(string)
+            return True
+        except ValueError:
+            return False
+
     def _syntax_error(self, msg, thing, where):
         """ Raise an error if something is wrong. """
 
@@ -733,6 +826,11 @@ if __name__ == "__main__":
         args = parser.parse_args()
 
         filters = {
+            "add": lambda x, y: x + y,
+            "subtract": lambda x, y: x - y,
+            "equal": lambda x, y: x == y,
+            "odd": lambda x: x % 2 == 1,
+            "even": lambda x: x % 2 == 0
         }
 
         e = Environment(None, filters)
@@ -743,7 +841,8 @@ if __name__ == "__main__":
             import json
             data = json.loads(open(args.data, "rU").read())
             o = StreamRenderer(sys.stdout)
-            t.render(o, data)
+            for i in range(100000):
+                t.render(o, data)
     except Error as e:
         print(e.message)
 
