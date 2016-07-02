@@ -50,9 +50,36 @@ try:
 except ImportError:
     pass
 
+# Errors
+################################################################################
+
 class Error(Exception):
     """ Base template engine error. """
     pass
+
+class TemplateError(Error):
+    """ An error at a specific location in atemplate file. """
+    MESSAGE_PREFIX = "Template Error"
+
+    def __init__(self, message, filename, line):
+        Error.__init__("{0}: {1} on {2}:{3}".format(
+            self.MESSAGE_PREFIX,
+            message,
+            filename if filename else "<string>",
+            line
+        ))
+
+class SyntaxError(TemplateError):
+    MESSAGE_PREFIX = "Syntax Error"
+
+class UnknownVariableError(TemplateError):
+    MESSAGE_PREFIX = "Unknown Variable Error"
+
+class UnknownFilterError(TemplateError):
+    MESSAGE_PREFIX = "Unknown Filter Error"
+    
+
+_KEY_ERRORS = (KeyError, ValueError, TypeError, AttributeError)
 
 # Renderers
 ################################################################################
@@ -69,16 +96,34 @@ class Renderer(object):
         raise NotImplementedError
 
 
-class Streamenderer(object):
+class StreamRenderer(Renderer):
     """ Render to a given stream. """
 
     def __init__(self, stream):
         """ Initialize the stream. """
+        Renderer.__init__(self)
         self._stream = stream
 
     def render(self, content):
         """ Render to the stream. """
         self._stream.write(content)
+
+
+class StringRenderer(Renderer):
+    """ Render to a string. """
+
+    def __init__(self):
+        """ Initialize the renderer. """
+        Renderer.__init__(self)
+        self._buffer = []
+
+    def render(self, content):
+        """ Render the content to the buffer. """
+        self._buffer.append(content)
+
+    def get(self):
+        """ Get the buffer. """
+        return "".join(self._buffer)
 
 
 # Nodes
@@ -90,9 +135,11 @@ class Node(object):
     def __init__(self, template):
         """ Initialize the node. """
         self._template = template
+        self._line = template._line
         self._env = template._env
 
     def render(self, renderer):
+        """ Render the node to a renderer. """
         raise NotImplementedError
 
 
@@ -117,16 +164,17 @@ class IfNode(Node):
         Node.__init__(self, template)
         self._var = var
         self._if = []
-        self._else = None
-
-    def add_else(self):
-        """ Add an else block to the if/elif/else blocks. """
         self._else = []
 
     def render(self, renderer):
         """ Render the if node. """
         env = self._env
-        if env.get(self._var):
+        try:
+            result = env.get(self._var)
+        except _KEY_ERRORS:
+            result = False
+
+        if result:
             for action in self._if:
                 action.render(renderer)
         elif self._else:
@@ -142,23 +190,29 @@ class ForNode(Node):
         Node.__init__(self, template)
         self._var1 = var1
         self._var2 = var2
-        self._actions = []
+        self._nodes = []
 
     def render(self, renderer):
         """ Render the for node. """
         env = self._env
 
         # Iterate over each value
-        var2 = env.get(self._var2)
-        if var2:
+        try:
+            var2 = env.get(self._var2)
+        except _KEY_ERRORS:
+            raise UnknownVariableError(
+                ".".join(self._var2),
+                self._template._filename,
+                self._line
+            )
 
+        if var2:
             for var1 in var2:
                 env.set(self._var1, var1)
                                     
                 # Execute each sub-node
-                for action in self._actions:
-                    action.render(renderer)
-
+                for node in self._nodes:
+                    node.render(renderer)
 
 
 class VarNode(Node):
@@ -173,10 +227,24 @@ class VarNode(Node):
     def render(self, renderer):
         """ Render the output. """
         env = self._env
-        var = env.get(self._var)
+        try:
+            var = env.get(self._var)
+        except _KEY_ERRORS:
+            raise UnknownVariableError(
+                ".".join(self._var),
+                self._template._filename,
+                self._line
+            )
 
         for filter in self._filters:
-            var = env.filter(var, filter)
+            try:
+                var = env.filter(var, filter)
+            except KeyError:
+                raise UnknownFilterError(
+                    filter,
+                    self._template._filename,
+                    self._line
+                )
 
         renderer.render(str(var))
 
@@ -191,7 +259,14 @@ class IncludeNode(Node):
 
     def render(self, renderer):
         """ Actually do the work of including the template. """
-        self._template._include(self._filename, renderer)
+        try:
+            self._template._include(self._filename, renderer)
+        except (IOError, OSError) as e:
+            raise TemplateError(
+                str(e),
+                self._template._filename,
+                self._line
+            )
 
 
 class WithNode(Node):
@@ -205,8 +280,8 @@ class WithNode(Node):
     def render(self, renderer):
         """ Render. """
         self._env.save_context()
-        for i in self._nodes:
-            i.render(renderer)
+        for node in self._nodes:
+            node.render(renderer)
         self._env.restore_context()
 
 
@@ -221,7 +296,14 @@ class AssignNode(Node):
 
     def render(self, renderer):
         """ Set the value. """
-        self._env.set(self._var, self._env.get(self._var2))
+        try:
+            self._env.set(self._var, self._env.get(self._var2))
+        except _KEY_ERROR:
+            raise UnknownVariableError(
+                ".".join(self._var2),
+                self._template._filename,
+                self._line
+            )
 
 
 class SetNode(Node):
@@ -281,22 +363,16 @@ class Environment(object):
 
     def get(self, var):
         """ Evaluate dotted expressions. """
-        try:
-            value = self._context[var[0]]
+        value = self._context[var[0]]
+        if callable(value):
+            value = value()
+
+        for dot in var[1:]:
+            value = value[dot]
             if callable(value):
                 value = value()
-
-            for dot in var[1:]:
-                try:
-                    value = value[dot]
-                except (KeyError, IndexError, TypeError):
-                    return None
-                if callable(value):
-                    value = value()
-                    
-            return value
-        except (KeyError, IndexError, TypeError, AttributeError):
-            return None
+                
+        return value
 
     def set(self, var1, var2):
         """ Set a value in the context. """
@@ -304,10 +380,7 @@ class Environment(object):
 
     def filter(self, value, filter):
         """ Filter a value. """
-        if filter in self._filters:
-            return self._filters[filter](value)
-        else:
-            return value
+        return self._filters[filter](value)
 
 
 class Template(object):
@@ -364,8 +437,8 @@ class Template(object):
 
         # Stack and line number
         self._ops_stack = []
-        self._actions = []
-        self._stack = [self._actions]
+        self._nodes = []
+        self._stack = [self._nodes]
         self._line = 0
 
         # Defines
@@ -461,8 +534,6 @@ class Template(object):
 
                     self._stack.pop()
                     node = self._stack[-1][-1]
-
-                    node.add_else()
                     self._stack.append(node._else)
 
                 elif words[0] == "for":
@@ -476,7 +547,7 @@ class Template(object):
 
                     node = ForNode(self, var1, var2)
                     self._stack[-1].append(node)
-                    self._stack.append(node._actions)
+                    self._stack.append(node._nodes)
 
                 elif words[0] == "include":
                     # include <filename>
@@ -597,10 +668,11 @@ class Template(object):
     def _syntax_error(self, msg, thing, where):
         """ Raise an error if something is wrong. """
 
-        if self._filename:
-            raise Error("{0} on line {1} file {2}: - {3}".format(msg, where, self._filename, repr(thing)))
-        else:
-            raise Error("{0} on line {1}: - {2}".format(msg, where, repr(thing)))
+        raise SyntaxError(
+            "{0}: {1}".format(msg, thing),
+            self._filename,
+            where
+        )
 
     def _variable(self, what, allow_dots=True):
         """ Track a varialbe that is used. """
@@ -623,8 +695,8 @@ class Template(object):
         try:
             if context:
                 env._context.update(context)
-            for action in self._actions:
-                action.render(renderer)
+            for node in self._nodes:
+                node.render(renderer)
         finally:
             env.restore_context()
 
@@ -642,14 +714,8 @@ class Template(object):
 # Test
 ################################################################################
 
-# TODO
-
 if __name__ == "__main__":
     import sys
-    class OutputRenderer(Renderer):
-        def render(self, text):
-            sys.stdout.write(text)
-
     import argparse
 
     parser = argparse.ArgumentParser(description="Template Test")
@@ -669,7 +735,7 @@ if __name__ == "__main__":
     else:
         import json
         data = json.loads(open(args.data).read())
-        o = OutputRenderer()
+        o = StreamRenderer(sys.stdout)
         t.render(o, data)
 
         
