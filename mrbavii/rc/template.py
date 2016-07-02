@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-#
 # \file
 # \author Brian Allen Vanderburg II
 # \copyright MIT license
@@ -138,10 +136,10 @@ class StringRenderer(Renderer):
 class Node(object):
     """ A node is a part of the expression that is rendered. """
 
-    def __init__(self, template):
+    def __init__(self, template, line):
         """ Initialize the node. """
         self._template = template
-        self._line = template._line
+        self._line = line
         self._env = template._env
 
     def render(self, renderer):
@@ -152,9 +150,9 @@ class Node(object):
 class TextNode(Node):
     """ A node that represents a raw block of text. """
 
-    def __init__(self, template, text):
+    def __init__(self, template, line, text):
         """ Initialize a text node. """
-        Node.__init__(self, template)
+        Node.__init__(self, template, line)
         self._text = text
 
     def render(self, renderer):
@@ -165,9 +163,9 @@ class TextNode(Node):
 class IfNode(Node):
     """ A node that manages if/elif/else. """
 
-    def __init__(self, template, expr):
+    def __init__(self, template, line, expr):
         """ Initialize the if node. """
-        Node.__init__(self, template)
+        Node.__init__(self, template, line)
         self._expr = expr
         self._if = []
         self._else = []
@@ -190,9 +188,9 @@ class IfNode(Node):
 class ForNode(Node):
     """ A node for handling for loops. """
 
-    def __init__(self, template, var, expr):
+    def __init__(self, template, line, var, expr):
         """ Initialize the for node. """
-        Node.__init__(self, template)
+        Node.__init__(self, template, line)
         self._var = var
         self._expr = expr
         self._nodes = []
@@ -200,6 +198,7 @@ class ForNode(Node):
     def render(self, renderer):
         """ Render the for node. """
         env = self._env
+
         # Iterate over each value
         values = self._expr.eval()
         if values:
@@ -214,9 +213,9 @@ class ForNode(Node):
 class VarNode(Node):
     """ A node to output some value. """
 
-    def __init__(self, template, expr):
+    def __init__(self, template, line, expr):
         """ Initialize the node. """
-        Node.__init__(self, template)
+        Node.__init__(self, template, line)
         self._expr = expr
 
     def render(self, renderer):
@@ -227,9 +226,9 @@ class VarNode(Node):
 class IncludeNode(Node):
     """ A node to include another template. """
 
-    def __init__(self, template, filename):
+    def __init__(self, template, line, filename):
         """ Initialize the include node. """
-        Node.__init__(self, template)
+        Node.__init__(self, template, line)
         self._filename = filename
 
     def render(self, renderer):
@@ -247,9 +246,9 @@ class IncludeNode(Node):
 class WithNode(Node):
     """ Save the state of the context. """
 
-    def __init__(self, template):
+    def __init__(self, template, line):
         """ Initialize. """
-        Node.__init__(self, template)
+        Node.__init__(self, template, line)
         self._nodes = []
 
     def render(self, renderer):
@@ -263,9 +262,9 @@ class WithNode(Node):
 class AssignNode(Node):
     """ Set a variable to a subvariable. """
 
-    def __init__(self, template, var, expr):
+    def __init__(self, template, line, var, expr):
         """ Initialize. """
-        Node.__init__(self, template)
+        Node.__init__(self, template, line)
         self._var = var
         self._expr = expr
 
@@ -277,9 +276,9 @@ class AssignNode(Node):
 class SetNode(Node):
     """ Set or clear a flag. """
 
-    def __init__(self, template, var, value):
+    def __init__(self, template, line, var, value):
         """ Initialize. """
-        Node.__init__(self, template)
+        Node.__init__(self, template, line)
         self._var = var
         self._value = bool(value)
 
@@ -294,11 +293,11 @@ class SetNode(Node):
 class Expr(object):
     """ Base for an expression object. """
 
-    def __init__(self, template):
+    def __init__(self, template, line):
         """ Initialize the expression object. """
         self._template = template
         self._env = template._env
-        self._line = template._line
+        self._line = line
 
     def eval(self):
         """ Evaluate the expression object. """
@@ -308,9 +307,9 @@ class Expr(object):
 class ValueExpr(Expr):
     """ An expression that represents a value. """
 
-    def __init__(self, template, value):
+    def __init__(self, template, line, value):
         """ Initialize the value expression. """
-        Expr.__init__(self, template)
+        Expr.__init__(self, template, line)
         self._value = value
 
     def eval(self):
@@ -321,9 +320,9 @@ class ValueExpr(Expr):
 class FilterExpr(Expr):
     """ An expression that represents a filter to call. """
 
-    def __init__(self, template, node, filter, nodes):
+    def __init__(self, template, line, node, filter, nodes):
         """ Initialize the filter expression. """
-        Expr.__init__(self, template)
+        Expr.__init__(self, template, line)
         self._node = node
         self._filter = filter
         self._nodes = nodes
@@ -348,9 +347,9 @@ class FilterExpr(Expr):
 class VarExpr(Expr):
     """ An expression that represents a variable. """
 
-    def __init__(self, template, var):
+    def __init__(self, template, line, var):
         """ Initialize the variable expression. """
-        Expr.__init__(self, template)
+        Expr.__init__(self, template, line)
         self._var = var
 
     def eval(self):
@@ -363,6 +362,322 @@ class VarExpr(Expr):
                 self._template._filename,
                 self._line
             )
+
+# Parser
+################################################################################
+
+class TemplateParser(object):
+    """ A base tokenizer. """
+
+    def __init__(self, template, text):
+        """ Initialize the parser. """
+
+        self._template = template
+        self._text = text
+        
+        # Stack and line number
+        self._ops_stack = []
+        self._nodes = []
+        self._stack = [self._nodes]
+        self._line = 0
+
+        # Buffer for plain text segments
+        self._buffer = []
+        self._post_strip = False
+
+    def parse(self):
+        """ Parse the template and return the node list. """
+        
+        # Split tokens
+        for linetext in self._text.splitlines():
+            if self._line > 0:
+                self._buffer.append("\n")
+            self._line += 1
+            self._parse_line(linetext)
+
+        if self._ops_stack:
+            self._syntax_error(
+                "Unmatched action tag", 
+                self._ops_stack[-1][0],
+                self._ops_stack[-1][1]
+            )
+
+        self._flush_buffer()
+
+        return self._nodes
+    
+    def _parse_line(self, text):
+        """ Parse from a single line. """
+
+        for token in re.split(r"(?s)({{.*?}}|{%.*?%}|{#.*?#})", text):
+
+            if token.startswith("{#"):
+                # Just a comment
+                if not token.endswith("#}"):
+                    self._syntax_error("Invalid token syntax", token, self._line)
+                (pre, post, token) = self._read_token(token)
+                self._flush_buffer(pre, post)
+
+            elif token.startswith("{{"):
+                # Output some value
+                if not token.endswith("}}"):
+                    self._syntax_error("Invalid token syntax", token, self._line)
+                (pre, post, token) = self._read_token(token)
+                self._flush_buffer(pre, post)
+
+                # Determine filters if any
+                expr = self._prep_expr(token)
+                node = VarNode(self._template, self._line, expr)
+
+                self._stack[-1].append(node)
+
+            elif token.startswith("{%"):
+                # An action
+                if not token.endswith("%}"):
+                    self._syntax_error("Invalid token syntax", token, self._line)
+                (pre, post, token) = self._read_token(token)
+                self._flush_buffer(pre, post)
+                
+                words = token.split()
+
+                if words[0] == "if":
+                    # if <expr>
+                    if len(words) < 2:
+                        self._syntax_error("Don't understand if", token, self._line)
+                    self._ops_stack.append(["if", self._line])
+
+                    expr = self._prep_expr("".join(words[1:]))
+                    node = IfNode(self._template, self._line, expr)
+                    
+                    self._stack[-1].append(node)
+                    self._stack.append(node._if)
+
+                elif words[0] == "else":
+                    # else
+                    if len(words) != 1:
+                        self._syntax_error("Don't understand else", token, self._line)
+
+                    if not self._ops_stack:
+                        self._syntax_error("Mismatched else", token, self._line)
+                    start_what = self._ops_stack[-1]
+                    if start_what[0] != "if":
+                        self._syntax_error("Mismatched else", token, self._line)
+
+                    self._stack.pop()
+                    node = self._stack[-1][-1]
+                    self._stack.append(node._else)
+
+                elif words[0] == "for":
+                    # for <variable> in <expr>
+                    if len(words) < 4 or words[2] != "in":
+                        self._syntax_error("Don't understarnd for", token, self._line)
+                    self._ops_stack.append(["for", self._line])
+
+                    var = self._variable(words[1], False)
+                    expr = self._prep_expr("".join(words[3:]))
+                    node = ForNode(self._template, self._line, var, expr)
+
+                    self._stack[-1].append(node)
+                    self._stack.append(node._nodes)
+
+                elif words[0] == "include":
+                    # include <filename>
+                    if len(words) != 2:
+                        self._syntax_error("Don't understand include", token, self._line)
+
+                    filename = words[1]
+                    node = IncludeNode(self._template, self._line, filename)
+                    self._stack[-1].append(node)
+
+                elif words[0] == "with":
+                    # with
+                    if len(words) != 1:
+                        self._syntax_error("Don't understand with", token, self._line)
+
+                    self._ops_stack.append(["with", self._line])
+                    node = WithNode(self._template, self._line)
+                    self._stack[-1].append(node)
+                    self._stack.append(node._nodes)
+
+                elif words[0] == "set":
+                    # set var = var.subvar.subsubvar, set var
+                    if len(words) == 2:
+                        var = self._variable(words[1], False)
+                        node = SetNode(self._template, self._line, var, True)
+                        self._stack[-1].append(node)
+
+                    elif len(words) < 4 or words[2] != "=":
+                        self._syntax_error("Don't understand set", token, self._line)
+
+                    else:
+                        var = self._variable(words[1], False)
+                        expr = self._prep_expr("".join(words[3:]))
+                        node = AssignNode(self._template, self._line, var, expr)
+
+                        self._stack[-1].append(node)
+
+                elif words[0] == "unset":
+                    # unset <var>
+                    if len(words) != 2:
+                        self._syntax_error("Don't understand unset", token, self._line)
+
+                    var = self._variable(words[1], False)
+                    node = SetNode(self._template, self._line, var, False)
+
+                    self._stack[-1].append(node)
+
+                elif words[0].startswith("end"):
+                    if len(words) != 1:
+                        self._syntax_error("Don't understand end", token, self._line)
+
+                    end_what = words[0][3:]
+                    if not self._ops_stack:
+                        self._syntax_error("Too many ends", token, self._line)
+                    start_what = self._ops_stack.pop()
+                    if start_what[0] != end_what:
+                        self._syntax_error("Mismatched end tag", end_what, self._line)
+
+                    # Next nodes go to the previous level
+                    self._stack.pop()
+
+                else:
+                    self._syntax_error("Don't understand tag", words[0], self._line)
+
+            else:
+                #Literal content
+                if token:
+                    self._buffer.append(token)
+    
+    def _flush_buffer(self, pre=False, post=False):
+        """ Flush the buffer to output. """
+        if self._buffer:
+            expr = "".join(self._buffer)
+
+            if self._post_strip:
+                # If the previous tag had a post-strip {{ ... -}}
+                # trim the start of this buffer up to/including a new line
+                first_nl = expr.find("\n")
+                if first_nl == -1:
+                    expr = expr.lstrip()
+                else:
+                    expr = expr[:first_nl + 1].lstrip() + expr[first_nl + 1:]
+
+            if pre:
+                # If the current tag has a pre-strip {{- ... }}
+                # trim the end of the buffer up to/including a new line
+                last_nl = expr.find("\n")
+                if last_nl == -1:
+                    expr = expr.rstrip()
+                else:
+                    expr = expr[:last_nl] + expr[last_nl:].rstrip()
+            
+            if expr:
+                node = TextNode(self._template, self._line, expr)
+                self._stack[-1].append(node)
+
+        self._buffer = []
+        self._post_strip = post # Store this tag's post-strip for the next flush
+
+    def _read_token(self, token):
+        """ Read a token and whitepsace control. """
+
+        if token[2:3] == "-":
+            pre = True
+            start = 3
+        else:
+            pre = False
+            start = 2
+
+        if token[-3:-2] == "-":
+            post = True
+            end = -3
+        else:
+            post = False
+            end = -2
+
+        return (pre, post, token[start:end].strip())
+    
+    def _prep_expr(self, text):
+        """ Prepare an expression text. """
+        
+        # Strip out whitespace
+        text = "".join(text.split())
+
+        return self._do_expr(text)
+
+    def _do_expr(self, text):
+        """ The real expression parsing is here. """
+
+        if len(text) == 0:
+            self._syntax_error("Expecting an expression", text, self._line)
+
+        elif "|" in text:
+            pipes = text.split("|")
+            expr = self._do_expr(pipes[0])
+            for pipe in pipes[1:]:
+                (filter, params) = self._parse_pipe(pipe)
+                self._variable(filter, False)
+
+                expr = FilterExpr(self._template, self._line, expr, filter, params)
+
+        elif self._is_int(text):
+            expr = ValueExpr(self._template, self._line, int(text))
+
+        else:
+            var = self._variable(text)
+            expr = VarExpr(self._template, self._line, var)
+
+        return expr
+
+    def _parse_pipe(self, text):
+        """ Parse a text for filters """
+
+        start = text.find("(")
+        if start == -1:
+            return (text, [])
+
+        func = text[0:start]
+        end = text.rfind(")")
+        if end != len(text) - 1:
+            self._syntax_error("Don't understand pipe", text, self._line)
+
+        params = []
+        for param in text[start + 1:end].split(","):
+            params.append(self._do_expr(param))
+
+        return (func, params)
+
+    def _is_int(self, text):
+        """ Return true if the string is an integer. """
+        try:
+            value = int(text)
+            return True
+        except ValueError:
+            return False
+
+    def _syntax_error(self, msg, thing, where):
+        """ Raise an error if something is wrong. """
+
+        raise SyntaxError(
+            "{0}: {1}".format(msg, thing),
+            self._template._filename,
+            where
+        )
+
+    def _variable(self, what, allow_dots=True):
+        """ Check that a variable is valid form. """
+        if allow_dots:
+            result = []
+            for part in what.split("."):
+                if not re.match(r"[_a-zA-Z][_a-zA-Z0-9]*$", part):
+                    self._syntax_error("Not a valid name", what, self._line)
+                result.append(part)
+            return tuple(result)
+        else:
+            if not re.match(r"[_a-zA-Z][_a-zA-Z0-9]*$", what):
+                self._syntax_error("Not a valid name", what, self._line)
+            return what
+
 
 # Environment and Template
 ################################################################################
@@ -465,328 +780,22 @@ class Template(object):
         {%- ... %}
     """
 
-    def __init__(self, env, string=None, filename=None):
+    def __init__(self, env, text=None, filename=None):
         """ Initialize a template with context variables. """
         
         # Initialize
+        self._env = env
         self._filename = filename
 
-        if string is None:
+        if text is None:
             if self._filename is None:
                 raise Error("Filename must be specified if text is not.")
-            string = open(self._filename, "rU").read()
+            text = open(self._filename, "rU").read()
 
-        # Remember the environment
-        self._env = env
+        # Parse the template
+        parser = TemplateParser(self, text)
+        self._nodes = parser.parse()
 
-        # Stack and line number
-        self._ops_stack = []
-        self._nodes = []
-        self._stack = [self._nodes]
-        self._line = 0
-
-        # Defines
-        self._defines = {}
-
-        # Buffer for plain text segments
-        self._buffer = []
-        self._post_strip = False
-
-        
-        self._build(string)
-
-    def _build(self, string):
-        """ Build the nodes for the template. """
-
-        # Split tokens
-        for linetext in string.splitlines():
-            if self._line > 0:
-                self._buffer.append("\n")
-            self._line += 1
-            self._build_line(linetext)
-
-        if self._ops_stack:
-            self._syntax_error(
-                "Unmatched action tag", 
-                self._ops_stack[-1][0],
-                self._ops_stack[-1][1]
-            )
-
-        self._flush_buffer()
-
-    def _build_line(self, string):
-        """ Build from a single line. """
-
-        for token in re.split(r"(?s)({{.*?}}|{%.*?%}|{#.*?#})", string):
-
-            if token.startswith("{#"):
-                # Just a comment
-                if not token.endswith("#}"):
-                    self._syntax_error("Invalid token syntax", token, self._line)
-                (pre, post, token) = self._read_token(token)
-                self._flush_buffer(pre, post)
-                continue
-
-            elif token.startswith("{{"):
-                # Output some value
-                if not token.endswith("}}"):
-                    self._syntax_error("Invalid token syntax", token, self._line)
-                (pre, post, token) = self._read_token(token)
-                self._flush_buffer(pre, post)
-
-                # Determine filters if any
-                expr = self._prep_expr(token)
-                node = VarNode(self, expr)
-
-                self._stack[-1].append(node)
-
-            elif token.startswith("{%"):
-                # An action
-                if not token.endswith("%}"):
-                    self._syntax_error("Invalid token syntax", token, self._line)
-                (pre, post, token) = self._read_token(token)
-                self._flush_buffer(pre, post)
-                
-                words = token.split()
-
-                if words[0] == "if":
-                    # if <expr>
-                    if len(words) < 2:
-                        self._syntax_error("Don't understand if", token, self._line)
-                    self._ops_stack.append(["if", self._line])
-
-                    expr = self._prep_expr("".join(words[1:]))
-                    node = IfNode(self, expr)
-                    
-                    self._stack[-1].append(node)
-                    self._stack.append(node._if)
-
-                elif words[0] == "else":
-                    # else
-                    if len(words) != 1:
-                        self._syntax_error("Don't understand else", token, self._line)
-
-                    if not self._ops_stack:
-                        self._syntax_error("Mismatched else", token, self._line)
-                    start_what = self._ops_stack[-1]
-                    if start_what[0] != "if":
-                        self._syntax_error("Mismatched else", token, self._line)
-
-                    self._stack.pop()
-                    node = self._stack[-1][-1]
-                    self._stack.append(node._else)
-
-                elif words[0] == "for":
-                    # for <variable> in <expr>
-                    if len(words) < 4 or words[2] != "in":
-                        self._syntax_error("Don't understarnd for", token, self._line)
-                    self._ops_stack.append(["for", self._line])
-
-                    var = self._variable(words[1], False)
-                    expr = self._prep_expr("".join(words[3:]))
-                    node = ForNode(self, var, expr)
-
-                    self._stack[-1].append(node)
-                    self._stack.append(node._nodes)
-
-                elif words[0] == "include":
-                    # include <filename>
-                    if len(words) != 2:
-                        self._syntax_error("Don't understand include", token, self._line)
-
-                    filename = words[1]
-                    node = IncludeNode(self, filename)
-                    self._stack[-1].append(node)
-
-                elif words[0] == "with":
-                    # with
-                    if len(words) != 1:
-                        self._syntax_error("Don't understand with", token, self._line)
-
-                    self._ops_stack.append(["with", self._line])
-                    node = WithNode(self)
-                    self._stack[-1].append(node)
-                    self._stack.append(node._nodes)
-
-                elif words[0] == "set":
-                    # set var = var.subvar.subsubvar, set var
-                    if len(words) == 2:
-                        var = self._variable(words[1], False)
-                        node = SetNode(self, var, True)
-                        self._stack[-1].append(node)
-
-                    elif len(words) < 4 or words[2] != "=":
-                        self._syntax_error("Don't understand set", token, self._line)
-
-                    else:
-                        var = self._variable(words[1], False)
-                        expr = self._prep_expr("".join(words[3:]))
-                        node = AssignNode(self, var, expr)
-
-                        self._stack[-1].append(node)
-
-                elif words[0] == "unset":
-                    # unset <var>
-                    if len(words) != 2:
-                        self._syntax_error("Don't understand unset", token, self._line)
-
-                    var = self._variable(words[1], False)
-                    node = SetNode(self, var, False)
-
-                    self._stack[-1].append(node)
-
-                elif words[0].startswith("end"):
-                    if len(words) != 1:
-                        self._syntax_error("Don't understand end", token, self._line)
-
-                    end_what = words[0][3:]
-                    if not self._ops_stack:
-                        self._syntax_error("Too many ends", token, self._line)
-                    start_what = self._ops_stack.pop()
-                    if start_what[0] != end_what:
-                        self._syntax_error("Mismatched end tag", end_what, self._line)
-
-                    # Next nodes go to the previous level
-                    self._stack.pop()
-
-                else:
-                    self._syntax_error("Don't understand tag", words[0], self._line)
-
-            else:
-                #Literal content
-                if token:
-                    self._buffer.append(token)
-
-    def _flush_buffer(self, pre=False, post=False):
-        """ Flush the buffer to output. """
-        if self._buffer:
-            expr = "".join(self._buffer)
-
-            if self._post_strip:
-                # If the previous tag had a post-strip {{ ... -}}
-                # trim the start of this buffer up to/including a new line
-                first_nl = expr.find("\n")
-                if first_nl == -1:
-                    expr = expr.lstrip()
-                else:
-                    expr = expr[:first_nl + 1].lstrip() + expr[first_nl + 1:]
-
-            if pre:
-                # If the current tag has a pre-strip {{- ... }}
-                # trim the end of the buffer up to/including a new line
-                last_nl = expr.find("\n")
-                if last_nl == -1:
-                    expr = expr.rstrip()
-                else:
-                    expr = expr[:last_nl] + expr[last_nl:].rstrip()
-            
-            if expr:
-                node = TextNode(self, expr)
-                self._stack[-1].append(node)
-
-        self._buffer = []
-        self._post_strip = post # Store this tag's post-strip for the next flush
-
-    def _read_token(self, token):
-        """ Read a token and whitepsace control. """
-
-        if token[2:3] == "-":
-            pre = True
-            start = 3
-        else:
-            pre = False
-            start = 2
-
-        if token[-3:-2] == "-":
-            post = True
-            end = -3
-        else:
-            post = False
-            end = -2
-
-        return (pre, post, token[start:end].strip())
-
-    def _prep_expr(self, string):
-        """ Prepare an expression string. """
-        
-        # Strip out whitespace
-        string = "".join(string.split())
-
-        return self._do_expr(string)
-
-    def _do_expr(self, string):
-        """ The real expression parsing is here. """
-
-        if len(string) == 0:
-            self._syntax_error("Expecting an expression", string, self._line)
-
-        elif "|" in string:
-            pipes = string.split("|")
-            expr = self._do_expr(pipes[0])
-            for pipe in pipes[1:]:
-                (filter, params) = self._parse_pipe(pipe)
-                self._variable(filter, False)
-
-                expr = FilterExpr(self, expr, filter, params)
-
-        elif self._is_int(string):
-            expr = ValueExpr(self, int(string))
-
-        else:
-            var = self._variable(string)
-            expr = VarExpr(self, var)
-
-        return expr
-
-    def _parse_pipe(self, pipe):
-        """ Parse a pipe for filters """
-
-        start = pipe.find("(")
-        if start == -1:
-            return (pipe, [])
-
-        func = pipe[0:start]
-        end = pipe.rfind(")")
-        if end != len(pipe) - 1:
-            self._syntax_error("Don't understand pipe", pipe, self._line)
-
-        params = []
-        for param in pipe[start + 1:end].split(","):
-            params.append(self._do_expr(param))
-
-        return (func, params)
-
-    def _is_int(self, string):
-        """ Return true if the string is an integer. """
-        try:
-            value = int(string)
-            return True
-        except ValueError:
-            return False
-
-    def _syntax_error(self, msg, thing, where):
-        """ Raise an error if something is wrong. """
-
-        raise SyntaxError(
-            "{0}: {1}".format(msg, thing),
-            self._filename,
-            where
-        )
-
-    def _variable(self, what, allow_dots=True):
-        """ Track a varialbe that is used. """
-        if allow_dots:
-            result = []
-            for part in what.split("."):
-                if not re.match(r"[_a-zA-Z][_a-zA-Z0-9]*$", part):
-                    self._syntax_error("Not a valid name", what, self._line)
-                result.append(part)
-            return tuple(result)
-        else:
-            if not re.match(r"[_a-zA-Z][_a-zA-Z0-9]*$", what):
-                self._syntax_error("Not a valid name", what, self._line)
-            return what
-    
     def render(self, renderer, context=None):
         """ Render the template. """
         env = self._env
@@ -817,9 +826,11 @@ if __name__ == "__main__":
     try:
         import sys
         import argparse
+        
+        import json
 
         parser = argparse.ArgumentParser(description="Template Test")
-        parser.add_argument("-c", dest="code", action="store_true", default=False, help="Output the generated code")
+        parser.add_argument("-c", dest="count", default=1, help="Render the template this many times")
         parser.add_argument("template", help="Location of the template")
         parser.add_argument("data", nargs="?", help="Location of the data json")
 
@@ -835,14 +846,13 @@ if __name__ == "__main__":
 
         e = Environment(None, filters)
         t = e.load_file(args.template)
-        if args.code:
-            print(t._code)
-        else:
-            import json
-            data = json.loads(open(args.data, "rU").read())
-            o = StreamRenderer(sys.stdout)
-            for i in range(100000):
-                t.render(o, data)
+
+        data = json.loads(open(args.data, "rU").read())
+        o = StreamRenderer(sys.stdout)
+
+        for i in range(int(args.count)):
+            data["cycle"] = i + 1
+            t.render(o, data)
     except Error as e:
         print(e.message)
 
