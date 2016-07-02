@@ -55,27 +55,33 @@ except ImportError:
 
 class Error(Exception):
     """ Base template engine error. """
-    pass
+    def __init__(self, message):
+        self.message = message
 
 class TemplateError(Error):
     """ An error at a specific location in atemplate file. """
     MESSAGE_PREFIX = "Template Error"
 
     def __init__(self, message, filename, line):
-        Error.__init__("{0}: {1} on {2}:{3}".format(
+        Error.__init__(self, "{0}: {1} on {2}:{3}".format(
             self.MESSAGE_PREFIX,
             message,
             filename if filename else "<string>",
             line
         ))
+        self.filename = filename
+        self.line = line
 
 class SyntaxError(TemplateError):
+    """ Represent a syntax error in the template. """
     MESSAGE_PREFIX = "Syntax Error"
 
 class UnknownVariableError(TemplateError):
+    """ Represent an unknown variable access. """
     MESSAGE_PREFIX = "Unknown Variable Error"
 
 class UnknownFilterError(TemplateError):
+    """ Represent an unknown filter access. """
     MESSAGE_PREFIX = "Unknown Filter Error"
     
 
@@ -493,10 +499,10 @@ class Template(object):
                 # Determine filters if any
                 parts = token.split("|")
 
-                var = self._variable(parts[0])
+                var = self._variable(parts[0].strip())
                 filters = []
                 for part in parts[1:]:
-                    self._variables(part, False)
+                    part = self._variable(part.strip(), False)
                     filters.append(part)
 
                 node = VarNode(self, var, filters)
@@ -715,28 +721,31 @@ class Template(object):
 ################################################################################
 
 if __name__ == "__main__":
-    import sys
-    import argparse
+    try:
+        import sys
+        import argparse
 
-    parser = argparse.ArgumentParser(description="Template Test")
-    parser.add_argument("-c", dest="code", action="store_true", default=False, help="Output the generated code")
-    parser.add_argument("template", help="Location of the template")
-    parser.add_argument("data", nargs="?", help="Location of the data json")
+        parser = argparse.ArgumentParser(description="Template Test")
+        parser.add_argument("-c", dest="code", action="store_true", default=False, help="Output the generated code")
+        parser.add_argument("template", help="Location of the template")
+        parser.add_argument("data", nargs="?", help="Location of the data json")
 
-    args = parser.parse_args()
+        args = parser.parse_args()
 
-    filters = {
-    }
+        filters = {
+        }
 
-    e = Environment(None, filters)
-    t = e.load_file(args.template)
-    if args.code:
-        print(t._code)
-    else:
-        import json
-        data = json.loads(open(args.data).read())
-        o = StreamRenderer(sys.stdout)
-        t.render(o, data)
+        e = Environment(None, filters)
+        t = e.load_file(args.template)
+        if args.code:
+            print(t._code)
+        else:
+            import json
+            data = json.loads(open(args.data, "rU").read())
+            o = StreamRenderer(sys.stdout)
+            t.render(o, data)
+    except Error as e:
+        print(e.message)
 
         
 
