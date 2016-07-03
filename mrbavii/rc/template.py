@@ -708,9 +708,9 @@ class Environment(object):
 
         return self._cache[abspath]
 
-    def load_string(self, string):
+    def load_text(self, text):
         """ Load a template from a string. """
-        return Template(self, string=string)
+        return Template(self, text=text)
 
     def save_context(self):
         """ Save the current context. """
