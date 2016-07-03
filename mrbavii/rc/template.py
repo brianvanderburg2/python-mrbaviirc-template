@@ -379,7 +379,7 @@ class TemplateParser(object):
         self._ops_stack = []
         self._nodes = []
         self._stack = [self._nodes]
-        self._line = 0
+        self._line = 1
 
         # Buffer for plain text segments
         self._buffer = []
@@ -388,12 +388,8 @@ class TemplateParser(object):
     def parse(self):
         """ Parse the template and return the node list. """
         
-        # Split tokens
-        for linetext in self._text.splitlines():
-            if self._line > 0:
-                self._buffer.append("\n")
-            self._line += 1
-            self._parse_line(linetext)
+        self._parse_text(self._text)
+        self._flush_buffer()
 
         if self._ops_stack:
             self._syntax_error(
@@ -402,14 +398,14 @@ class TemplateParser(object):
                 self._ops_stack[-1][1]
             )
 
-        self._flush_buffer()
-
         return self._nodes
     
-    def _parse_line(self, text):
-        """ Parse from a single line. """
+    def _parse_text(self, text):
+        """ Parse the template from the text and build the node list. """
 
         for token in re.split(r"(?s)({{.*?}}|{%.*?%}|{#.*?#})", text):
+            # How many new lines
+            line_count = token.count("\n")
 
             if token.startswith("{#"):
                 # Just a comment
@@ -425,9 +421,13 @@ class TemplateParser(object):
                 (pre, post, token) = self._read_token(token)
                 self._flush_buffer(pre, post)
 
-                # Determine filters if any
-                expr = self._prep_expr(token)
-                node = VarNode(self._template, self._line, expr)
+                if token in ("{{", "{#", "{%"):
+                    # Allow for literal tags.
+                    node = TextNode(self._template, self._line,token)
+                else:
+                    # Create the expression node
+                    expr = self._prep_expr(token)
+                    node = VarNode(self._template, self._line, expr)
 
                 self._stack[-1].append(node)
 
@@ -547,7 +547,11 @@ class TemplateParser(object):
                 #Literal content
                 if token:
                     self._buffer.append(token)
-    
+
+            # Increase line count after processing
+            self._line += line_count
+
+
     def _flush_buffer(self, pre=False, post=False):
         """ Flush the buffer to output. """
         if self._buffer:
