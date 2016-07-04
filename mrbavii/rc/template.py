@@ -399,11 +399,68 @@ class TemplateParser(object):
             )
 
         return self._nodes
-    
+
+    def _parse_text_tokens(self, text):
+        """ Parse the text into a series of tokens. """
+        last = 0
+
+        while True:
+            start = text.find("{", last)
+
+            if start == -1:
+                # No token found
+                yield text[last:]
+                return
+
+            if start > last:
+                # Token found, text before it
+                yield text[last:start]
+
+            # Now we are in the token
+            kind = text[start + 1:start + 2]
+            if not kind in ("%", "{", "#"):
+                self._syntax_error("Unkown token type", kind, self._line)
+            
+            # Find the end of the token
+            quoted = False
+            escaped = False
+            found = False
+
+            for pos in range(start + 2, len(text)):
+                if escaped:
+                    escaped = False
+                    continue
+
+                if text[pos] == "\"":
+                    quoted = not quoted
+                    continue
+
+                if quoted:
+                    continue
+
+                if text[pos] == "}":
+
+                    if text[pos+1:pos+2] == "}" and kind == "{":
+                        # // Found }} with opening {{
+                        # Skip this char because next char is the real end
+                        kind = "}"
+                        continue
+                        
+                    if text[pos - 1] == kind and pos - 1 > start + 1:
+                        yield text[start:pos + 1]
+                        last = pos + 1
+                        found = True
+                        break
+                    else:
+                        self._syntax_error("Mismatch token close tag", text[pos - 1], self._line)
+
+            if not found:
+                self._syntax_error("Unclosed token", kind, self._line)
+
     def _parse_text(self, text):
         """ Parse the template from the text and build the node list. """
 
-        for token in re.split(r"(?s)({{.*?}}|{%.*?%}|{#.*?#})", text):
+        for token in self._parse_text_tokens(text):
             # How many new lines
             line_count = token.count("\n")
 
@@ -845,7 +902,8 @@ if __name__ == "__main__":
             "subtract": lambda x, y: x - y,
             "equal": lambda x, y: x == y,
             "odd": lambda x: x % 2 == 1,
-            "even": lambda x: x % 2 == 0
+            "even": lambda x: x % 2 == 0,
+            "mod": lambda x, y: x % y
         }
 
         e = Environment(None, filters)
