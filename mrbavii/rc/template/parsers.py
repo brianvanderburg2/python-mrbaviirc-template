@@ -73,6 +73,7 @@ class TemplateParser(object):
             found = False
 
             for pos in range(start + 2, len(text)):
+                # Handle if we are in a string or not
                 if escaped:
                     escaped = False
                     continue
@@ -82,8 +83,11 @@ class TemplateParser(object):
                     continue
 
                 if quoted:
+                    if text[pos] == "\\":
+                        escaped = True
                     continue
 
+                # At this point, we should not be quoted
                 if text[pos] == "}":
 
                     if text[pos+1:pos+2] == "}" and kind == "{":
