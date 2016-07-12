@@ -11,11 +11,38 @@ class Renderer(object):
 
     def __init__(self):
         """ Initialize the renderer. """
+        self._sections = {}
+        self._cursection = []
         pass
 
     def render(self, content):
         """ Render the content. """
-        raise NotImplementedError
+        if self._cursection:
+            section = self._cursection[-1]
+            self._sections[section].append(content)
+            return True
+        else:
+            return False
+
+    def push_section(self, name):
+        """ Set a named section to render to. """
+        self._sections.setdefault(name, [])
+        self._cursection.append(name)
+
+    def pop_section(self):
+        """ Return rendering to the previous section or default. """
+        self._cursection.pop()
+
+    def get_sections(self):
+        """ Return all known sections. """
+        return list(self._sections.keys())
+
+    def get_section(self, name):
+        """ Return the contents of a particular section. """
+        if name in self._sections:
+            return "".join(self._sections[name])
+
+        return ""
 
 
 class StreamRenderer(Renderer):
@@ -28,7 +55,8 @@ class StreamRenderer(Renderer):
 
     def render(self, content):
         """ Render to the stream. """
-        self._stream.write(content)
+        if not Renderer.render(self, content):
+            self._stream.write(content)
 
 
 class StringRenderer(Renderer):
@@ -41,10 +69,12 @@ class StringRenderer(Renderer):
 
     def render(self, content):
         """ Render the content to the buffer. """
-        self._buffer.append(content)
+        if not Renderer.render(self, content):
+            self._buffer.append(content)
 
     def get(self):
         """ Get the buffer. """
         return "".join(self._buffer)
+
 
 

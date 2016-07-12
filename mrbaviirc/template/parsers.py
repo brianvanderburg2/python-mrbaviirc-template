@@ -200,8 +200,8 @@ class TemplateParser(object):
                     # with
                     if len(words) != 1:
                         self._syntax_error("Don't understand with", token, self._line)
-
                     self._ops_stack.append(["with", self._line])
+
                     node = WithNode(self._template, self._line)
                     self._stack[-1].append(node)
                     self._stack.append(node._nodes)
@@ -231,6 +231,26 @@ class TemplateParser(object):
                     var = self._variable(words[1], False)
                     node = SetNode(self._template, self._line, var, False)
 
+                    self._stack[-1].append(node)
+
+                elif words[0] == "section":
+                    # section <...>
+                    if len(words) < 2:
+                        self._syntax_error("Don't understand section", token, self._line)
+                    self._ops_stack.append(["section", self._line])
+
+                    expr = self._prep_expr("".join(words[1:]))
+                    node = SectionNode(self._template, self._line, expr)
+                    self._stack[-1].append(node)
+                    self._stack.append(node._nodes)
+
+                elif words[0] == "use":
+                    # use <...>
+                    if len(words) < 2:
+                        self._syntax_error("Don't understand use", token, self._line)
+
+                    expr = self._prep_expr("".join(words[1:]))
+                    node = UseSectionNode(self._template, self._line, expr)
                     self._stack[-1].append(node)
 
                 elif words[0].startswith("end"):

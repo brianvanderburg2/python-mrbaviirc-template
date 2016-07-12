@@ -10,7 +10,7 @@ from .errors import *
 
 __all__ = [
     "Node", "TextNode", "IfNode", "ForNode", "VarNode", "IncludeNode",
-    "WithNode", "AssignNode", "SetNode"
+    "WithNode", "AssignNode", "SetNode", "SectionNode", "UseSectionNode"
 ]
 
 
@@ -166,5 +166,41 @@ class SetNode(Node):
     def render(self, renderer):
         """ Set or clear the value. """
         self._env.set(self._var, self._value)
+
+
+class SectionNode(Node):
+    """ A node to redirect template output to a section. """
+
+    def __init__(self, template, line, expr):
+        """ Initialize. """
+        Node.__init__(self, template, line)
+        self._expr = expr
+        self._nodes = []
+
+    def render(self, renderer):
+        """ Redirect output to a section. """
+
+        section = str(self._expr.eval())
+        renderer.push_section(section)
+
+        for node in self._nodes:
+            node.render(renderer)
+
+        renderer.pop_section()
+
+
+class UseSectionNode(Node):
+    """ A node to use a section in the output. """
+
+    def __init__(self, template, line, expr):
+        """ Initialize. """
+        Node.__init__(self, template, line)
+        self._expr = expr
+
+    def render(self, renderer):
+        """ Render the section to the output. """
+
+        section = str(self._expr.eval())
+        renderer.render(renderer.get_section(section))
 
 
