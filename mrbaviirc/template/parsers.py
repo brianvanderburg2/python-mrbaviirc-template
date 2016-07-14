@@ -29,12 +29,12 @@ class TemplateParser(object):
 
         # Buffer for plain text segments
         self._buffer = []
-        self._post_strip = False
+        self._pre_strip = False
 
     def parse(self):
         """ Parse the template and return the node list. """
         
-        self._parse_text(self._text)
+        self._parse_body()
         self._flush_buffer()
 
         if self._ops_stack:
@@ -45,6 +45,201 @@ class TemplateParser(object):
             )
 
         return self._nodes
+
+    def _parse_body(self):
+        """ Parse the entire body. """
+
+        last = 0
+        while True:
+
+            pos = self._text.find("{", last)
+            if pos == -1:
+                # No more tags
+                self._buffer.append(self._text[last:])
+                return
+            else:
+                # Found the start of a tag
+                text = self._text[last:pos]
+                self._line += text.count("\n")
+                self._buffer.append(self._text[last:pos])
+
+                last = self._parse_tag(pos)
+
+    def _parse_tag(self, pos):
+        """ Parse a tag found at pos """
+        tag = self._text[pos:pos + 2]
+        if not tag in ("{#", "{%", "{{"):
+            raise SyntaxError(
+                "Unknown tag {0}".format(tag),
+                self._template._filename,
+                self._line
+            )
+
+        start = tag + 2
+        if self._text[start:start + 1] == "-":
+            post_strip = True
+            start += 1
+        else:
+            post_strip = False
+
+        self._flush_buffer(post_strip)
+        if tag == "{#":
+            return self._parse_tag_comment(start)
+        elif tag == "{%":
+            return self._parse_tag_action(start)
+        elif tag == "{{":
+            return self._parse_tag_emitter(start)
+
+    def _parse_tag_ending(self, start, ending, bare=True):
+        """ Parse an expected tag ending. """
+
+        # Find out ending
+        pos = self._text.find(ending, start)
+        if pos == -1:
+            raise SyntaxError(
+                "Expecting end tag: {0}".format(ending),
+                self._template._filename,
+                self._line
+            )
+
+        # Make sure only whitespace was before it
+        guts = self._text[start:pos + 2]
+        if bare and (guts.strip() != ending):
+            raise SyntaxError(
+                "Expecting end tag: {0}".format(ending),
+                self._template._filename,
+                self._line
+            )
+            
+
+        if (pos - 1 > start) and (self._text[pos - 1:pos] == "-"):
+            self._pre_strip = True
+
+        self._line += guts.count("\n")
+        return pos + 2
+
+    def _parse_tag_comment(self, start):
+        """ Parse a comment tag: """
+
+        return self._parse_tag_ending(start, "#}", False)
+
+    def _parse_tag_action(self, start):
+        """ Parse some action tag. """
+        
+        # Determine the action
+        pos = self._skip_space(start, "Incomplete tag")
+        end = self._find_space(pos, "Incomplete tag")
+        action = self._text[pos:end]
+        
+        if action == "if":
+            return self._parse_action_if(end)
+        elif action == "else":
+            return self._parse_action_else(end)
+        elif action == "for":
+            return self._parse_action_for(end)
+        elif action == "set":
+            return self._parse_action_set(end)
+        elif action == "with":
+            return self._parse_action_with(end)
+        elif action == "include":
+            return self._parse_action_include(end)
+        elif action == "set":
+            return self._parse_action_set(end)
+        elif action == "section":
+            return self._parse_action_section(end)
+        elif action == "use":
+            return self._parse_action_use(end)
+        elif action.startswith("end"):
+            return self._parse_action_end(end)
+        else:
+            raise SyntaxError(
+                "Unknown action tag: {0}".format(action),
+                self._template._filename,
+                self._line
+            )
+
+    def _parse_action_if(self, start):
+        """ Parse an if action. """
+        line = self._line
+        pos = self._skip_space(start, "Expected expression")
+        (expr, pos) = self._parse_expr(pos)
+        pos = self._parse_tag_ending("%}")
+        
+        node = IfNode(self._template, line, expr)
+        
+        self._stack[-1].append(node)
+        self._stack.append(node._nodes)
+        return pos
+
+    def _parse_action_else(self, start):
+        """ Parse an else. """
+        line = self._line
+        pos = self._parse_tag_ending("%}")
+
+        if not self._ops_stack:
+            raise SyntaxError(
+                "Mismatched else",
+                self._template._filename,
+                line
+            )
+
+        what = self._ops_stack[-1]
+        if what[0] != "if":
+            raise SyntaxError(
+                "Mismatched else",
+                self._template._filename,
+                line
+            )
+
+        self._stack.pop()
+        node = self._stack[-1][-1]
+        self._stack.append(node._else)
+        return pos
+
+    def _parse_tag_emitter(self, start):
+        pass
+
+    def _skip_space(self, start, errmsg=None):
+        """ Return the first non-whitespace position. """
+        for pos in range(start, len(self._text)):
+            ch = self._text[pos]
+            if ch == "\n":
+                self._line += 1
+            elif ch in (" ", "\t"):
+                continue
+
+            return pos
+
+        if errmsg:
+            raise SyntaxError(
+                errmsg,
+                self._template._filename,
+                self._line
+            )
+
+        return -1
+
+    def _find_space(self, start, errmsg=None):
+        """ Find the next space, do not increase line number. """
+        for pos in range(start, len(self._text)):
+            if self._text[pos] in ("\n", " ", "\t"):
+                return pos
+        
+        if errmsg:
+            raise SyntaxError(
+                errmsg,
+                self._template._filename,
+                self._line
+            )
+
+        return -1
+
+    def _parse_expression(self, start):
+        """ Parse an expression and return (node, pos) """
+        pass
+
+
+
 
     def _parse_text_tokens(self, text):
         """ Parse the text into a series of tokens. """
@@ -279,13 +474,13 @@ class TemplateParser(object):
             self._line += line_count
 
 
-    def _flush_buffer(self, pre=False, post=False):
+    def _flush_buffer(self, post=False):
         """ Flush the buffer to output. """
         if self._buffer:
             expr = "".join(self._buffer)
 
-            if self._post_strip:
-                # If the previous tag had a post-strip {{ ... -}}
+            if self._pre_strip:
+                # If the previous tag had a white-space control {{ ... -}}
                 # trim the start of this buffer up to/including a new line
                 first_nl = expr.find("\n")
                 if first_nl == -1:
@@ -293,8 +488,8 @@ class TemplateParser(object):
                 else:
                     expr = expr[:first_nl + 1].lstrip() + expr[first_nl + 1:]
 
-            if pre:
-                # If the current tag has a pre-strip {{- ... }}
+            if post:
+                # If the current tag has a white-space contro {{- ... }}
                 # trim the end of the buffer up to/including a new line
                 last_nl = expr.find("\n")
                 if last_nl == -1:
@@ -307,7 +502,6 @@ class TemplateParser(object):
                 self._stack[-1].append(node)
 
         self._buffer = []
-        self._post_strip = post # Store this tag's post-strip for the next flush
 
     def _read_token(self, token):
         """ Read a token and whitepsace control. """
