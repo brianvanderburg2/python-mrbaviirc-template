@@ -93,7 +93,7 @@ class TemplateParser(object):
     def _parse_tag_ending(self, start, ending, bare=True):
         """ Parse an expected tag ending. """
 
-        # Find out ending
+        # Find our ending
         pos = self._text.find(ending, start)
         if pos == -1:
             raise SyntaxError(
@@ -101,6 +101,10 @@ class TemplateParser(object):
                 self._template._filename,
                 self._line
             )
+            
+        if (pos  > start) and (self._text[pos - 1:pos] == "-"):
+            self._pre_strip = True
+            ending = "-" + ending
 
         # Make sure only whitespace was before it
         guts = self._text[start:pos + 2]
@@ -110,10 +114,6 @@ class TemplateParser(object):
                 self._template._filename,
                 self._line
             )
-            
-
-        if (pos - 1 > start) and (self._text[pos - 1:pos] == "-"):
-            self._pre_strip = True
 
         self._line += guts.count("\n")
         return pos + 2
@@ -132,25 +132,23 @@ class TemplateParser(object):
         action = self._text[pos:end]
         
         if action == "if":
-            return self._parse_action_if(end)
+            pos =  self._parse_action_if(end)
         elif action == "else":
-            return self._parse_action_else(end)
+            pos =  self._parse_action_else(end)
         elif action == "for":
-            return self._parse_action_for(end)
+            pos =  self._parse_action_for(end)
         elif action == "set":
-            return self._parse_action_set(end)
+            pos =  self._parse_action_set(end)
         elif action == "with":
-            return self._parse_action_with(end)
+            pos =  self._parse_action_with(end)
         elif action == "include":
-            return self._parse_action_include(end)
-        elif action == "set":
-            return self._parse_action_set(end)
+            pos =  self._parse_action_include(end)
         elif action == "section":
-            return self._parse_action_section(end)
+            pos =  self._parse_action_section(end)
         elif action == "use":
-            return self._parse_action_use(end)
+            pos =  self._parse_action_use(end)
         elif action.startswith("end"):
-            return self._parse_action_end(end)
+            pos =  self._parse_action_end(end, action)
         else:
             raise SyntaxError(
                 "Unknown action tag: {0}".format(action),
@@ -158,15 +156,17 @@ class TemplateParser(object):
                 self._line
             )
 
+        return self._parse_tag_ending(pos, "%}")
+
     def _parse_action_if(self, start):
         """ Parse an if action. """
         line = self._line
         pos = self._skip_space(start, "Expected expression")
         (expr, pos) = self._parse_expr(pos)
-        pos = self._parse_tag_ending("%}")
         
         node = IfNode(self._template, line, expr)
         
+        self._ops_stack.append(("if", line))
         self._stack[-1].append(node)
         self._stack.append(node._nodes)
         return pos
@@ -174,7 +174,6 @@ class TemplateParser(object):
     def _parse_action_else(self, start):
         """ Parse an else. """
         line = self._line
-        pos = self._parse_tag_ending("%}")
 
         if not self._ops_stack:
             raise SyntaxError(
@@ -196,9 +195,128 @@ class TemplateParser(object):
         self._stack.append(node._else)
         return pos
 
-    def _parse_tag_emitter(self, start):
-        pass
+    def _parse_action_for(self, start):
+        """ Parse a for statement. """
+        line = self._line
 
+        pos = self._skip_space(start, "Expected variable")
+        (var, pos) = self._parse_var(pos, False)
+
+        pos = self._skip_word(pos, "in", "Expected 'in'")
+
+        (expr, pos) = self._parse_expr(pos)
+
+        node = ForNode(self._template, line, var, expr)
+        self._ops_stack.append(("for", line))
+        self._stack[-1].append(node)
+        self._stack.append(node._nodes)
+        return pos
+    
+    def _parse_action_set(self, start):
+        """ Parse a set statement. """
+        line = self._line
+
+        pos = self._skip_space(start, "Expected variable")
+        (var, pos) = self._parse_var(pos, False)
+
+        pos = self._skip_word(pos, "=", "Expected '='")
+
+        (expr, pos) = self._parse_expr(pos)
+
+        node = AssignNode(self._template, line, var, expr)
+        self._stack[-1].append(node)
+        return pos
+
+    def _parse_action_with(self, start):
+        """ Parse a with statement. """
+        line = self._line
+
+        self._ops_stack.append(("with", line))
+
+        node = WithNode(self._template, line)
+        self._stack[-1].append(node)
+        self._stack.append(node._nodes)
+
+        return pos
+
+    def _parse_action_include(self, start):
+        """ Parse an include node. """
+        line = self._line
+
+        pos = self._skip_space(start, "Expecting string")
+        if self._text[pos] != "\"":
+            raise SyntaxError(
+                "Expecting string",
+                self._template._filename,
+                line
+            )
+
+        (path, pos) = self._parse_string(pos)
+
+        node = IncludeNode(self._template, line, path)
+        self._stack[-1].append(node)
+
+        return pos
+
+    def _parse_action_section(self, start):
+        """ Parse a section node. """
+        line = self._line
+
+        pos = self._skip_space(start, "Expecting expression")
+        (expr, pos) = self._parse_expr(pos)
+
+        self._ops_stack.append(("section", line))
+        node = SectionNode(self._template, line, expr)
+        self._stack[-1].append(node)
+        self._stack.append(node._nodes)
+
+        return post
+
+    def _parse_action_use(self, start):
+        """ Parse a use section node. """
+        line = self._line
+
+        pos = self._skip_space(start, "Expecting expression")
+        (expr, pos) = self._parse_expr(pos)
+
+        node = UseSectionNode(self._template, line, expr)
+        self._stack[-1].append(node)
+        return pos
+
+    def _parse_action_end(self, start, action):
+        """ Parse an end tag """
+        line = self._line
+
+        if not self._ops_stack:
+            raise SyntaxError(
+                "To many ends: {0}".format(action),
+                self._template._filename,
+                line
+            )
+
+        what = self._ops_stack[-1]
+        if what[0] != action[3:]:
+            raise SyntaxError(
+                "Mismatched end tag: {0}".format(action),
+                self._template._filename,
+                line
+            )
+
+        self._stack.pop()
+        return pos
+
+    def _parse_tag_emitter(self, start):
+        """ Parse an emitter tag. """
+        line = self._line
+
+        pos = self._skip_space(pos, "Expected expression")
+        (expr, pos) = self._parse_expr(pos)
+        pos = self._parse_ending_tag(pos, "}}")
+
+        node = VarNode(self._template, line, expr)
+        self._stack[-1].append(node)
+        return pos
+        
     def _skip_space(self, start, errmsg=None):
         """ Return the first non-whitespace position. """
         for pos in range(start, len(self._text)):
@@ -234,244 +352,132 @@ class TemplateParser(object):
 
         return -1
 
-    def _parse_expression(self, start):
+    def _skip_word(self, start, word, errmsg=None):
+        """ Skip a word. """
+        pos = self._skip_space(start, errmsg)
+        if pos == -1:
+            return -1
+
+        end = self._find_space(pos, errmsg):
+        if pos == -1:
+            return -1
+
+        if self._text[pos:end] == word:
+            return end
+
+        if errmsg:
+            raise SyntaxError(
+                errmsg,
+                self._template._filename,
+                line
+            )
+
+        return -1
+
+    def _parse_expr(self, start):
         """ Parse an expression and return (node, pos) """
         pass
 
+    def _parse_string(self, start):
+        """ Parse a string and return (str, pos) """
 
+        if self._text[start:start + 1] != "\"":
+            raise SyntaxError(
+                "Expected string",
+                self._template._filename,
+                self._line
+            )
 
-
-    def _parse_text_tokens(self, text):
-        """ Parse the text into a series of tokens. """
-        last = 0
-
-        while True:
-            start = text.find("{", last)
-
-            if start == -1:
-                # No token found
-                yield text[last:]
-                return
-
-            if start > last:
-                # Token found, text before it
-                yield text[last:start]
-
-            # Now we are in the token
-            kind = text[start + 1:start + 2]
-            if not kind in ("%", "{", "#"):
-                self._syntax_error("Unkown token type", kind, self._line)
+        escaped = False
+        result = []
+        for pos in range(start + 1,len(self._text)):
+            ch = self._text[pos]
             
-            # Find the end of the token
-            quoted = False
-            escaped = False
-            found = False
+            if escaped:
+                escaped = False
+                if ch == "n":
+                    result.append("\n")
+                elif ch == "t":
+                    result.append("\t")
+                elif ch == "\\":
+                    result.append("\\")
+                elif ch == "\"":
+                    result.append("\"")
+                continue
 
-            for pos in range(start + 2, len(text)):
-                # Handle if we are in a string or not
-                if escaped:
-                    escaped = False
-                    continue
+            if ch == "\"":
+                return ("".join(result), pos + 1)
 
-                if text[pos] == "\"":
-                    quoted = not quoted
-                    continue
+            if ch == "\\":
+                escaped = True
+                continue
 
-                if quoted:
-                    if text[pos] == "\\":
-                        escaped = True
-                    continue
+            result.append(ch)
 
-                # At this point, we should not be quoted
-                if text[pos] == "}":
+        raise SyntaxError(
+            "Expected end of string",
+            self._template._filename,
+            self._line
+        )
 
-                    if text[pos+1:pos+2] == "}" and kind == "{":
-                        # // Found }} with opening {{
-                        # Skip this char because next char is the real end
-                        kind = "}"
-                        continue
-                        
-                    if text[pos - 1] == kind and pos - 1 > start + 1:
-                        yield text[start:pos + 1]
-                        last = pos + 1
-                        found = True
-                        break
-                    else:
-                        self._syntax_error("Mismatch token close tag", text[pos - 1], self._line)
+    def _parse_var(self, start, allow_dots=True):
+        """ Parse a variable and return (var, pos) """
 
-            if not found:
-                self._syntax_error("Unclosed token", kind, self._line)
+        first = True
+        result = []
+        current = []
+        for pos in range(start, len(self._text)):
+            ch = self._text[pos]
 
-    def _parse_text(self, text):
-        """ Parse the template from the text and build the node list. """
+            if ch == ".":
+                if not allow_dots:
+                    raise SyntaxError(
+                        "Dotted variable not allowed",
+                        self._template._filename,
+                        self._line
+                    )
 
-        for token in self._parse_text_tokens(text):
-            # How many new lines
-            line_count = token.count("\n")
+                if not current:
+                    raise SyntaxError(
+                        "Expected variable segment",
+                        self._template._filename,
+                        self._line
+                    )
 
-            if token.startswith("{#"):
-                # Just a comment
-                if not token.endswith("#}"):
-                    self._syntax_error("Invalid token syntax", token, self._line)
-                (pre, post, token) = self._read_token(token)
-                self._flush_buffer(pre, post)
+                result.append("".join(current))
+                current = []
+                first = True
+                continue
 
-            elif token.startswith("{{"):
-                # Output some value
-                if not token.endswith("}}"):
-                    self._syntax_error("Invalid token syntax", token, self._line)
-                (pre, post, token) = self._read_token(token)
-                self._flush_buffer(pre, post)
+            if ch in ("abcdefghijklmnopqrstuvwxyz"
+                      "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+                      "0123456789_"):
 
-                if token in ("{{", "{#", "{%"):
-                    # Allow for literal tags.
-                    node = TextNode(self._template, self._line,token)
-                else:
-                    # Create the expression node
-                    expr = self._prep_expr(token)
-                    node = VarNode(self._template, self._line, expr)
+                if first and ch in "0123456789":
+                    raise SyntaxError(
+                        "Expected variable",
+                        self._template._filename,
+                        self._line
+                    )
 
-                self._stack[-1].append(node)
-
-            elif token.startswith("{%"):
-                # An action
-                if not token.endswith("%}"):
-                    self._syntax_error("Invalid token syntax", token, self._line)
-                (pre, post, token) = self._read_token(token)
-                self._flush_buffer(pre, post)
-                
-                words = token.split()
-
-                if words[0] == "if":
-                    # if <expr>
-                    if len(words) < 2:
-                        self._syntax_error("Don't understand if", token, self._line)
-                    self._ops_stack.append(["if", self._line])
-
-                    expr = self._prep_expr("".join(words[1:]))
-                    node = IfNode(self._template, self._line, expr)
-                    
-                    self._stack[-1].append(node)
-                    self._stack.append(node._if)
-
-                elif words[0] == "else":
-                    # else
-                    if len(words) != 1:
-                        self._syntax_error("Don't understand else", token, self._line)
-
-                    if not self._ops_stack:
-                        self._syntax_error("Mismatched else", token, self._line)
-                    start_what = self._ops_stack[-1]
-                    if start_what[0] != "if":
-                        self._syntax_error("Mismatched else", token, self._line)
-
-                    self._stack.pop()
-                    node = self._stack[-1][-1]
-                    self._stack.append(node._else)
-
-                elif words[0] == "for":
-                    # for <variable> in <expr>
-                    if len(words) < 4 or words[2] != "in":
-                        self._syntax_error("Don't understarnd for", token, self._line)
-                    self._ops_stack.append(["for", self._line])
-
-                    var = self._variable(words[1], False)
-                    expr = self._prep_expr("".join(words[3:]))
-                    node = ForNode(self._template, self._line, var, expr)
-
-                    self._stack[-1].append(node)
-                    self._stack.append(node._nodes)
-
-                elif words[0] == "include":
-                    # include <filename>
-                    if len(words) != 2:
-                        self._syntax_error("Don't understand include", token, self._line)
-
-                    filename = words[1]
-                    node = IncludeNode(self._template, self._line, filename)
-                    self._stack[-1].append(node)
-
-                elif words[0] == "with":
-                    # with
-                    if len(words) != 1:
-                        self._syntax_error("Don't understand with", token, self._line)
-                    self._ops_stack.append(["with", self._line])
-
-                    node = WithNode(self._template, self._line)
-                    self._stack[-1].append(node)
-                    self._stack.append(node._nodes)
-
-                elif words[0] == "set":
-                    # set var = var.subvar.subsubvar, set var
-                    if len(words) == 2:
-                        var = self._variable(words[1], False)
-                        node = SetNode(self._template, self._line, var, True)
-                        self._stack[-1].append(node)
-
-                    elif len(words) < 4 or words[2] != "=":
-                        self._syntax_error("Don't understand set", token, self._line)
-
-                    else:
-                        var = self._variable(words[1], False)
-                        expr = self._prep_expr("".join(words[3:]))
-                        node = AssignNode(self._template, self._line, var, expr)
-
-                        self._stack[-1].append(node)
-
-                elif words[0] == "unset":
-                    # unset <var>
-                    if len(words) != 2:
-                        self._syntax_error("Don't understand unset", token, self._line)
-
-                    var = self._variable(words[1], False)
-                    node = SetNode(self._template, self._line, var, False)
-
-                    self._stack[-1].append(node)
-
-                elif words[0] == "section":
-                    # section <...>
-                    if len(words) < 2:
-                        self._syntax_error("Don't understand section", token, self._line)
-                    self._ops_stack.append(["section", self._line])
-
-                    expr = self._prep_expr("".join(words[1:]))
-                    node = SectionNode(self._template, self._line, expr)
-                    self._stack[-1].append(node)
-                    self._stack.append(node._nodes)
-
-                elif words[0] == "use":
-                    # use <...>
-                    if len(words) < 2:
-                        self._syntax_error("Don't understand use", token, self._line)
-
-                    expr = self._prep_expr("".join(words[1:]))
-                    node = UseSectionNode(self._template, self._line, expr)
-                    self._stack[-1].append(node)
-
-                elif words[0].startswith("end"):
-                    if len(words) != 1:
-                        self._syntax_error("Don't understand end", token, self._line)
-
-                    end_what = words[0][3:]
-                    if not self._ops_stack:
-                        self._syntax_error("Too many ends", token, self._line)
-                    start_what = self._ops_stack.pop()
-                    if start_what[0] != end_what:
-                        self._syntax_error("Mismatched end tag", end_what, self._line)
-
-                    # Next nodes go to the previous level
-                    self._stack.pop()
-
-                else:
-                    self._syntax_error("Don't understand tag", words[0], self._line)
-
+                current.append(ch)
+                first = False
             else:
-                #Literal content
-                if token:
-                    self._buffer.append(token)
+                break
 
-            # Increase line count after processing
-            self._line += line_count
+        if first == True:
+            raise SyntaxError(
+                "Epected variable",
+                self._template._filename
+                self._line
+            )
+
+        if allow_dots:
+            result.append("".join(current))
+            return (result, pos)
+        else:
+            return ("".join(current), pos)
+                
 
 
     def _flush_buffer(self, post=False):
