@@ -31,7 +31,7 @@ if __name__ == "__main__":
             "mod": lambda x, y: x % y
         }
 
-        e = Environment(None, filters)
+        e = Environment(filters)
         t = e.load_file(args.template)
 
         data = json.loads(open(args.data, "rU").read())

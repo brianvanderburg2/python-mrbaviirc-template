@@ -9,7 +9,7 @@ from .errors import *
 
 
 __all__ = [
-    "Expr", "ValueExpr", "FilterExpr", "VarExpr"
+    "Expr", "ValueExpr", "FuncExpr", "ListExpr", "VarExpr"
 ]
 
 
@@ -39,33 +39,45 @@ class ValueExpr(Expr):
         """ Evaluate the expression. """
         return self._value
 
+class FuncExpr(Expr):
+    """ A function expression node. """
 
-class FilterExpr(Expr):
-    """ An expression that represents a filter to call. """
-
-    def __init__(self, template, line, node, filter, nodes):
-        """ Initialize the filter expression. """
+    def __init__(self, template, line, var, nodes):
+        """ Initialize the node. """
         Expr.__init__(self, template, line)
-        self._node = node
-        self._filter = filter
+        self._var = var
         self._nodes = nodes
 
     def eval(self):
         """ Evaluate the expression. """
-        value = self._node.eval()
-
         params = []
         for node in self._nodes:
             params.append(node.eval())
 
         try:
-            return self._env.filter(self._filter, value, *params)
+            return self._env.filter(self._var, params)
         except KeyError:
             raise UnknownFilterError(
-                self._filter,
+                ".".join(self._var),
                 self._template._filename,
                 self._line
             )
+
+class ListExpr(Expr):
+    """ A list expression node. """
+    
+    def __init__(self, template, line, nodes):
+        """ Initialize the node. """
+        Expr.__init__(self, template, line)
+        self._nodes = nodes
+
+    def eval(self):
+        """ Evaluate the expression. """
+        results = []
+        for node in self._nodes:
+            results.append(node.eval())
+
+        return results
 
 class VarExpr(Expr):
     """ An expression that represents a variable. """

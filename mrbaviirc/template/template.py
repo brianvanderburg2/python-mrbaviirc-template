@@ -7,7 +7,7 @@
 
 
 from .errors import *
-from .parsers import TemplateParser
+from .parser import TemplateParser
 
 class Template(object):
     """ Simple template parser and renderer.

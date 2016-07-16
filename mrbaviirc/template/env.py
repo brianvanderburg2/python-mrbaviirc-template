@@ -9,17 +9,14 @@
 import os
 
 from .template import Template
+from .errors import *
 
 
 class Environment(object):
     """ represent a template environment. """
 
-    def __init__(self, context=None, filters=None):
+    def __init__(self, context=None):
         """ Initialize the template environment. """
-
-        self._filters = {}
-        if filters:
-            self._filters.update(filters)
 
         self._context = {}
         if context:
@@ -52,13 +49,8 @@ class Environment(object):
     def get(self, var):
         """ Evaluate dotted expressions. """
         value = self._context[var[0]]
-        if callable(value):
-            value = value()
-
         for dot in var[1:]:
             value = value[dot]
-            if callable(value):
-                value = value()
                 
         return value
 
@@ -66,9 +58,10 @@ class Environment(object):
         """ Set a value in the context. """
         self._context[var1] = var2
 
-    def filter(self, filter, value, *params):
+    def filter(self, name, params):
         """ Filter a value. """
-        return self._filters[filter](value, *params)
+        fn = self.get(name)
+        return fn(*params)
 
 
 

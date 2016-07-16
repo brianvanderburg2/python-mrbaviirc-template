@@ -38,7 +38,7 @@ class TemplateParser(object):
         self._flush_buffer()
 
         if self._ops_stack:
-            self._syntax_error(
+            raise SyntaxError(
                 "Unmatched action tag", 
                 self._ops_stack[-1][0],
                 self._ops_stack[-1][1]
@@ -75,7 +75,7 @@ class TemplateParser(object):
                 self._line
             )
 
-        start = tag + 2
+        start = pos + 2
         if self._text[start:start + 1] == "-":
             post_strip = True
             start += 1
@@ -105,6 +105,8 @@ class TemplateParser(object):
         if (pos  > start) and (self._text[pos - 1:pos] == "-"):
             self._pre_strip = True
             ending = "-" + ending
+        else:
+            self._pre_strip = False
 
         # Make sure only whitespace was before it
         guts = self._text[start:pos + 2]
@@ -132,23 +134,23 @@ class TemplateParser(object):
         action = self._text[pos:end]
         
         if action == "if":
-            pos =  self._parse_action_if(end)
+            pos = self._parse_action_if(end)
         elif action == "else":
             pos =  self._parse_action_else(end)
         elif action == "for":
-            pos =  self._parse_action_for(end)
+            pos = self._parse_action_for(end)
         elif action == "set":
-            pos =  self._parse_action_set(end)
+            pos = self._parse_action_set(end)
         elif action == "with":
-            pos =  self._parse_action_with(end)
+            pos = self._parse_action_with(end)
         elif action == "include":
-            pos =  self._parse_action_include(end)
+            pos = self._parse_action_include(end)
         elif action == "section":
-            pos =  self._parse_action_section(end)
+            pos = self._parse_action_section(end)
         elif action == "use":
-            pos =  self._parse_action_use(end)
+            pos = self._parse_action_use(end)
         elif action.startswith("end"):
-            pos =  self._parse_action_end(end, action)
+            pos = self._parse_action_end(end, action)
         else:
             raise SyntaxError(
                 "Unknown action tag: {0}".format(action),
@@ -244,13 +246,6 @@ class TemplateParser(object):
         line = self._line
 
         pos = self._skip_space(start, "Expecting string")
-        if self._text[pos] != "\"":
-            raise SyntaxError(
-                "Expecting string",
-                self._template._filename,
-                line
-            )
-
         (path, pos) = self._parse_string(pos)
 
         node = IncludeNode(self._template, line, path)
@@ -270,7 +265,7 @@ class TemplateParser(object):
         self._stack[-1].append(node)
         self._stack.append(node._nodes)
 
-        return post
+        return pos
 
     def _parse_action_use(self, start):
         """ Parse a use section node. """
@@ -302,16 +297,17 @@ class TemplateParser(object):
                 line
             )
 
+        self._ops_stack.pop()
         self._stack.pop()
-        return pos
+        return start
 
     def _parse_tag_emitter(self, start):
         """ Parse an emitter tag. """
         line = self._line
 
-        pos = self._skip_space(pos, "Expected expression")
+        pos = self._skip_space(start, "Expected expression")
         (expr, pos) = self._parse_expr(pos)
-        pos = self._parse_ending_tag(pos, "}}")
+        pos = self._parse_tag_ending(pos, "}}")
 
         node = VarNode(self._template, line, expr)
         self._stack[-1].append(node)
@@ -358,7 +354,7 @@ class TemplateParser(object):
         if pos == -1:
             return -1
 
-        end = self._find_space(pos, errmsg):
+        end = self._find_space(pos, errmsg)
         if pos == -1:
             return -1
 
@@ -376,7 +372,90 @@ class TemplateParser(object):
 
     def _parse_expr(self, start):
         """ Parse an expression and return (node, pos) """
-        pass
+        pos = self._skip_space(start, "Expecting expression")
+
+        ch = self._text[pos:pos + 1]
+
+        if ch == "\"":
+            (value, pos) = self._parse_string(pos)
+            node = ValueExpr(self._template, self._line, str(value))
+            return (node, pos)
+
+        if ch == "[":
+            return self._parse_expr_list(pos + 1)
+
+        if ch in "0123456789.":
+            return self._parse_expr_number(pos)
+
+        (var, pos) = self._parse_var(pos)
+        if self._text[pos:pos + 1] != "(":
+            node = VarExpr(self._template, self._line, var)
+        else:
+            (nodes, pos) = self._parse_expr_items(pos + 1, ")")
+            node = FuncExpr(self._template, self._line, var, nodes)
+          
+        return (node, pos)
+
+    def _parse_expr_list(self, start):
+        """ Pare an expression that's a list. """
+        (nodes, pos) = self._parse_expr_items(start, "]")
+        node = ListExpr(self._template, self._line, nodes)
+        return (node, pos)
+
+    def _parse_expr_number(self, start):
+        """ Parse a number """
+        result = []
+        for pos in range(start, len(self._text)):
+            ch = self._text[pos]
+            if not ch in "0123456789.":
+                break
+            result.append(ch)
+
+        if not result:
+            raise SyntaxError(
+                "Expecting number",
+                self._template._filename,
+                self._line
+            )
+
+        result = "".join(result)
+
+        if not "." in result:
+            node = ValueExpr(self._template, self._line, int(result))
+        elif result.count("." == 1):
+            node = ValueExpr(self._template, self._line, float(result))
+        else:
+            raise SyntaxError(
+                "Expecting number",
+                self._template._filename,
+                self._line
+            )
+
+        return (node, pos)
+
+    def _parse_expr_items(self, start, ending):
+        """ Parse a list of items """
+        items = []
+
+        pos = start
+        first = True
+        while True:
+            pos = self._skip_space(pos, "Expecting expression")
+            if self._text[pos] == ending:
+                return (items, pos + 1)
+
+            if not first:
+                if self._text[pos] != ",":
+                    raise SyntaxError(
+                        "Expecting comma",
+                        self._template._filename,
+                        self._line
+                    )
+                pos = self._skip_space(pos + 1, "Expecting expression")
+            first = False
+
+            (node, pos) = self._parse_expr(pos)
+            items.append(node)
 
     def _parse_string(self, start):
         """ Parse a string and return (str, pos) """
@@ -450,7 +529,7 @@ class TemplateParser(object):
                 continue
 
             if ch in ("abcdefghijklmnopqrstuvwxyz"
-                      "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+                      "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                       "0123456789_"):
 
                 if first and ch in "0123456789":
@@ -468,7 +547,7 @@ class TemplateParser(object):
         if first == True:
             raise SyntaxError(
                 "Epected variable",
-                self._template._filename
+                self._template._filename,
                 self._line
             )
 
@@ -508,105 +587,4 @@ class TemplateParser(object):
                 self._stack[-1].append(node)
 
         self._buffer = []
-
-    def _read_token(self, token):
-        """ Read a token and whitepsace control. """
-
-        if token[2:3] == "-":
-            pre = True
-            start = 3
-        else:
-            pre = False
-            start = 2
-
-        if token[-3:-2] == "-":
-            post = True
-            end = -3
-        else:
-            post = False
-            end = -2
-
-        return (pre, post, token[start:end].strip())
-    
-    def _prep_expr(self, text):
-        """ Prepare an expression text. """
-        
-        # Strip out whitespace
-        text = "".join(text.split())
-
-        return self._do_expr(text)
-
-    def _do_expr(self, text):
-        """ The real expression parsing is here. """
-
-        if len(text) == 0:
-            self._syntax_error("Expecting an expression", text, self._line)
-
-        elif "|" in text:
-            pipes = text.split("|")
-            expr = self._do_expr(pipes[0])
-            for pipe in pipes[1:]:
-                (filter, params) = self._parse_pipe(pipe)
-                self._variable(filter, False)
-
-                expr = FilterExpr(self._template, self._line, expr, filter, params)
-
-        elif self._is_int(text):
-            expr = ValueExpr(self._template, self._line, int(text))
-
-        else:
-            var = self._variable(text)
-            expr = VarExpr(self._template, self._line, var)
-
-        return expr
-
-    def _parse_pipe(self, text):
-        """ Parse a text for filters """
-
-        start = text.find("(")
-        if start == -1:
-            return (text, [])
-
-        func = text[0:start]
-        end = text.rfind(")")
-        if end != len(text) - 1:
-            self._syntax_error("Don't understand pipe", text, self._line)
-
-        params = []
-        for param in text[start + 1:end].split(","):
-            params.append(self._do_expr(param))
-
-        return (func, params)
-
-    def _is_int(self, text):
-        """ Return true if the string is an integer. """
-        try:
-            value = int(text)
-            return True
-        except ValueError:
-            return False
-
-    def _syntax_error(self, msg, thing, where):
-        """ Raise an error if something is wrong. """
-
-        raise SyntaxError(
-            "{0}: {1}".format(msg, thing),
-            self._template._filename,
-            where
-        )
-
-    def _variable(self, what, allow_dots=True):
-        """ Check that a variable is valid form. """
-        if allow_dots:
-            result = []
-            for part in what.split("."):
-                if not re.match(r"[_a-zA-Z][_a-zA-Z0-9]*$", part):
-                    self._syntax_error("Not a valid name", what, self._line)
-                result.append(part)
-            return tuple(result)
-        else:
-            if not re.match(r"[_a-zA-Z][_a-zA-Z0-9]*$", what):
-                self._syntax_error("Not a valid name", what, self._line)
-            return what
-
 
