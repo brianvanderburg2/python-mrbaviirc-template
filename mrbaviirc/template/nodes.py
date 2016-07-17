@@ -142,17 +142,24 @@ class IncludeNode(Node):
 class WithNode(Node):
     """ Save the state of the context. """
 
-    def __init__(self, template, line):
+    def __init__(self, template, line, assigns):
         """ Initialize. """
         Node.__init__(self, template, line)
+        self._assigns = assigns
         self._nodes = []
 
     def render(self, renderer):
         """ Render. """
-        self._env.save_context()
+        env = self._env
+        env.save_context()
+
+        for (var, expr) in self._assigns:
+            env.set(var, expr.eval())
+
         for node in self._nodes:
             node.render(renderer)
-        self._env.restore_context()
+
+        env.restore_context()
 
 
 class AssignNode(Node):

@@ -257,12 +257,7 @@ class TemplateParser(object):
         """ Parse a set statement. """
         line = self._line
 
-        pos = self._skip_space(start, "Expected variable")
-        (var, pos) = self._parse_var(pos, False)
-
-        pos = self._skip_word(pos, "=", "Expected '='")
-
-        (expr, pos) = self._parse_expr(pos)
+        (var, expr, pos) = self._parse_assign(start)
 
         node = AssignNode(self._template, line, var, expr)
         self._stack[-1].append(node)
@@ -275,11 +270,33 @@ class TemplateParser(object):
 
         self._ops_stack.append(("with", line))
 
-        node = WithNode(self._template, line)
+        assigns = []
+
+        pos = start
+        first = True
+        while True:
+            pos = self._skip_space(pos)
+            if self._text[pos] in "-%": # Ending of the tag
+                break
+
+            if not first:
+                if self._text[pos] != ",":
+                    raise SyntaxError(
+                        "Expecting comma",
+                        self._template._filename,
+                        line
+                    )
+                pos = self._skip_space(pos + 1, "Expecting variable")
+            first = False
+
+            (var, expr, pos) = self._parse_assign(pos)
+            assigns.append((var, expr))
+
+        node = WithNode(self._template, line, assigns)
         self._stack[-1].append(node)
         self._stack.append(node._nodes)
 
-        return start
+        return pos
 
     def _parse_action_include(self, start):
         """ Parse an include node. """
@@ -525,6 +542,18 @@ class TemplateParser(object):
 
             (node, pos) = self._parse_expr(pos)
             items.append(node)
+
+    def _parse_assign(self, start):
+        """ Parse a var = expr assignment, return (var, expr, pos) """
+        line = self._line
+
+        pos = self._skip_space(start, "Expected variable")
+        (var, pos) = self._parse_var(pos, False)
+
+        pos = self._skip_word(pos, "=", "Expected '='")
+        (expr, pos) = self._parse_expr(pos)
+
+        return (var, expr, pos)
 
     def _parse_string(self, start):
         """ Parse a string and return (str, pos) """
