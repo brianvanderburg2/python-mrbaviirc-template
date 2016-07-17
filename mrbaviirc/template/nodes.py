@@ -10,7 +10,8 @@ from .errors import *
 
 __all__ = [
     "Node", "TextNode", "IfNode", "ForNode", "VarNode", "IncludeNode",
-    "WithNode", "AssignNode", "SetNode", "SectionNode", "UseSectionNode"
+    "WithNode", "AssignNode", "SetNode", "SectionNode", "UseSectionNode",
+    "CallNode"
 ]
 
 
@@ -47,23 +48,37 @@ class IfNode(Node):
     def __init__(self, template, line, expr):
         """ Initialize the if node. """
         Node.__init__(self, template, line)
-        self._expr = expr
-        self._if = []
+        self._ifs = [(expr, [])]
+        self._else = None
+        self._nodes = self.ifs[0][1]
+
+    def add_elif(self, expr):
+        """ Add an if section. """
+        # TODO: error if self._else exists
+        self._ifs.append((expr, []))
+        self._nodes = self.ifs[-1][1]
+
+    def add_else(self):
+        """ Add an else. """
         self._else = []
+        self._nodes = self._else
 
     def render(self, renderer):
         """ Render the if node. """
-        try:
-            result = self._expr.eval()
-        except (UnknownVariableError, UnknownFilterError):
-            result = False
+        for (expr, nodes) in self._ifs:
+            try:
+                result = expr.eval()
+            except (UnknownVariableError, UnknownFilterError):
+                result = False
 
-        if result:
-            for action in self._if:
-                action.render(renderer)
-        elif self._else:
-            for action in self._else:
-                action.render(renderer)
+            if result:
+                for node in nodes:
+                    node.render(renderer)
+                return
+
+        if self._else:
+            for node in self._else:
+                node.render(renderer)
 
 
 class ForNode(Node):
@@ -203,4 +218,29 @@ class UseSectionNode(Node):
         section = str(self._expr.eval())
         renderer.render(renderer.get_section(section))
 
+
+class CallNode(Node):
+    """ A node to call a defined block. """
+
+    def __init__(self, template, line, name):
+        """ Initialize. """
+        Node.__init__(self, template, line)
+        self._name = name
+
+    def render(self, renderer):
+        """ Render the called block. """
+
+        nodes = self._template._defines.get(self._name, None)
+        if nodes is None:
+            nodes = self._env._defines.get(self._name, None)
+
+        if nodes is None:
+            raise UnknownDefineError(
+                self._name,
+                self._template._filename,
+                self._line
+            )
+
+        for node in nodes:
+            node.render(renderer)
 

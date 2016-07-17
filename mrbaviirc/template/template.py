@@ -5,6 +5,7 @@
 #
 # This file provides the template used by the template engine.
 
+import os
 
 from .errors import *
 from .parser import TemplateParser
@@ -58,6 +59,8 @@ class Template(object):
             if self._filename is None:
                 raise Error("Filename must be specified if text is not.")
             text = open(self._filename, "rU").read()
+
+        self._defines = {}
 
         # Parse the template
         parser = TemplateParser(self, text)

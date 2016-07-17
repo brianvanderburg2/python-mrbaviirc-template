@@ -24,6 +24,7 @@ class Environment(object):
 
         self._saved_contexts = []
         self._cache = {}
+        self._defines = {}
 
     def load_file(self, filename):
         """ Load a template from a file. """

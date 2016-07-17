@@ -135,6 +135,8 @@ class TemplateParser(object):
         
         if action == "if":
             pos = self._parse_action_if(end)
+        elif action == "elif":
+            pos = self._parse_action_elif(end)
         elif action == "else":
             pos =  self._parse_action_else(end)
         elif action == "for":
@@ -149,6 +151,12 @@ class TemplateParser(object):
             pos = self._parse_action_section(end)
         elif action == "use":
             pos = self._parse_action_use(end)
+        elif action == "localdef":
+            pos = self._parse_action_def(end, self._template._defines)
+        elif action == "globaldef":
+            pos = self._parse_action_def(end, self._template._env._defines)
+        elif action == "call":
+            pos = self._parse_action_call(end)
         elif action.startswith("end"):
             pos = self._parse_action_end(end, action)
         else:
@@ -173,6 +181,34 @@ class TemplateParser(object):
         self._stack.append(node._nodes)
         return pos
 
+    def _parse_action_elif(self, start):
+        """ Parse an elif action. """
+        line = self._line
+        pos = self._skip_space(start, "Expected expression")
+        (expr, pos) = self._parse_expr(pos)
+
+        if not self._ops_stack:
+            raise SyntaxError(
+                "Mismatched elif",
+                self._template._filename,
+                line
+            )
+
+        what = self._ops_stack[-1]
+        if what[0] != "if":
+            raise SyntaxError(
+                "Mismatched elif",
+                self._template._filename,
+                line
+            )
+
+        self._stack.pop()
+        node = self._stack[-1][-1]
+        node.add_elif(expr)
+        self._stack.append(node._nodes)
+
+        return pos
+
     def _parse_action_else(self, start):
         """ Parse an else. """
         line = self._line
@@ -194,7 +230,9 @@ class TemplateParser(object):
 
         self._stack.pop()
         node = self._stack[-1][-1]
-        self._stack.append(node._else)
+        node.add_else()
+        self._stack.append(node._nodes)
+
         return pos
 
     def _parse_action_for(self, start):
@@ -212,6 +250,7 @@ class TemplateParser(object):
         self._ops_stack.append(("for", line))
         self._stack[-1].append(node)
         self._stack.append(node._nodes)
+
         return pos
     
     def _parse_action_set(self, start):
@@ -227,6 +266,7 @@ class TemplateParser(object):
 
         node = AssignNode(self._template, line, var, expr)
         self._stack[-1].append(node)
+
         return pos
 
     def _parse_action_with(self, start):
@@ -239,7 +279,7 @@ class TemplateParser(object):
         self._stack[-1].append(node)
         self._stack.append(node._nodes)
 
-        return pos
+        return start
 
     def _parse_action_include(self, start):
         """ Parse an include node. """
@@ -276,7 +316,35 @@ class TemplateParser(object):
 
         node = UseSectionNode(self._template, line, expr)
         self._stack[-1].append(node)
+
         return pos
+
+    def _parse_action_def(self, start, target):
+        """ Parse a local or global def. """
+        line = self._line
+
+        pos = self._skip_space(start, "Expecting string")
+        (name, pos) = self._parse_string(pos)
+
+        self._ops_stack.append(("def", line))
+
+        nodes = target.setdefault(name, [])
+        self._stack.append(nodes)
+
+        return pos
+
+    def _parse_action_call(self, start):
+        """ Parse a call to a local or global def. """
+        line = self._line
+
+        pos = self._skip_space(start, "Expecting string")
+        (name, pos) = self._parse_string(pos)
+
+        node = CallNode(self._template, line, name)
+        self._stack[-1].append(node)
+
+        return pos
+
 
     def _parse_action_end(self, start, action):
         """ Parse an end tag """
@@ -299,6 +367,7 @@ class TemplateParser(object):
 
         self._ops_stack.pop()
         self._stack.pop()
+
         return start
 
     def _parse_tag_emitter(self, start):
