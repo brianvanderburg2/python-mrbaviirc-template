@@ -405,6 +405,7 @@ class TemplateParser(object):
             ch = self._text[pos]
             if ch == "\n":
                 self._line += 1
+                continue
             elif ch in (" ", "\t"):
                 continue
 
