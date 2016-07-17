@@ -30,6 +30,7 @@ class TemplateParser(object):
         # Buffer for plain text segments
         self._buffer = []
         self._pre_strip = False
+        self._auto_strip = False
 
     def parse(self):
         """ Parse the template and return the node list. """
@@ -159,6 +160,12 @@ class TemplateParser(object):
             pos = self._parse_action_call(end)
         elif action.startswith("end"):
             pos = self._parse_action_end(end, action)
+        elif action == "autostrip":
+            self._auto_strip = True
+            pos = end
+        elif action == "no_autostrip":
+            self._auto_strip = False
+            pos = end
         else:
             raise SyntaxError(
                 "Unknown action tag: {0}".format(action),
@@ -661,28 +668,31 @@ class TemplateParser(object):
     def _flush_buffer(self, post=False):
         """ Flush the buffer to output. """
         if self._buffer:
-            expr = "".join(self._buffer)
+            text = "".join(self._buffer)
 
-            if self._pre_strip:
-                # If the previous tag had a white-space control {{ ... -}}
-                # trim the start of this buffer up to/including a new line
-                first_nl = expr.find("\n")
-                if first_nl == -1:
-                    expr = expr.lstrip()
-                else:
-                    expr = expr[:first_nl + 1].lstrip() + expr[first_nl + 1:]
+            if self._auto_strip:
+                text = text.strip()
+            else:
+                if self._pre_strip:
+                    # If the previous tag had a white-space control {{ ... -}}
+                    # trim the start of this buffer up to/including a new line
+                    first_nl = text.find("\n")
+                    if first_nl == -1:
+                        text = text.lstrip()
+                    else:
+                        text = text[:first_nl + 1].lstrip() + text[first_nl + 1:]
 
-            if post:
-                # If the current tag has a white-space contro {{- ... }}
-                # trim the end of the buffer up to/including a new line
-                last_nl = expr.find("\n")
-                if last_nl == -1:
-                    expr = expr.rstrip()
-                else:
-                    expr = expr[:last_nl] + expr[last_nl:].rstrip()
+                if post:
+                    # If the current tag has a white-space contro {{- ... }}
+                    # trim the end of the buffer up to/including a new line
+                    last_nl = text.find("\n")
+                    if last_nl == -1:
+                        text = text.rstrip()
+                    else:
+                        text = text[:last_nl] + text[last_nl:].rstrip()
             
-            if expr:
-                node = TextNode(self._template, self._line, expr)
+            if text:
+                node = TextNode(self._template, self._line, text)
                 self._stack[-1].append(node)
 
         self._buffer = []
