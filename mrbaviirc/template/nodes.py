@@ -50,13 +50,13 @@ class IfNode(Node):
         Node.__init__(self, template, line)
         self._ifs = [(expr, [])]
         self._else = None
-        self._nodes = self.ifs[0][1]
+        self._nodes = self._ifs[0][1]
 
     def add_elif(self, expr):
         """ Add an if section. """
         # TODO: error if self._else exists
         self._ifs.append((expr, []))
-        self._nodes = self.ifs[-1][1]
+        self._nodes = self._ifs[-1][1]
 
     def add_else(self):
         """ Add an else. """

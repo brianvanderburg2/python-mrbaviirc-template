@@ -240,7 +240,7 @@ class TemplateParser(object):
         node.add_else()
         self._stack.append(node._nodes)
 
-        return pos
+        return start
 
     def _parse_action_for(self, start):
         """ Parse a for statement. """

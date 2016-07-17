@@ -69,14 +69,10 @@ class Template(object):
     def render(self, renderer, context=None):
         """ Render the template. """
         env = self._env
-        env.save_context()
-        try:
-            if context:
-                env._context.update(context)
-            for node in self._nodes:
-                node.render(renderer)
-        finally:
-            env.restore_context()
+        if context:
+            env._context.update(context)
+        for node in self._nodes:
+            node.render(renderer)
 
     def _include(self, filename, renderer):
         """ Include another template. """
