@@ -10,8 +10,7 @@ from .errors import *
 
 __all__ = [
     "Node", "TextNode", "IfNode", "ForNode", "VarNode", "IncludeNode",
-    "WithNode", "AssignNode", "SetNode", "SectionNode", "UseSectionNode",
-    "CallNode"
+    "WithNode", "AssignNode", "SectionNode", "UseSectionNode", "CallNode"
 ]
 
 
@@ -165,29 +164,17 @@ class WithNode(Node):
 class AssignNode(Node):
     """ Set a variable to a subvariable. """
 
-    def __init__(self, template, line, var, expr):
+    def __init__(self, template, line, assigns):
         """ Initialize. """
         Node.__init__(self, template, line)
-        self._var = var
-        self._expr = expr
+        self._assigns = assigns
 
     def render(self, renderer):
         """ Set the value. """
-        self._env.set(self._var, self._expr.eval())
+        env = self._env
 
-
-class SetNode(Node):
-    """ Set or clear a flag. """
-
-    def __init__(self, template, line, var, value):
-        """ Initialize. """
-        Node.__init__(self, template, line)
-        self._var = var
-        self._value = bool(value)
-
-    def render(self, renderer):
-        """ Set or clear the value. """
-        self._env.set(self._var, self._value)
+        for (var, expr) in self._assigns:
+            env.set(var, expr.eval())
 
 
 class SectionNode(Node):

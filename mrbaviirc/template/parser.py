@@ -264,9 +264,9 @@ class TemplateParser(object):
         """ Parse a set statement. """
         line = self._line
 
-        (var, expr, pos) = self._parse_assign(start)
+        (assigns, pos) = self._parse_multi_assign(start)
 
-        node = AssignNode(self._template, line, var, expr)
+        node = AssignNode(self._template, line, assigns)
         self._stack[-1].append(node)
 
         return pos
@@ -277,33 +277,14 @@ class TemplateParser(object):
 
         self._ops_stack.append(("with", line))
 
-        assigns = []
-
-        pos = start
-        first = True
-        while True:
-            pos = self._skip_space(pos)
-            if self._text[pos] in "-%": # Ending of the tag
-                break
-
-            if not first:
-                if self._text[pos] != ",":
-                    raise SyntaxError(
-                        "Expecting comma",
-                        self._template._filename,
-                        line
-                    )
-                pos = self._skip_space(pos + 1, "Expecting variable")
-            first = False
-
-            (var, expr, pos) = self._parse_assign(pos)
-            assigns.append((var, expr))
+        (assigns, pos) = self._parse_multi_assign(start)
 
         node = WithNode(self._template, line, assigns)
         self._stack[-1].append(node)
         self._stack.append(node._nodes)
 
         return pos
+
 
     def _parse_action_include(self, start):
         """ Parse an include node. """
@@ -562,6 +543,32 @@ class TemplateParser(object):
         (expr, pos) = self._parse_expr(pos)
 
         return (var, expr, pos)
+
+    def _parse_multi_assign(self, start):
+        """ Parse multiple var = expr statemetns, return ( [(var, expr)], pos) """
+        assigns = []
+
+        pos = start
+        first = True
+        while True:
+            pos = self._skip_space(pos)
+            if self._text[pos] in "-%": # Ending of the tag
+                break
+
+            if not first:
+                if self._text[pos] != ",":
+                    raise SyntaxError(
+                        "Expecting comma",
+                        self._template._filename,
+                        line
+                    )
+                pos = self._skip_space(pos + 1, "Expecting variable")
+            first = False
+
+            (var, expr, pos) = self._parse_assign(pos)
+            assigns.append((var, expr))
+
+        return (assigns, pos)
 
     def _parse_string(self, start):
         """ Parse a string and return (str, pos) """
