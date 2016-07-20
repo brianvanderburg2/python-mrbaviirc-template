@@ -49,8 +49,8 @@ class Environment(object):
 
     def get(self, var):
         """ Evaluate dotted expressions. """
-        value = self._context[var[0]]
-        for dot in var[1:]:
+        value = self._context
+        for dot in var:
             value = value[dot]
                 
         return value

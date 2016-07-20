@@ -62,7 +62,7 @@ class TemplateParser(object):
                 # Found the start of a tag
                 text = self._text[last:pos]
                 self._line += text.count("\n")
-                self._buffer.append(self._text[last:pos])
+                self._buffer.append(text)
 
                 last = self._parse_tag(pos)
 

@@ -66,13 +66,20 @@ class Template(object):
         parser = TemplateParser(self, text)
         self._nodes = parser.parse()
 
-    def render(self, renderer, context=None):
+    def render(self, renderer, context=None, save=True):
         """ Render the template. """
         env = self._env
+        if save:
+            env.save_context()
+
         if context:
             env._context.update(context)
+
         for node in self._nodes:
             node.render(renderer)
+
+        if save:
+            env.restore_context()
 
     def _include(self, filename, renderer):
         """ Include another template. """
@@ -81,5 +88,5 @@ class Template(object):
 
         newfile = os.path.join(os.path.dirname(self._filename), *(filename.split("/")))
         t = self._env.load_file(newfile)
-        t.render(renderer)
+        t.render(renderer, save=False)
 

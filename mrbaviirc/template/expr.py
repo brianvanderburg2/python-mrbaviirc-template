@@ -50,12 +50,8 @@ class FuncExpr(Expr):
 
     def eval(self):
         """ Evaluate the expression. """
-        params = []
-        for node in self._nodes:
-            params.append(node.eval())
-
         try:
-            return self._env.filter(self._var, params)
+            return self._env.filter(self._var, [node.eval() for node in self._nodes])
         except KeyError:
             raise UnknownFilterError(
                 ".".join(self._var),
@@ -73,11 +69,7 @@ class ListExpr(Expr):
 
     def eval(self):
         """ Evaluate the expression. """
-        results = []
-        for node in self._nodes:
-            results.append(node.eval())
-
-        return results
+        return [node.eval() for node in self._nodes]
 
 class VarExpr(Expr):
     """ An expression that represents a variable. """
