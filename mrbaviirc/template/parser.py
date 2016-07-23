@@ -403,7 +403,10 @@ class TemplateParser(object):
         (expr, pos) = self._parse_expr(pos)
         pos = self._parse_tag_ending(pos, "}}")
 
-        node = VarNode(self._template, line, expr)
+        if isinstance(expr, ValueExpr):
+            node = TextNode(self._template, line, str(expr.eval()))
+        else:
+            node = VarNode(self._template, line, expr)
         self._stack[-1].append(node)
         return pos
         
