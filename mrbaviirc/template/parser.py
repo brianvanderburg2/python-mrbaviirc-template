@@ -293,7 +293,16 @@ class TemplateParser(object):
         pos = self._skip_space(start, "Expecting string")
         (path, pos) = self._parse_string(pos)
 
-        node = IncludeNode(self._template, line, path)
+        try:
+            target = self._template._include(path)
+        except (IOError, OSError) as e:
+            raise TemplateError(
+                str(e),
+                self._template._filename,
+                line
+            )
+
+        node = IncludeNode(self._template, line, target)
         self._stack[-1].append(node)
 
         return pos
@@ -345,8 +354,19 @@ class TemplateParser(object):
         pos = self._skip_space(start, "Expecting string")
         (name, pos) = self._parse_string(pos)
 
-        node = CallNode(self._template, line, name)
-        self._stack[-1].append(node)
+
+        nodes = self._template._defines.get(name, None)
+        if nodes is None:
+            nodes = self.template._env._defines.get(name, None)
+
+        if nodes is None:
+            raise UnknownDefineError(
+                name,
+                self._template._filename,
+                self._line
+            )
+
+        self._stack[-1].extend(nodes)
 
         return pos
 

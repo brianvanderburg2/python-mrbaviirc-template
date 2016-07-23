@@ -7,7 +7,7 @@
 
 __all__ = [
     "Error", "TemplateError", "SyntaxError", "UnknownVariableError",
-    "UnknownFilterError", "UnknownDefineError"
+    "UnknownDefineError"
 ]
 
 
@@ -41,10 +41,6 @@ class UnknownVariableError(TemplateError):
     """ Represent an unknown variable access. """
     MESSAGE_PREFIX = "Unknown Variable Error"
 
-
-class UnknownFilterError(TemplateError):
-    """ Represent an unknown filter access. """
-    MESSAGE_PREFIX = "Unknown Filter Error"
 
 class UnknownDefineError(TemplateError):
     """ Represent an unknown definition access. """

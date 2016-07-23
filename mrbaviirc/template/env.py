@@ -59,10 +59,6 @@ class Environment(object):
         """ Set a value in the context. """
         self._context[var1] = var2
 
-    def filter(self, name, params):
-        """ Filter a value. """
-        fn = self.get(name)
-        return fn(*params)
 
 
 

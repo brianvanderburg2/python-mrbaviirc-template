@@ -10,7 +10,7 @@ from .errors import *
 
 __all__ = [
     "Node", "TextNode", "IfNode", "ForNode", "VarNode", "IncludeNode",
-    "WithNode", "AssignNode", "SectionNode", "UseSectionNode", "CallNode"
+    "WithNode", "AssignNode", "SectionNode", "UseSectionNode"
 ]
 
 
@@ -27,6 +27,10 @@ class Node(object):
         """ Render the node to a renderer. """
         raise NotImplementedError
 
+    def compile(self, code, depth):
+        """ Compile the node. """
+        raise NotImplementedError
+
 
 class TextNode(Node):
     """ A node that represents a raw block of text. """
@@ -39,6 +43,10 @@ class TextNode(Node):
     def render(self, renderer):
         """ Render content from a text node. """
         renderer.render(self._text)
+
+    def compile(self, code, depth):
+        """ Compile the node. """
+        code.add_line("renderer.render({0})".format(repr(self._text)))
 
 
 class IfNode(Node):
@@ -65,11 +73,7 @@ class IfNode(Node):
     def render(self, renderer):
         """ Render the if node. """
         for (expr, nodes) in self._ifs:
-            try:
-                result = expr.eval()
-            except (UnknownVariableError, UnknownFilterError):
-                result = False
-
+            result = expr.eval()
             if result:
                 for node in nodes:
                     node.render(renderer)
@@ -78,6 +82,36 @@ class IfNode(Node):
         if self._else:
             for node in self._else:
                 node.render(renderer)
+
+    def compile(self, code, depth):
+        """ Compile the node. """
+
+        first = True
+        for (expr, nodes) in self._ifs:
+            cexpr = expr.compile()
+            if first:
+                code.add_line("if {0}:".format(cexpr))
+                first = False
+            else:
+                code.add_line("elif {0}".format(cexpr))
+
+            code.indent()
+
+            for node in nodes:
+                node.compile(code, depth + 1)
+
+            code.add_line("pass")
+            code.dedent()
+
+        if self._else:
+            code.add_line("else:")
+            code.indent()
+
+            for node in self._else:
+                node.compile(code, depth + 1)
+
+            code.add_line("pass")
+            code.dedent()
 
 
 class ForNode(Node):
@@ -104,6 +138,20 @@ class ForNode(Node):
                 for node in self._nodes:
                     node.render(renderer)
 
+    def compile(self, code, depth):
+        """ Compile the node. """
+
+        cexpr = self._expr.compile()
+        code.add_line("for f_{0} in {1}:".format(depth, cexpr))
+        code.indent()
+
+        code.add_line("env.set({0}, f_{1})".format(repr(self._var), depth))
+
+        for node in self._nodes:
+            node.compile(code, depth + 1)
+
+        code.dedent()
+
 
 class VarNode(Node):
     """ A node to output some value. """
@@ -117,25 +165,29 @@ class VarNode(Node):
         """ Render the output. """
         renderer.render(str(self._expr.eval()))
 
+    def compile(self, code, depth):
+        """ Compile the node. """
+
+        cexpr = self._expr.compile()
+        code.add_line("renderer.render(str({0}))".format(cexpr))
+
 
 class IncludeNode(Node):
     """ A node to include another template. """
 
-    def __init__(self, template, line, filename):
+    def __init__(self, template, line, target):
         """ Initialize the include node. """
         Node.__init__(self, template, line)
-        self._filename = filename
+        self._target = target
 
     def render(self, renderer):
         """ Actually do the work of including the template. """
-        try:
-            self._template._include(self._filename, renderer)
-        except (IOError, OSError) as e:
-            raise TemplateError(
-                str(e),
-                self._template._filename,
-                self._line
-            )
+        self._target.render(renderer, save=False)
+
+    def compile(self, code, depth):
+        """ Compile the node. """
+        code.add_line("template = env.load_file({0})".format(repr(self._target._filename)))
+        code.add_line("template.render(renderer, save=False, compiled=True)")
 
 
 class WithNode(Node):
@@ -160,6 +212,20 @@ class WithNode(Node):
 
         env.restore_context()
 
+    def compile(self, code, depth):
+        """ Compile the node. """
+
+        code.add_line("env.save_context()")
+
+        for (var, expr) in self._assigns:
+            cexpr = expr.compile()
+            code.add_line("env.set({0}, {1})".format(repr(var), cexpr))
+
+        for node in self._nodes:
+            node.compile(code, depth + 1)
+
+        code.add_line("env.restore_context()")
+
 
 class AssignNode(Node):
     """ Set a variable to a subvariable. """
@@ -175,6 +241,13 @@ class AssignNode(Node):
 
         for (var, expr) in self._assigns:
             env.set(var, expr.eval())
+
+    def compile(self, code, depth):
+        """ Compile the node. """
+
+        for (var, expr) in self._assigns:
+            cexpr = expr.compile()
+            code.add_line("env.set({0}, {1})".format(repr(var), cexpr))
 
 
 class SectionNode(Node):
@@ -197,6 +270,17 @@ class SectionNode(Node):
 
         renderer.pop_section()
 
+    def compile(self, code, depth):
+        """ Compile the node. """
+
+        cexpr = self._expr.compile()
+        code.add_line("renderer.push_section(str({0}))".format(cexpr))
+
+        for node in self._nodes:
+            node.compile(code, depth + 1)
+
+        code.add_line("renderer.pop_section()")
+
 
 class UseSectionNode(Node):
     """ A node to use a section in the output. """
@@ -212,29 +296,10 @@ class UseSectionNode(Node):
         section = str(self._expr.eval())
         renderer.render(renderer.get_section(section))
 
+    def compile(self, code, depth):
+        """ Compile the node. """
 
-class CallNode(Node):
-    """ A node to call a defined block. """
+        cexpr = self._expr.compile()
+        code.add_line("renderer.render(renderer.get_section(str({0})))".format(cexpr))
 
-    def __init__(self, template, line, name):
-        """ Initialize. """
-        Node.__init__(self, template, line)
-        self._name = name
-
-    def render(self, renderer):
-        """ Render the called block. """
-
-        nodes = self._template._defines.get(self._name, None)
-        if nodes is None:
-            nodes = self._env._defines.get(self._name, None)
-
-        if nodes is None:
-            raise UnknownDefineError(
-                self._name,
-                self._template._filename,
-                self._line
-            )
-
-        for node in nodes:
-            node.render(renderer)
 

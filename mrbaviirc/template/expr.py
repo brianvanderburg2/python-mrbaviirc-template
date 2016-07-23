@@ -26,6 +26,10 @@ class Expr(object):
         """ Evaluate the expression object. """
         raise NotImplementedError
 
+    def compile(self):
+        """ Compile the portion of an expression to a string. """
+        raise NotImplementedError
+
 
 class ValueExpr(Expr):
     """ An expression that represents a value. """
@@ -39,6 +43,10 @@ class ValueExpr(Expr):
         """ Evaluate the expression. """
         return self._value
 
+    def compile(self):
+        """ Compile the expression. """
+        return repr(self._value)
+
 class FuncExpr(Expr):
     """ A function expression node. """
 
@@ -51,13 +59,22 @@ class FuncExpr(Expr):
     def eval(self):
         """ Evaluate the expression. """
         try:
-            return self._env.filter(self._var, [node.eval() for node in self._nodes])
+            fn = self._env.get(self._var)
+            params = [node.eval() for node in self._nodes]
+            return fn(*params)
         except KeyError:
-            raise UnknownFilterError(
+            raise UnknownVariableError(
                 ".".join(self._var),
                 self._template._filename,
                 self._line
             )
+
+    def compile(self):
+        """ Compile the expression. """
+        cparams = [node.compile() for node in self._nodes]
+        return "getvar(env, {0}, {1})({2})".format(
+            repr(self._var), self._line, ",".join(cparams)
+        )
 
 class ListExpr(Expr):
     """ A list expression node. """
@@ -71,6 +88,11 @@ class ListExpr(Expr):
         """ Evaluate the expression. """
         return [node.eval() for node in self._nodes]
 
+    def compile(self):
+        """ Compile the expression. """
+        cparams = [node.compile() for node in self._nodes]
+        return "[{0}]".format(",".join(cparams))
+
 class VarExpr(Expr):
     """ An expression that represents a variable. """
 
@@ -83,11 +105,17 @@ class VarExpr(Expr):
         """ Evaluate the expression. """
         try:
             return self._env.get(self._var)
-        except (KeyError, ValueError, TypeError, AttributeError):
+        except KeyError:
             raise UnknownVariableError(
                 ".".join(self._var),
                 self._template._filename,
                 self._line
             )
+
+    def compile(self):
+        """ Compile the expression. """
+        return "getvar(env, {0}, {1})".format(
+            repr(self._var), self._line
+        )
 
 
