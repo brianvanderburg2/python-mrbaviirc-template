@@ -494,7 +494,11 @@ class TemplateParser(object):
     def _parse_expr_list(self, start):
         """ Pare an expression that's a list. """
         (nodes, pos) = self._parse_expr_items(start, "]")
-        node = ListExpr(self._template, self._line, nodes)
+
+        if nodes and all(isinstance(node, ValueExpr) for node in nodes):
+            node = ValueExpr(self._template, nodes[0]._line, [node.eval() for node in nodes])
+        else:
+            node = ListExpr(self._template, self._line, nodes)
         return (node, pos)
 
     def _parse_expr_number(self, start):
