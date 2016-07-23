@@ -92,8 +92,7 @@ class Template(object):
             raise Error("Can't include a template if a filename isn't specified.")
 
         newfile = os.path.join(os.path.dirname(self._filename), *(filename.split("/")))
-        t = self._env.load_file(newfile)
-        return t
+        return self._env.load_file(newfile)
 
     def _compile(self):
         """ Compile the template to a python function. """
