@@ -66,9 +66,8 @@ class Template(object):
         # Parse the template
         parser = TemplateParser(self, text)
         self._nodes = parser.parse()
-        (self._code, self._fn) = self._compile()
 
-    def render(self, renderer, context=None, save=True, compiled=False):
+    def render(self, renderer, context=None, save=True):
         """ Render the template. """
         env = self._env
         if save:
@@ -77,11 +76,8 @@ class Template(object):
         if context:
             env._context.update(context)
 
-        if compiled:
-            self._fn(self, env, renderer)
-        else:
-            for node in self._nodes:
-                node.render(renderer)
+        for node in self._nodes:
+            node.render(renderer)
 
         if save:
             env.restore_context()
@@ -93,39 +89,4 @@ class Template(object):
 
         newfile = os.path.join(os.path.dirname(self._filename), *(filename.split("/")))
         return self._env.load_file(newfile)
-
-    def _compile(self):
-        """ Compile the template to a python function. """
-        code = CodeBuilder()
-
-        # Get a variable
-        code.add_line("def getvar(env, var, line):")
-        code.indent()
-
-        code.add_line("try:")
-        code.indent()
-        code.add_line("return env.get(var)")
-        code.dedent()
-
-        code.add_line("except KeyError:")
-        code.indent()
-        code.add_line("raise UnknownVariableError('.'.join(var), {0}, line)".format(
-            repr(self._filename)
-        ))
-        code.dedent()
-
-        code.dedent()
-
-
-        # Render function
-        code.add_line("def render(template, env, renderer):")
-        code.indent()
-
-        for node in self._nodes:
-            node.compile(code, 0)
-
-        code.dedent()
-
-        _globals = code.execute()
-        return (str(code), _globals["render"])
 

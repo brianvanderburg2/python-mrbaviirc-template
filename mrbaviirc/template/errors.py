@@ -16,6 +16,10 @@ class Error(Exception):
     def __init__(self, message):
         self.message = message
 
+    def __str__(self):
+        return self.message
+
+
 
 class TemplateError(Error):
     """ An error at a specific location in atemplate file. """
