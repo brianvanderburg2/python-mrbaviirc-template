@@ -152,10 +152,8 @@ class TemplateParser(object):
             pos = self._parse_action_section(end)
         elif action == "use":
             pos = self._parse_action_use(end)
-        elif action == "localdef":
-            pos = self._parse_action_def(end, self._template._defines)
-        elif action == "globaldef":
-            pos = self._parse_action_def(end, self._template._env._defines)
+        elif action == "def":
+            pos = self._parse_action_def(end)
         elif action == "call":
             pos = self._parse_action_call(end)
         elif action.startswith("end"):
@@ -333,7 +331,7 @@ class TemplateParser(object):
 
         return pos
 
-    def _parse_action_def(self, start, target):
+    def _parse_action_def(self, start):
         """ Parse a local or global def. """
         line = self._line
 
@@ -342,7 +340,7 @@ class TemplateParser(object):
 
         self._ops_stack.append(("def", line))
 
-        nodes = target.setdefault(name, [])
+        nodes = self._defines.setdefault(name, [])
         self._stack.append(nodes)
 
         return pos
@@ -356,9 +354,6 @@ class TemplateParser(object):
 
 
         nodes = self._template._defines.get(name, None)
-        if nodes is None:
-            nodes = self.template._env._defines.get(name, None)
-
         if nodes is None:
             raise UnknownDefineError(
                 name,
