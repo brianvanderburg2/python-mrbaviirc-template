@@ -17,7 +17,6 @@ if __name__ == "__main__":
 
         parser = argparse.ArgumentParser(description="Template Test")
         parser.add_argument("-c", dest="count", default=1, help="Render the template this many times")
-        parser.add_argument("-f", dest="fast", default=False, action="store_true", help="Fast render using compile.")
         parser.add_argument("-p", dest="show", default=None, action="store_true", help="Print compiled templates.")
         parser.add_argument("template", help="Location of the template")
         parser.add_argument("data", nargs="?", help="Location of the data json")
@@ -48,7 +47,7 @@ if __name__ == "__main__":
 
             for i in range(int(args.count)):
                 data["cycle"] = i + 1
-                t.render(o, data, compiled=args.fast)
+                t.render(o, data)
     except Error as e:
         print(e.message)
 
