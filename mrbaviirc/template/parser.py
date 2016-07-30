@@ -441,15 +441,18 @@ class TemplateParser(object):
 
         return -1
 
-    def _skip_word(self, start, word, errmsg=None):
+    def _skip_word(self, start, word, errmsg=None, space=True):
         """ Skip a word. """
         pos = self._skip_space(start, errmsg)
         if pos == -1:
             return -1
 
-        end = self._find_space(pos, errmsg)
-        if pos == -1:
-            return -1
+        if space:
+            end = self._find_space(pos, errmsg)
+            if pos == -1:
+                return -1
+        else:
+            end = pos + len(word)
 
         if self._text[pos:end] == word:
             return end
@@ -458,7 +461,7 @@ class TemplateParser(object):
             raise SyntaxError(
                 errmsg,
                 self._template._filename,
-                line
+                self._line
             )
 
         return -1
@@ -561,7 +564,7 @@ class TemplateParser(object):
         pos = self._skip_space(start, "Expected variable")
         (var, pos) = self._parse_var(pos, False)
 
-        pos = self._skip_word(pos, "=", "Expected '='")
+        pos = self._skip_word(pos, "=", "Expected '='", False)
         (expr, pos) = self._parse_expr(pos)
 
         return (var, expr, pos)
