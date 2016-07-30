@@ -1,0 +1,8 @@
+{{ author }}
+{{ nested.item1 }}
+{% with author = "Me", other="You", one= "Okay", two ="AndOkay" %}
+{{ author }}
+{{ other }}
+{{ one }}{{ two }}
+{% endwith %}
+{{ author }}

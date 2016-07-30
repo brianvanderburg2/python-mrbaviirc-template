@@ -1,0 +1,23 @@
+{
+    "author": "Brian Allen Vanderburg II",
+    "weekdays": [
+        "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"
+    ],
+    "people": [
+        {
+            "name": "Bob",
+            "age": 22
+        },
+        {
+            "name": "Susan",
+            "age": 25
+        }
+    ],
+    "true": 1,
+    "false": 0,
+    "nested": {
+        "item1": 11,
+        "item2": 22
+    }
+}
+

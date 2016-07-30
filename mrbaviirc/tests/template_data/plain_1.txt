@@ -1,0 +1,1 @@
+This is play text (note new line auto added by Vim)
