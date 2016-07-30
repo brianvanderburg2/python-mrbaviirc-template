@@ -1,17 +1,16 @@
-# \file
-# \author Brian Allen Vanderburg II
-# \copyright MIT license
-# \date 2016
-#
-# This file provides the nodes used by the template engine.
+""" Provide the nodes for the template engine. """
 
-from .errors import *
-
+__author__      = "Brian Allen Vanderburg II"
+__copyright__   = "Copyright 2016"
+__license__     = "MIT"
 
 __all__ = [
     "Node", "TextNode", "IfNode", "ForNode", "VarNode", "IncludeNode",
     "WithNode", "AssignNode", "SectionNode", "UseSectionNode"
 ]
+
+
+from .errors import *
 
 
 class Node(object):

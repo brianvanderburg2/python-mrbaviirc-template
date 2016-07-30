@@ -1,9 +1,9 @@
-# \file
-# \author Brian Allen Vanderburg II
-# \copyright MIT license
-# \date 2016
-#
-# This file provides the parsers used by the template engine.
+""" A parser for the template engine. """
+
+__author__      = "Brian Allen Vanderburg II"
+__copyright__   = "Copyright 2016"
+__license__     = "MIT"
+
 
 import re
 

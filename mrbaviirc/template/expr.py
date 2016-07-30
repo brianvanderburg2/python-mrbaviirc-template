@@ -1,16 +1,15 @@
-# \file
-# \author Brian Allen Vanderburg II
-# \copyright MIT license
-# \date 2016
-#
-# This file provides the expression nodes used by the template engine.
+""" Provide expressions for the templates. """
 
-from .errors import *
-
+__author__      = "Brian Allen Vanderburg II"
+__copyright__   = "Copyright 2016"
+__license__     = "MIT"
 
 __all__ = [
     "Expr", "ValueExpr", "FuncExpr", "ListExpr", "VarExpr"
 ]
+
+
+from .errors import *
 
 
 class Expr(object):

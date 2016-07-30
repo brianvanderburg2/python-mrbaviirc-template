@@ -1,14 +1,8 @@
-# \file
-# \author Brian Allen Vanderburg II
-# \copyright MIT license
-# \date 2016
-#
-# This file provides the exceptions used by the template engine.
+""" Provide errors for the templates. """
 
-__all__ = [
-    "Error", "TemplateError", "SyntaxError", "UnknownVariableError",
-    "UnknownDefineError"
-]
+__author__      = "Brian Allen Vanderburg II"
+__copyright__   = "Copyright 2016"
+__license__     = "MIT"
 
 
 class Error(Exception):

@@ -1,9 +1,8 @@
-# \file
-# \author Brian Allen Vanderburg II
-# \copyright MIT license
-# \date 2016
-#
-# This file provides the renderers used by the template engine.
+""" Renderers for the template engine. """
+
+__author__      = "Brian Allen Vanderburg II"
+__copyright__   = "Copyright 2016"
+__license__     = "MIT"
 
 
 class Renderer(object):

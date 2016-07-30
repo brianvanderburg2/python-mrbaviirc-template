@@ -1,20 +1,8 @@
-# \file
-# \author Brian Allen Vanderburg II
-# \copyright MIT license
-# \date 2016
-#
-# This file provides a simple light-weight template engine.
+""" Provide a simple template engine. """
 
-# Credits
-################################################################################
-
-# Templite
-#------------------------------------------------------------------------------
-# Some portions of the code in the template package were originally based on
-# the Templite class in the 500 lines or less project.  However, the code
-# has been largely rewritten and refactored to my own needs.  Still some of the
-# original ideas originated with Templite
-#
+__author__      = "Brian Allen Vanderburg II"
+__copyright__   = "Copyright 2016"
+__license__     = "MIT"
 
 
 from .errors import *
