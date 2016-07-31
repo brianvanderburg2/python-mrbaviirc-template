@@ -1,9 +1,9 @@
-# \file
-# \author Brian Allen Vanderburg II
-# \copyright MIT license
-# \date 2016
-#
-# This file runs the unit tests for mrbaviirc
+""" Main entry point for unit tests. """
+
+__author__      = "Brian Allen Vanderburg II"
+__copyright__   = "Copyright 2016"
+__license__     = "Apache License 2.0"
+
 
 import unittest
 
