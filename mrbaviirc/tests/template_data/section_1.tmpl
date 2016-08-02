@@ -1,0 +1,8 @@
+This file tests sections
+
+{% for name in ["sec1", "sec2", "sec3"] %}
+{% section name %}
+This is section {{ name }}
+{% endsection %}
+{% endfor %}
+{% use name %}

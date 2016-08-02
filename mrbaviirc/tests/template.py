@@ -33,12 +33,12 @@ class TemplateTest(unittest.TestCase):
 
         for path in sorted(glob.glob(os.path.join(DATADIR, "*.tmpl"))):
             source = path
-            target = source[:-5] + ".txt"
 
             tmpl = self._env.load_file(filename=source)
             rndr = template.StringRenderer()
             tmpl.render(rndr, data)
 
+            target = source[:-5] + ".txt"
             contents = rndr.get()
 
             with open(target, "rU") as handle:
@@ -49,6 +49,22 @@ class TemplateTest(unittest.TestCase):
                 target_contents,
                 "render compare failed: {0}".format(os.path.basename(path))
             )
+
+            sections = rndr.get_sections()
+            for section in sections:
+                target = source[:-5] + "_" + section + ".txt"
+                contents = rndr.get_section(section)
+
+                with open(target, "rU") as handle:
+                    target_contents = handle.read()
+
+                self.assertEqual(
+                    contents,
+                    target_contents,
+                    "render comapre failed: {0}:{1}".format(
+                        os.path.basename(path),
+                        section
+                ))
 
 
 def suite():
