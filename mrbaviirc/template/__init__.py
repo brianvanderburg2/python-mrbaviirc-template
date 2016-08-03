@@ -8,6 +8,7 @@ __license__     = "Apache License 2.0"
 from .errors import *
 from .renderers import *
 from .env import Environment
+from .loaders import *
 from .template import Template
 
 

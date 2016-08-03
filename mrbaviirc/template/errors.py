@@ -14,14 +14,16 @@ class Error(Exception):
         return self.message
 
 
+class RestrictedError(Error):
+    """ Represent an restriction". """
+    pass
+
 
 class TemplateError(Error):
     """ An error at a specific location in atemplate file. """
-    MESSAGE_PREFIX = "Template Error"
 
     def __init__(self, message, filename, line):
-        Error.__init__(self, "{0}: {1} on {2}:{3}".format(
-            self.MESSAGE_PREFIX,
+        Error.__init__(self, "{0} on: {1}:{2}".format(
             message,
             filename if filename else "<string>",
             line
@@ -32,15 +34,15 @@ class TemplateError(Error):
 
 class SyntaxError(TemplateError):
     """ Represent a syntax error in the template. """
-    MESSAGE_PREFIX = "Syntax Error"
+    pass
 
 
 class UnknownVariableError(TemplateError):
     """ Represent an unknown variable access. """
-    MESSAGE_PREFIX = "Unknown Variable Error"
+    pass
 
 
 class UnknownDefineError(TemplateError):
     """ Represent an unknown definition access. """
-    MESSAGE_PREFIX = "Unknown Define Error"
+    pass
 

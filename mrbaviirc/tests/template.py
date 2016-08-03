@@ -20,7 +20,8 @@ DATADIR = os.path.join(os.path.dirname(__file__), "template_data")
 class TemplateTest(unittest.TestCase):
 
     def setUp(self):
-        self._env = template.Environment()
+        loader = template.FileSystemLoader(DATADIR)
+        self._env = template.Environment(loader=loader)
 
     def tearDown(self):
         self._env = None

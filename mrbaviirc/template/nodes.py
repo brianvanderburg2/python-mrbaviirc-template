@@ -128,7 +128,7 @@ class IncludeNode(Node):
                 str(self._expr.eval()),
                 self._template._filename
             )
-        except (IOError, OSError) as e:
+        except (IOError, OSError, RestrictedError) as e:
             raise TemplateError(
                 str(e),
                 self._template._filename,
