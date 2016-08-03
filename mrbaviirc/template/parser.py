@@ -288,19 +288,10 @@ class TemplateParser(object):
         """ Parse an include node. """
         line = self._line
 
-        pos = self._skip_space(start, "Expecting string")
-        (path, pos) = self._parse_string(pos)
+        pos = self._skip_space(start, "Expecting expression")
+        (expr, pos) = self._parse_expr(pos)
 
-        try:
-            target = self._template._include(path)
-        except (IOError, OSError) as e:
-            raise TemplateError(
-                str(e),
-                self._template._filename,
-                line
-            )
-
-        node = IncludeNode(self._template, line, target)
+        node = IncludeNode(self._template, line, expr)
         self._stack[-1].append(node)
 
         return pos

@@ -116,14 +116,26 @@ class VarNode(Node):
 class IncludeNode(Node):
     """ A node to include another template. """
 
-    def __init__(self, template, line, target):
+    def __init__(self, template, line, expr):
         """ Initialize the include node. """
         Node.__init__(self, template, line)
-        self._target = target
+        self._expr = expr
 
     def render(self, renderer):
         """ Actually do the work of including the template. """
-        self._target.render(renderer, save=False)
+        try:
+            template = self._env.load_file(
+                str(self._expr.eval()),
+                self._template._filename
+            )
+        except (IOError, OSError) as e:
+            raise TemplateError(
+                str(e),
+                self._template._filename,
+                self._line
+            )
+
+        template.render(renderer, save=False)
 
 
 class WithNode(Node):

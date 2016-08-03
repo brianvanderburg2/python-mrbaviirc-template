@@ -81,11 +81,3 @@ class Template(object):
         if save:
             env.restore_context()
 
-    def _include(self, filename):
-        """ Include another template. """
-        if self._filename is None:
-            raise Error("Can't include a template if a filename isn't specified.")
-
-        newfile = os.path.join(os.path.dirname(self._filename), *(filename.split("/")))
-        return self._env.load_file(newfile)
-
