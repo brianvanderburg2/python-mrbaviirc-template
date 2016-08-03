@@ -5,33 +5,31 @@ __copyright__   = "Copyright 2016"
 __license__     = "Apache License 2.0"
 
 
-import os
-
 from .template import Template
+from .loaders import FileSystemLoader
 from .errors import *
 
 
 class Environment(object):
     """ represent a template environment. """
 
-    def __init__(self, context=None):
+    def __init__(self, context=None, loader=None):
         """ Initialize the template environment. """
 
         self._context = {}
         if context:
             self._context.update(context)
 
+        if loader:
+            self._loader = loader
+        else:
+            self._loader = FileSystemLoader()
+
         self._saved_contexts = []
-        self._cache = {}
 
-    def load_file(self, filename):
+    def load_file(self, filename, parent=None):
         """ Load a template from a file. """
-
-        abspath = os.path.abspath(os.path.normpath(filename))
-        if not abspath in self._cache:
-            self._cache[abspath] = Template(self, filename=abspath)
-
-        return self._cache[abspath]
+        return self._loader.load_template(self, filename, parent)
 
     def load_text(self, text):
         """ Load a template from a string. """

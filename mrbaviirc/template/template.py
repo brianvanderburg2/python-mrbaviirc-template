@@ -54,12 +54,11 @@ class Template(object):
         
         # Initialize
         self._env = env
+        self._text = text
         self._filename = filename
 
         if text is None:
-            if self._filename is None:
-                raise Error("Filename must be specified if text is not.")
-            text = open(self._filename, "rU").read()
+            raise Error("Template text must be specified.")
 
         self._defines = {}
 
