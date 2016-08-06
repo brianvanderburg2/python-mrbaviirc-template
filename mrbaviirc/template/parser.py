@@ -79,11 +79,17 @@ class TemplateParser(object):
         start = pos + 2
         if self._text[start:start + 1] == "-":
             post_strip = True
+            post_strip_nl = True
+            start += 1
+        elif self._text[start:start + 1] == "<":
+            post_strip = True
+            post_strip_nl = False
             start += 1
         else:
             post_strip = False
+            post_strip_nl = False
 
-        self._flush_buffer(post_strip)
+        self._flush_buffer(post_strip, post_strip_nl)
         if tag == "{#":
             return self._parse_tag_comment(start)
         elif tag == "{%":
@@ -691,7 +697,7 @@ class TemplateParser(object):
                 
 
 
-    def _flush_buffer(self, post=False):
+    def _flush_buffer(self, post_strip=False, post_strip_nl=False):
         """ Flush the buffer to output. """
         if self._buffer:
             text = "".join(self._buffer)
@@ -708,14 +714,17 @@ class TemplateParser(object):
                     else:
                         text = text[:first_nl + 1].lstrip() + text[first_nl + 1:]
 
-                if post:
-                    # If the current tag has a white-space contro {{- ... }}
+                if post_strip:
+                    # If the current tag has a white-space control {{- ... }}
                     # trim the end of the buffer up to/including a new line
+                    # If the current tag has a white-space control {{< .. }}
+                    # trim the end of the buffer up to but excluding a new line
                     last_nl = text.rfind("\n")
                     if last_nl == -1:
                         text = text.rstrip()
                     else:
-                        text = text[:last_nl] + text[last_nl:].rstrip()
+                        nl = 0 if post_strip_nl else 1
+                        text = text[:last_nl + nl] + text[last_nl + nl:].rstrip()
             
             if text:
                 node = TextNode(self._template, self._line, text)
