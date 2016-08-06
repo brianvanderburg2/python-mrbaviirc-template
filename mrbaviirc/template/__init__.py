@@ -10,5 +10,6 @@ from .renderers import *
 from .env import Environment
 from .loaders import *
 from .template import Template
+from .lib import StdLib
 
 

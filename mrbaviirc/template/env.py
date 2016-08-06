@@ -51,10 +51,8 @@ class Environment(object):
                 
         return value
 
-    def set(self, var1, var2):
+    def set(self, name, value):
         """ Set a value in the context. """
-        self._context[var1] = var2
-
-
+        self._context[name] = value
 
 
