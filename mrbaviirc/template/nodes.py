@@ -78,10 +78,11 @@ class IfNode(Node):
 class ForNode(Node):
     """ A node for handling for loops. """
 
-    def __init__(self, template, line, var, expr):
+    def __init__(self, template, line, var, cvar, expr):
         """ Initialize the for node. """
         Node.__init__(self, template, line)
         self._var = var
+        self._cvar = cvar
         self._expr = expr
         self._nodes = []
 
@@ -92,8 +93,12 @@ class ForNode(Node):
         # Iterate over each value
         values = self._expr.eval()
         if values:
+            index = 0
             for var in values:
+                if self._cvar:
+                    env.set(self._cvar, index)
                 env.set(self._var, var)
+                index += 1
                                     
                 # Execute each sub-node
                 for node in self._nodes:

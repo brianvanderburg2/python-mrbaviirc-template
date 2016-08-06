@@ -252,12 +252,18 @@ class TemplateParser(object):
 
         pos = self._skip_space(start, "Expected variable")
         (var, pos) = self._parse_var(pos, False)
+        pos = self._skip_space(pos)
+
+        if self._text[pos:pos + 1] == ",":
+            (cvar, pos) = self._parse_var(pos + 1, False)
+        else:
+            cvar = None
 
         pos = self._skip_word(pos, "in", "Expected 'in'")
 
         (expr, pos) = self._parse_expr(pos)
 
-        node = ForNode(self._template, line, var, expr)
+        node = ForNode(self._template, line, var, cvar, expr)
         self._ops_stack.append(("for", line))
         self._stack[-1].append(node)
         self._stack.append(node._nodes)
