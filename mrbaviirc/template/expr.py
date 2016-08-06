@@ -5,7 +5,7 @@ __copyright__   = "Copyright 2016"
 __license__     = "Apache License 2.0"
 
 __all__ = [
-    "Expr", "ValueExpr", "FuncExpr", "ListExpr", "VarExpr"
+    "Expr", "ValueExpr", "FuncExpr", "ListExpr", "VarExpr", "IndexExpr"
 ]
 
 
@@ -94,4 +94,40 @@ class VarExpr(Expr):
                 self._line
             )
 
+
+class IndexExpr(Expr):
+    """ An array index expression node. """
+
+    def __init__(self, template, line, var, nodes):
+        """ Initialize the node. """
+        Expr.__init__(self, template, line)
+        self._var = var
+        self._nodes = nodes
+
+    def eval(self):
+        """ Evaluate the expression. """
+        try:
+            var = self._env.get(self._var)
+            params = [node.eval() for node in self._nodes]
+        except KeyError:
+            raise UnknownVariableError(
+                ".".join(self._var),
+                self._template._filename,
+                self._line
+            )
+
+        try:
+            for param in params:
+                var = var[param]
+        except (TypeError, KeyError, IndexError):
+            raise UnknownIndexError(
+                "{0}[{1}]".format(
+                    ".".join(self._var),
+                    ",".join(map(str, params))
+                ),
+                self._template._filename,
+                self._line
+            )
+
+        return var
 

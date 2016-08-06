@@ -475,11 +475,14 @@ class TemplateParser(object):
             return self._parse_expr_number(pos)
 
         (var, pos) = self._parse_var(pos)
-        if self._text[pos:pos + 1] != "(":
-            node = VarExpr(self._template, self._line, var)
-        else:
+        if self._text[pos:pos + 1] == "(":
             (nodes, pos) = self._parse_expr_items(pos + 1, ")")
             node = FuncExpr(self._template, self._line, var, nodes)
+        elif self._text[pos:pos + 1] == "[":
+            (nodes, pos) = self._parse_expr_items(pos + 1, "]")
+            node = IndexExpr(self._template, self._line, var, nodes)
+        else:
+            node = VarExpr(self._template, self._line, var)
           
         return (node, pos)
 
