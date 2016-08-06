@@ -49,7 +49,7 @@ if __name__ == "__main__":
                 data["cycle"] = i + 1
                 t.render(o, data)
     except Error as e:
-        print(e.message)
+        print("{0}: {1}".format(type(e).__name__, e.message))
 
         
 
