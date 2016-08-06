@@ -711,7 +711,7 @@ class TemplateParser(object):
                 if post:
                     # If the current tag has a white-space contro {{- ... }}
                     # trim the end of the buffer up to/including a new line
-                    last_nl = text.find("\n")
+                    last_nl = text.rfind("\n")
                     if last_nl == -1:
                         text = text.rstrip()
                     else:
