@@ -182,8 +182,7 @@ class TemplateParser(object):
     def _parse_action_if(self, start):
         """ Parse an if action. """
         line = self._line
-        pos = self._skip_space(start, "Expected expression")
-        (expr, pos) = self._parse_expr(pos)
+        (expr, pos) = self._parse_expr(start)
         
         node = IfNode(self._template, line, expr)
         
@@ -195,8 +194,7 @@ class TemplateParser(object):
     def _parse_action_elif(self, start):
         """ Parse an elif action. """
         line = self._line
-        pos = self._skip_space(start, "Expected expression")
-        (expr, pos) = self._parse_expr(pos)
+        (expr, pos) = self._parse_expr(start)
 
         if not self._ops_stack:
             raise SyntaxError(
@@ -250,9 +248,8 @@ class TemplateParser(object):
         """ Parse a for statement. """
         line = self._line
 
-        pos = self._skip_space(start, "Expected variable")
-        (var, pos) = self._parse_var(pos, False)
-        pos = self._skip_space(pos)
+        (var, pos) = self._parse_var(start, False)
+        pos = self._skip_space(pos, "Expected 'in'")
 
         if self._text[pos:pos + 1] == ",":
             (cvar, pos) = self._parse_var(pos + 1, False)
@@ -300,8 +297,7 @@ class TemplateParser(object):
         """ Parse an include node. """
         line = self._line
 
-        pos = self._skip_space(start, "Expecting expression")
-        (expr, pos) = self._parse_expr(pos)
+        (expr, pos) = self._parse_expr(start)
 
         node = IncludeNode(self._template, line, expr)
         self._stack[-1].append(node)
@@ -312,8 +308,7 @@ class TemplateParser(object):
         """ Parse a section node. """
         line = self._line
 
-        pos = self._skip_space(start, "Expecting expression")
-        (expr, pos) = self._parse_expr(pos)
+        (expr, pos) = self._parse_expr(start)
 
         self._ops_stack.append(("section", line))
         node = SectionNode(self._template, line, expr)
@@ -326,8 +321,7 @@ class TemplateParser(object):
         """ Parse a use section node. """
         line = self._line
 
-        pos = self._skip_space(start, "Expecting expression")
-        (expr, pos) = self._parse_expr(pos)
+        (expr, pos) = self._parse_expr(start)
 
         node = UseSectionNode(self._template, line, expr)
         self._stack[-1].append(node)
@@ -338,8 +332,7 @@ class TemplateParser(object):
         """ Parse a local or global def. """
         line = self._line
 
-        pos = self._skip_space(start, "Expecting string")
-        (name, pos) = self._parse_string(pos)
+        (name, pos) = self._parse_string(start)
 
         self._ops_stack.append(("def", line))
 
@@ -352,8 +345,7 @@ class TemplateParser(object):
         """ Parse a call to a local or global def. """
         line = self._line
 
-        pos = self._skip_space(start, "Expecting string")
-        (name, pos) = self._parse_string(pos)
+        (name, pos) = self._parse_string(start)
 
 
         nodes = self._template._defines.get(name, None)
@@ -397,8 +389,7 @@ class TemplateParser(object):
         """ Parse an emitter tag. """
         line = self._line
 
-        pos = self._skip_space(start, "Expected expression")
-        (expr, pos) = self._parse_expr(pos)
+        (expr, pos) = self._parse_expr(start)
         pos = self._parse_tag_ending(pos, "}}")
 
         if isinstance(expr, ValueExpr):
@@ -408,7 +399,7 @@ class TemplateParser(object):
         self._stack[-1].append(node)
         return pos
         
-    def _skip_space(self, start, errmsg=None):
+    def _skip_space(self, start, errmsg):
         """ Return the first non-whitespace position. """
         for pos in range(start, len(self._text)):
             ch = self._text[pos]
@@ -420,31 +411,26 @@ class TemplateParser(object):
 
             return pos
 
-        if errmsg:
-            raise SyntaxError(
-                errmsg,
-                self._template._filename,
-                self._line
-            )
+        raise SyntaxError(
+            errmsg,
+            self._template._filename,
+            self._line
+        )
 
-        return -1
-
-    def _find_space(self, start, errmsg=None):
+    def _find_space(self, start, errmsg):
         """ Find the next space, do not increase line number. """
         for pos in range(start, len(self._text)):
             if self._text[pos] in ("\n", " ", "\t"):
                 return pos
         
-        if errmsg:
-            raise SyntaxError(
-                errmsg,
-                self._template._filename,
-                self._line
-            )
+        raise SyntaxError(
+            errmsg,
+            self._template._filename,
+            self._line
+        )
 
-        return -1
 
-    def _skip_word(self, start, word, errmsg=None, space=True):
+    def _skip_word(self, start, word, errmsg, space=True):
         """ Skip a word. """
         pos = self._skip_space(start, errmsg)
         if pos == -1:
@@ -460,14 +446,11 @@ class TemplateParser(object):
         if self._text[pos:end] == word:
             return end
 
-        if errmsg:
-            raise SyntaxError(
-                errmsg,
-                self._template._filename,
-                self._line
-            )
-
-        return -1
+        raise SyntaxError(
+            errmsg,
+            self._template._filename,
+            self._line
+        )
 
     def _parse_expr(self, start):
         """ Parse an expression and return (node, pos) """
@@ -582,7 +565,7 @@ class TemplateParser(object):
         pos = start
         first = True
         while True:
-            pos = self._skip_space(pos)
+            pos = self._skip_space(pos, "Expecting assignment")
             if self._text[pos] in "-%": # Ending of the tag
                 break
 
@@ -604,6 +587,7 @@ class TemplateParser(object):
     def _parse_string(self, start):
         """ Parse a string and return (str, pos) """
 
+        start = self._skip_space(start, "Expecting string")
         if self._text[start:start + 1] != "\"":
             raise SyntaxError(
                 "Expected string",
@@ -649,7 +633,8 @@ class TemplateParser(object):
         first = True
         result = []
         current = []
-        for pos in range(start, len(self._text)):
+        pos = self._skip_space(start, "Expecting variable")
+        for pos in range(pos, len(self._text)):
             ch = self._text[pos]
 
             if ch == ".":
