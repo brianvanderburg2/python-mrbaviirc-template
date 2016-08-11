@@ -433,13 +433,9 @@ class TemplateParser(object):
     def _skip_word(self, start, word, errmsg, space=True):
         """ Skip a word. """
         pos = self._skip_space(start, errmsg)
-        if pos == -1:
-            return -1
 
         if space:
             end = self._find_space(pos, errmsg)
-            if pos == -1:
-                return -1
         else:
             end = pos + len(word)
 
