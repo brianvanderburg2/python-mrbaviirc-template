@@ -136,40 +136,36 @@ class TemplateParser(object):
         """ Parse some action tag. """
         
         # Determine the action
-        pos = self._skip_space(start, "Incomplete tag")
-        end = self._find_space(pos, "Incomplete tag")
-        action = self._text[pos:end]
+        (action, pos) = self._parse_word(start)
         
         if action == "if":
-            pos = self._parse_action_if(end)
+            pos = self._parse_action_if(pos)
         elif action == "elif":
-            pos = self._parse_action_elif(end)
+            pos = self._parse_action_elif(pos)
         elif action == "else":
-            pos =  self._parse_action_else(end)
+            pos =  self._parse_action_else(pos)
         elif action == "for":
-            pos = self._parse_action_for(end)
+            pos = self._parse_action_for(pos)
         elif action == "set":
-            pos = self._parse_action_set(end)
+            pos = self._parse_action_set(pos)
         elif action == "with":
-            pos = self._parse_action_with(end)
+            pos = self._parse_action_with(pos)
         elif action == "include":
-            pos = self._parse_action_include(end)
+            pos = self._parse_action_include(pos)
         elif action == "section":
-            pos = self._parse_action_section(end)
+            pos = self._parse_action_section(pos)
         elif action == "use":
-            pos = self._parse_action_use(end)
+            pos = self._parse_action_use(pos)
         elif action == "def":
-            pos = self._parse_action_def(end)
+            pos = self._parse_action_def(pos)
         elif action == "call":
-            pos = self._parse_action_call(end)
+            pos = self._parse_action_call(pos)
         elif action.startswith("end"):
-            pos = self._parse_action_end(end, action)
+            pos = self._parse_action_end(pos, action)
         elif action == "autostrip":
             self._auto_strip = True
-            pos = end
         elif action == "no_autostrip":
             self._auto_strip = False
-            pos = end
         else:
             raise SyntaxError(
                 "Unknown action tag: {0}".format(action),
@@ -182,7 +178,8 @@ class TemplateParser(object):
     def _parse_action_if(self, start):
         """ Parse an if action. """
         line = self._line
-        (expr, pos) = self._parse_expr(start)
+        pos = self._skip_space(start, "Expected expression", True)
+        (expr, pos) = self._parse_expr(pos)
         
         node = IfNode(self._template, line, expr)
         
@@ -194,7 +191,8 @@ class TemplateParser(object):
     def _parse_action_elif(self, start):
         """ Parse an elif action. """
         line = self._line
-        (expr, pos) = self._parse_expr(start)
+        pos = self._skip_space(start, "Expected expression", True)
+        (expr, pos) = self._parse_expr(pos)
 
         if not self._ops_stack:
             raise SyntaxError(
@@ -248,7 +246,8 @@ class TemplateParser(object):
         """ Parse a for statement. """
         line = self._line
 
-        (var, pos) = self._parse_var(start, False)
+        pos = self._skip_space(start, "Expected variable", True)
+        (var, pos) = self._parse_var(pos, False)
         pos = self._skip_space(pos, "Expected 'in'")
 
         if self._text[pos:pos + 1] == ",":
@@ -271,7 +270,8 @@ class TemplateParser(object):
         """ Parse a set statement. """
         line = self._line
 
-        (assigns, pos) = self._parse_multi_assign(start)
+        pos = self._skip_space(start, "Expected assignment", True)
+        (assigns, pos) = self._parse_multi_assign(pos)
 
         node = AssignNode(self._template, line, assigns)
         self._stack[-1].append(node)
@@ -284,7 +284,13 @@ class TemplateParser(object):
 
         self._ops_stack.append(("with", line))
 
-        (assigns, pos) = self._parse_multi_assign(start)
+        if not self._text[start:start+1] in ("-", "%"):
+            pos = self._skip_space(start, "Expected assignment", True)
+            (assigns, pos) = self._parse_multi_assign(pos)
+        else:
+            pos = start
+            assigns = []
+
 
         node = WithNode(self._template, line, assigns)
         self._stack[-1].append(node)
@@ -297,7 +303,8 @@ class TemplateParser(object):
         """ Parse an include node. """
         line = self._line
 
-        (expr, pos) = self._parse_expr(start)
+        pos = self._skip_space(start, "Expected expression", True)
+        (expr, pos) = self._parse_expr(pos)
 
         node = IncludeNode(self._template, line, expr)
         self._stack[-1].append(node)
@@ -308,7 +315,8 @@ class TemplateParser(object):
         """ Parse a section node. """
         line = self._line
 
-        (expr, pos) = self._parse_expr(start)
+        pos = self._skip_space(start, "Expected expression", True)
+        (expr, pos) = self._parse_expr(pos)
 
         self._ops_stack.append(("section", line))
         node = SectionNode(self._template, line, expr)
@@ -321,7 +329,8 @@ class TemplateParser(object):
         """ Parse a use section node. """
         line = self._line
 
-        (expr, pos) = self._parse_expr(start)
+        pos = self._skip_space(start, "Expected expression", True)
+        (expr, pos) = self._parse_expr(pos)
 
         node = UseSectionNode(self._template, line, expr)
         self._stack[-1].append(node)
@@ -332,7 +341,8 @@ class TemplateParser(object):
         """ Parse a local or global def. """
         line = self._line
 
-        (name, pos) = self._parse_string(start)
+        pos = self._skip_space(start, "Expected string", True)
+        (name, pos) = self._parse_string(pos)
 
         self._ops_stack.append(("def", line))
 
@@ -345,8 +355,8 @@ class TemplateParser(object):
         """ Parse a call to a local or global def. """
         line = self._line
 
-        (name, pos) = self._parse_string(start)
-
+        pos = self._skip_space(start, "Expected string", True)
+        (name, pos) = self._parse_string(pos)
 
         nodes = self._template._defines.get(name, None)
         if nodes is None:
@@ -399,7 +409,7 @@ class TemplateParser(object):
         self._stack[-1].append(node)
         return pos
         
-    def _skip_space(self, start, errmsg):
+    def _skip_space(self, start, errmsg, required=False):
         """ Return the first non-whitespace position. """
         for pos in range(start, len(self._text)):
             ch = self._text[pos]
@@ -408,8 +418,10 @@ class TemplateParser(object):
                 continue
             elif ch in (" ", "\t"):
                 continue
-
-            return pos
+            elif required and (pos == start):
+                 break
+            else:
+                return pos
 
         raise SyntaxError(
             errmsg,
@@ -428,7 +440,6 @@ class TemplateParser(object):
             self._template._filename,
             self._line
         )
-
 
     def _skip_word(self, start, word, errmsg, space=True):
         """ Skip a word. """
@@ -681,8 +692,23 @@ class TemplateParser(object):
             return (result, pos)
         else:
             return ("".join(current), pos)
-                
 
+    def _parse_word(self, start):
+        """ Parse a word (a-zA-Z_) and return (word, pos) """
+        pos = self._skip_space(start, "Expected word")
+
+        result = []
+        for pos in range(pos, len(self._text)):
+            ch = self._text[pos]
+
+            if ch in ("abcdefghijklmnopqrstuvwxyz"
+                      "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                      "_"):
+                result.append(ch)
+            else:
+                break
+
+        return ("".join(result), pos)
 
     def _flush_buffer(self, post_strip=False, post_strip_nl=False):
         """ Flush the buffer to output. """
