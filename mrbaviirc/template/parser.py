@@ -352,6 +352,7 @@ class TemplateParser(object):
         self._buffer = []
         self._pre_strip = False
         self._auto_strip = False
+        self._auto_strip_stack = []
 
     def _get_token(self, pos, errmsg="Expected token"):
         """ Get a token at a position. """
@@ -481,6 +482,10 @@ class TemplateParser(object):
             pos = self._parse_action_call(pos)
         elif action.startswith("end"):
             pos = self._parse_action_end(pos, action)
+        elif action == "push_autostrip":
+            pos = self._parse_action_push_autostrip(pos)
+        elif action == "pop_autostrip":
+            pos = self._parse_action_pop_autostrip(pos)
         elif action == "autostrip":
             self._auto_strip = True
         elif action == "no_autostrip":
@@ -718,6 +723,39 @@ class TemplateParser(object):
         self._ops_stack.pop()
         self._stack.pop()
 
+        return start
+
+    def _parse_action_push_autostrip(self, start):
+        """ Push autostrip and change the state. """
+
+        self._auto_strip_stack.append(self._auto_strip)
+
+        token = self._get_token(start, "Expected on or off")
+        if token._type == Token.TYPE_END_ACTION:
+            # No change
+            return start
+
+        if token._type != Token.TYPE_WORD or not token._value in ("on", "off"):
+            raise SyntaxError(
+                "Expected on or off",
+                self._template._filename,
+                token._line
+            )
+
+        self._auto_strip = (token._value == "on")
+        return start + 1
+
+    def _parse_action_pop_autostrip(self, start):
+        """ Return the state of autostrip. """
+
+        if not self._auto_strip_stack:
+            raise SyntaxError(
+                "No currently pushed autostrip values.",
+                self._template._filename,
+                self._token._line
+            )
+
+        self._auto_strip = self._auto_strip_stack.pop()
         return start
 
     def _parse_tag_emitter(self, start):
