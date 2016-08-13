@@ -656,22 +656,34 @@ class TemplateParser(object):
         """ Parse a local or global def. """
         line = self._token._line
 
-        (name, pos) = self._parse_string(pos)
+        token = self._get_token(start, "Expected string")
+        if token._type != Token.TYPE_STRING:
+            raise SyntaxError(
+                "Expected string",
+                self._template._filename,
+                line
+            )
 
         self._ops_stack.append(("def", line))
 
-        nodes = self._defines.setdefault(name, [])
+        nodes = self._template._defines.setdefault(token._value, [])
         self._stack.append(nodes)
 
-        return pos
+        return start + 1
 
     def _parse_action_call(self, start):
         """ Parse a call to a local or global def. """
         line = self._token._line
 
-        (name, pos) = self._parse_string(pos)
+        token = self._get_token(start, "Expected string")
+        if token._type != Token.TYPE_STRING:
+            raise SyntaxError(
+                "Expected string",
+                self._template._filename,
+                line
+            )
 
-        nodes = self._template._defines.get(name, None)
+        nodes = self._template._defines.get(token._value, None)
         if nodes is None:
             raise UnknownDefineError(
                 name,
@@ -681,7 +693,7 @@ class TemplateParser(object):
 
         self._stack[-1].extend(nodes)
 
-        return pos
+        return start + 1
 
 
     def _parse_action_end(self, start, action):
