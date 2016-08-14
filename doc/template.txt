@@ -1,0 +1,133 @@
+Template Syntax
+===============
+
+A template consistes of one or more blocks.  There are currently four types
+of blocks:
+
+    TEXTBLOCK - This is a direct text block
+    COMMENTBLOCK - This block is just for comments
+    ACTIONBLOCK - This block can affect the template
+    EMITTERBLOCK - This block emittes output from an expression.
+
+Parsing is performed by searching for the first "{" character that starts a
+tag in the template..  Everything before that becomes a TEXTBLOCK.  Then
+parsing handles the tag as the correct type, and continues until the end of the
+input.
+
+General Syntax Definition
+=========================
+
+TEMPLATE: BLOCK*
+
+BLOCK: TEXTBLOCK | COMMENTBLOCK | ACTIONBLOCK | EMITTERBLOCK
+
+WS1CONTROL = "" | "-" | "<"
+WS2CONTROL = "" | "-"
+
+TEXTBLOCK: All text up to a starting tag "{"
+
+COMMENTBLOCK: "{#" + WS1CONTROL + COMMENT + WS2CONTROL + "#}"
+COMMENT: All text up to the terminating tag of the comment block
+
+ACTIONBLOCK: "{%" + WS1CONTROL + ACTION + WS2CONTROL + "%}"
+EMITTERBLOCK: "{{" + WS1CONTROL + EXPRESSION + WS2CONTROL + "}}"
+
+ASSIGNMENT: VARPART + "=" + EXPRESSION
+MULTIASSIGNMENT: ASSIGNMENT [+ "," + ASSIGNMENT]*
+
+ACTION:
+    "if" + EXPRESSION
+    "elif" + EXPRESSION
+    "else"
+    "endif"
+    "for" + VARPART [+ "," + VARPART]? + "in" + EXPRESSION
+    "endfor"
+    "set" + MULTIASSIGNMENT
+    "with" MULTIASSIGNMENT?
+    "endwith"
+    "def" +  STRING
+    "enddef"
+    "call" + STRING
+    "section" + EXPRESSION
+    "endsection"
+    "use" + EXPRESSION
+    "include" + EXPRESSION
+    "autostrip"
+    "no_autostrip"
+    "push_autostrip" + ("on" | "off")
+    "pop_autostrip"
+
+MULTIEXPRESSION: EXPRESSION [+ "," + EXPRESSION]*
+EXPRESSION:
+    STRING
+    INTEGER
+    FLOAT
+    LIST
+    VAR
+    FUNC
+
+LIST: "[" MULTIEXPRESSION? "]"
+VAR: VARPART + ["." + VARPART]*
+VARPART: regex [A-Za-z_][A-Za-z0-9_]*
+FUNC: VAR + "(" + MULTIEXPRESSION? + ")"
+
+
+Functions
+=========
+
+Template functions are provided by passing variables to the environment.  If
+a variable is called as a function, then it will be attempted to use it as
+a function and pass any arguments supported to it.
+
+Some internal library functions are provided in the mrbavii.template.StdLib
+class.  To pass these, just assign an instance of this class to a context
+variable:
+
+    env = Environment({"lib": StdLib()})
+
+
+Library Functions
+=================
+
+str(value) - Return the string form of a value
+int(value) - Return the interger form of a value
+float(value) - Return the float form of a value
+
+add(value1, value2) - Add two values: value1 + value2
+sub(value2, value2) - Subtract two values: value1 - value2
+mul(value1, value2) - Multiply two values: value1 * value2
+div(value1, value2) - Divide two values: value1 / value2
+mod(value1, value2) - Determine a remainder: value1 % value2
+
+iseven(value) - Return true if a value is even
+isodd(value) - Return true if a value is odd
+eq(value1, value2) - Return true if two values are equal
+ne(value1, value2) - Return true if two values are not equal)
+
+concat(value...) - Concatenate multiple strings together
+
+
+
+Library Objects
+===============
+
+IndentManager: - Returned by lib.indent_manager()
+-------------------------------------------------
+
+Functions:
+
+    more(count) - Increase the indent by count
+    less(count) - Decrease the indent by count
+    char(str) - Set the indent character to the first character of str
+    char() - Return the current indent character
+    size(count) - Set the size of an indentation
+    size() - Return teh size of an indentation
+    level(n) - Set the current indent level
+    level() - Return the current indent level
+    push(n) - Push the current indent level and set a new level
+    push() - Push the current indent level
+    pop() - Restore the previous indent level
+
+    __init__() - Initializes the indent manager
+    __str__() - When used in an emitter, emit the indentation level
+            
