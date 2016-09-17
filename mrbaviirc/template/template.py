@@ -61,23 +61,21 @@ class Template(object):
             raise Error("Template text must be specified.")
 
         self._defines = {}
+        self._scope = env._scope.create()
 
         # Parse the template
         parser = TemplateParser(self, text)
         self._nodes = parser.parse()
 
-    def render(self, renderer, context=None, save=True):
+    def render(self, renderer, context=None):
         """ Render the template. """
         env = self._env
-        if save:
-            env.save_context()
 
-        if context:
-            env._context.update(context)
+        self._scope.clear()
+        if not context is None:
+            self._scope.update(context)
 
         for node in self._nodes:
             node.render(renderer)
 
-        if save:
-            env.restore_context()
 

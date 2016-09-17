@@ -354,6 +354,10 @@ class TemplateParser(object):
         self._auto_strip = False
         self._auto_strip_stack = []
 
+        # Allow for scoped variables
+        self._global_scope = self._template._env._scope
+        self._scope_stack = [self._template._scope]
+
     def _get_token(self, pos, errmsg="Expected token"):
         """ Get a token at a position. """
         if pos < 0 or pos >= len(self._tokens):
@@ -465,11 +469,15 @@ class TemplateParser(object):
         elif action == "else":
             pos =  self._parse_action_else(pos)
         elif action == "for":
-            pos = self._parse_action_for(pos)
+            pos = self._parse_action_for(pos, True)
+        elif action == "forlocal":
+            pos = self._parse_action_for(pos, False)
         elif action == "set":
-            pos = self._parse_action_set(pos)
-        elif action == "with":
-            pos = self._parse_action_with(pos)
+            pos = self._parse_action_set(pos, True)
+        elif action == "setlocal":
+            pos = self._parse_action_set(pos, False)
+        elif action == "scope":
+            pos = self._parse_action_scope(pos)
         elif action == "include":
             pos = self._parse_action_include(pos)
         elif action == "section":
@@ -563,7 +571,7 @@ class TemplateParser(object):
 
         return start
 
-    def _parse_action_for(self, start):
+    def _parse_action_for(self, start, use_global):
         """ Parse a for statement. """
         line = self._token._line
         (var, pos) = self._parse_var(start, False)
@@ -584,43 +592,39 @@ class TemplateParser(object):
 
         (expr, pos) = self._parse_expr(pos + 1)
 
-        node = ForNode(self._template, line, var, cvar, expr)
+        node = ForNode(self._template, line, var, cvar, expr,
+            self._global_scope if use_global else self._scope_stack[-1])
         self._ops_stack.append(("for", line))
         self._stack[-1].append(node)
         self._stack.append(node._nodes)
 
         return pos
     
-    def _parse_action_set(self, start):
+    def _parse_action_set(self, start, use_global):
         """ Parse a set statement. """
         line = self._token._line
 
         (assigns, pos) = self._parse_multi_assign(start)
 
-        node = AssignNode(self._template, line, assigns)
+        node = AssignNode(self._template, line, assigns,
+            self._global_scope if use_global else self._scope_stack[-1])
         self._stack[-1].append(node)
 
         return pos
 
-    def _parse_action_with(self, start):
-        """ Parse a with statement. """
+    def _parse_action_scope(self, start):
+        """ Parse a scope statement. """
         line = self._token._line
 
-        self._ops_stack.append(("with", line))
+        self._ops_stack.append(("scope", line))
 
-        token = self._get_token(start)
-        if token._type == Token.TYPE_END_ACTION:
-            pos = start
-            assigns = []
-        else:
-            (assigns, pos) = self._parse_multi_assign(start)
+        new_scope = self._scope_stack[-1].create()
+        self._scope_stack.append(new_scope)
+        node = ScopeNode(self._template, line, new_scope)
 
-
-        node = WithNode(self._template, line, assigns)
         self._stack[-1].append(node)
-        self._stack.append(node._nodes)
 
-        return pos
+        return start
 
     def _parse_action_include(self, start):
         """ Parse an include node. """
@@ -721,7 +725,11 @@ class TemplateParser(object):
             )
 
         self._ops_stack.pop()
-        self._stack.pop()
+
+        if what[0] == "scope":
+            self._scope_stack.pop()
+        else:
+            self._stack.pop()
 
         return start
 
@@ -787,12 +795,12 @@ class TemplateParser(object):
         next = self._get_token(pos)
         if next._type == Token.TYPE_START_FUNC:
             (nodes, pos) = self._parse_expr_items(pos + 1, Token.TYPE_END_FUNC)
-            node = FuncExpr(self._template, next._line, var, nodes)
+            node = FuncExpr(self._template, next._line, var, nodes, self._scope_stack[-1])
         elif next._type == Token.TYPE_START_LIST:
             (nodes, pos) = self._parse_expr_items(pos + 1, Token.TYPE_END_LIST)
-            node = IndexExpr(self._template, next._line, var, nodes)
+            node = IndexExpr(self._template, next._line, var, nodes, self._scope_stack[-1])
         else:
-            node = VarExpr(self._template, token._line, var)
+            node = VarExpr(self._template, token._line, var, self._scope_stack[-1])
           
         return (node, pos)
 

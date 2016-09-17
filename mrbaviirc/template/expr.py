@@ -42,16 +42,17 @@ class ValueExpr(Expr):
 class FuncExpr(Expr):
     """ A function expression node. """
 
-    def __init__(self, template, line, var, nodes):
+    def __init__(self, template, line, var, nodes, scope):
         """ Initialize the node. """
         Expr.__init__(self, template, line)
         self._var = var
         self._nodes = nodes
+        self._scope = scope
 
     def eval(self):
         """ Evaluate the expression. """
         try:
-            fn = self._env.get(self._var)
+            fn = self._scope.get(self._var)
             params = [node.eval() for node in self._nodes]
             return fn(*params)
         except KeyError:
@@ -78,15 +79,16 @@ class ListExpr(Expr):
 class VarExpr(Expr):
     """ An expression that represents a variable. """
 
-    def __init__(self, template, line, var):
+    def __init__(self, template, line, var, scope):
         """ Initialize the variable expression. """
         Expr.__init__(self, template, line)
         self._var = var
+        self._scope = scope
 
     def eval(self):
         """ Evaluate the expression. """
         try:
-            return self._env.get(self._var)
+            return self._scope.get(self._var)
         except KeyError:
             raise UnknownVariableError(
                 ".".join(self._var),
@@ -98,16 +100,17 @@ class VarExpr(Expr):
 class IndexExpr(Expr):
     """ An array index expression node. """
 
-    def __init__(self, template, line, var, nodes):
+    def __init__(self, template, line, var, nodes, scope):
         """ Initialize the node. """
         Expr.__init__(self, template, line)
         self._var = var
         self._nodes = nodes
+        self._scope = scope
 
     def eval(self):
         """ Evaluate the expression. """
         try:
-            var = self._env.get(self._var)
+            var = self._scope.get(self._var)
             params = [node.eval() for node in self._nodes]
         except KeyError:
             raise UnknownVariableError(

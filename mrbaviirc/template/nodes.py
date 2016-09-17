@@ -6,7 +6,7 @@ __license__     = "Apache License 2.0"
 
 __all__ = [
     "Node", "TextNode", "IfNode", "ForNode", "VarNode", "IncludeNode",
-    "WithNode", "AssignNode", "SectionNode", "UseSectionNode"
+    "AssignNode", "SectionNode", "UseSectionNode", "ScopeNode"
 ]
 
 
@@ -78,17 +78,18 @@ class IfNode(Node):
 class ForNode(Node):
     """ A node for handling for loops. """
 
-    def __init__(self, template, line, var, cvar, expr):
+    def __init__(self, template, line, var, cvar, expr, scope):
         """ Initialize the for node. """
         Node.__init__(self, template, line)
         self._var = var
         self._cvar = cvar
         self._expr = expr
         self._nodes = []
+        self._scope = scope
 
     def render(self, renderer):
         """ Render the for node. """
-        env = self._env
+        scope = self._scope
 
         # Iterate over each value
         values = self._expr.eval()
@@ -96,8 +97,8 @@ class ForNode(Node):
             index = 0
             for var in values:
                 if self._cvar:
-                    env.set(self._cvar, index)
-                env.set(self._var, var)
+                    scope.set(self._cvar, index)
+                scope.set(self._var, var)
                 index += 1
                                     
                 # Execute each sub-node
@@ -140,46 +141,24 @@ class IncludeNode(Node):
                 self._line
             )
 
-        template.render(renderer, save=False)
-
-
-class WithNode(Node):
-    """ Save the state of the context. """
-
-    def __init__(self, template, line, assigns):
-        """ Initialize. """
-        Node.__init__(self, template, line)
-        self._assigns = assigns
-        self._nodes = []
-
-    def render(self, renderer):
-        """ Render. """
-        env = self._env
-        env.save_context()
-
-        for (var, expr) in self._assigns:
-            env.set(var, expr.eval())
-
-        for node in self._nodes:
-            node.render(renderer)
-
-        env.restore_context()
+        template.render(renderer)
 
 
 class AssignNode(Node):
     """ Set a variable to a subvariable. """
 
-    def __init__(self, template, line, assigns):
+    def __init__(self, template, line, assigns, scope):
         """ Initialize. """
         Node.__init__(self, template, line)
+        self._scope = scope
         self._assigns = assigns
 
     def render(self, renderer):
         """ Set the value. """
-        env = self._env
+        scope = self._scope
 
         for (var, expr) in self._assigns:
-            env.set(var, expr.eval())
+            scope.set(var, expr.eval())
 
 
 class SectionNode(Node):
@@ -217,4 +196,16 @@ class UseSectionNode(Node):
         section = str(self._expr.eval())
         renderer.render(renderer.get_section(section))
 
+
+class ScopeNode(Node):
+    """ A node with a scope context. """
+
+    def __init__(self, template, line, scope):
+        """ Initialize. """
+        Node.__init__(self, template, line)
+        self._scope = scope
+
+    def render(self, renderer):
+        """ Render the scope. """
+        self._scope.clear()
 
