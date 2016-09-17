@@ -122,10 +122,11 @@ class VarNode(Node):
 class IncludeNode(Node):
     """ A node to include another template. """
 
-    def __init__(self, template, line, expr):
+    def __init__(self, template, line, expr, assigns):
         """ Initialize the include node. """
         Node.__init__(self, template, line)
         self._expr = expr
+        self._assigns = assigns
 
     def render(self, renderer):
         """ Actually do the work of including the template. """
@@ -141,7 +142,11 @@ class IncludeNode(Node):
                 self._line
             )
 
-        template.render(renderer)
+        context = {}
+        for (var, expr) in self._assigns:
+            context[var] = expr.eval()
+
+        template.render(renderer, context)
 
 
 class AssignNode(Node):

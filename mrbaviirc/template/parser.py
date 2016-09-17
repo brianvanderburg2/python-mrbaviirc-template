@@ -632,7 +632,12 @@ class TemplateParser(object):
 
         (expr, pos) = self._parse_expr(start)
 
-        node = IncludeNode(self._template, line, expr)
+        assigns = []
+        token = self._get_token(pos)
+        if token._type == Token.TYPE_WORD and token._value == "with":
+            (assigns, pos) = self._parse_multi_assign(pos + 1)
+
+        node = IncludeNode(self._template, line, expr, assigns)
         self._stack[-1].append(node)
 
         return pos

@@ -1,5 +1,11 @@
+Value 1
+Value 2
 About to include.
 I'm the included file.
+Value 1
+Value 3
 
 I'm the included file.
+Value 1
+Value 2
 

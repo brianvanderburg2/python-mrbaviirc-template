@@ -41,17 +41,19 @@ ACTION:
     "else"
     "endif"
     "for" + VARPART [+ "," + VARPART]? + "in" + EXPRESSION
+    "forlocal" + VARPART [+ "," + VARPART]? + "in" + EXPRESSION
     "endfor"
     "set" + MULTIASSIGNMENT
-    "with" MULTIASSIGNMENT?
-    "endwith"
+    "setlocal" + MULTIASSIGNMENT
+    "scope"
+    "endscope"
     "def" +  STRING
     "enddef"
     "call" + STRING
     "section" + EXPRESSION
     "endsection"
     "use" + EXPRESSION
-    "include" + EXPRESSION
+    "include" + EXPRESSION [+ "with" + MULTIASSIGNMENT]?
     "autostrip"
     "no_autostrip"
     "push_autostrip" + ("on" | "off")
@@ -66,7 +68,7 @@ EXPRESSION:
     VAR
     FUNC
 
-LIST: "[" MULTIEXPRESSION? "]"
+LIST: "[" + MULTIEXPRESSION? + "]"
 VAR: VARPART + ["." + VARPART]*
 VARPART: regex [A-Za-z_][A-Za-z0-9_]*
 FUNC: VAR + "(" + MULTIEXPRESSION? + ")"
@@ -111,23 +113,3 @@ concat(value...) - Concatenate multiple strings together
 Library Objects
 ===============
 
-IndentManager: - Returned by lib.indent_manager()
--------------------------------------------------
-
-Functions:
-
-    more(count) - Increase the indent by count
-    less(count) - Decrease the indent by count
-    char(str) - Set the indent character to the first character of str
-    char() - Return the current indent character
-    size(count) - Set the size of an indentation
-    size() - Return teh size of an indentation
-    level(n) - Set the current indent level
-    level() - Return the current indent level
-    push(n) - Push the current indent level and set a new level
-    push() - Push the current indent level
-    pop() - Restore the previous indent level
-
-    __init__() - Initializes the indent manager
-    __str__() - When used in an emitter, emit the indentation level
-            
