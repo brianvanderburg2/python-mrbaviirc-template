@@ -5,6 +5,9 @@ __copyright__   = "Copyright 2016"
 __license__     = "Apache License 2.0"
 
 
+import os
+
+
 class Library(object):
     """ Represent a library of functions. """
 
@@ -20,12 +23,55 @@ class Library(object):
             raise KeyError(name)
 
 
+class _PathLib(Library):
+    """ Path based functions. """
+
+    def __init__(self):
+        """ Initialize the library. """
+        pass
+
+    lib_sep = os.sep
+    """ The path separator for the current platform. """
+
+    def lib_join(self, *parts):
+        """ Join a path. """
+        return os.path.join(*parts)
+
+    def lib_split(self, path):
+        """ Split a path into a head and a tail. """
+        return os.path.split(path)
+
+    def lib_splitext(self, path):
+        """ Split the extension out of the path. """
+        return os.path.splitext(path)
+
+    def lib_dirname(self, path):
+        """ Return the directory name of a path. """
+        return os.path.dirname(path)
+
+    def lib_basename(self, path):
+        """ Return the base name of a path. """
+        return os.path.basename(path)
+
+    def lib_relpath(self, target, fromdir):
+        """ Return a relative path to target from the directory fromdir. """
+        return os.path.relpath(target, fromdir)
+
+
 class StdLib(Library):
     """ Represent the top-level standard library. """
 
     def __init__(self):
         """ Initialize the standard library. """
-        self._indent = None
+        self._path = None
+
+    @property
+    def lib_path(self):
+        """ Return the path library. """
+        if self._path is None:
+            self._path = _PathLib()
+
+        return self._path
 
     def lib_str(self, value):
         """ Return the string of an value. """
@@ -79,4 +125,27 @@ class StdLib(Library):
         """ Concatenate values. """
         return "".join(values)
 
+    def lib_split(self, delim, value):
+        """ Split a value into parts. """
+        return value.split(delim)
+
+    def lib_join(self, delim, values):
+        """ Join a value from parts. """
+        return delim.join(values)
+
+    def lib_replace(self, source, target, value):
+        """ Replace all source with target in value. """
+        return value.replace(source, target)
+
+    def lib_strip(self, value, what=None):
+        """ Strip from the start and end of value. """
+        return value.strip(what)
+
+    def lib_rstrip(self, value, what=None):
+        """ Strip from the end of value. """
+        return value.rstrip(what)
+
+    def lib_lstrip(self, value, what=None):
+        """ Strip from the start of value. """
+        return value.lstrip(what)
 
