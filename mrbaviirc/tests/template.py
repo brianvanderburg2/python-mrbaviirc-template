@@ -21,7 +21,7 @@ class TemplateTest(unittest.TestCase):
 
     def setUp(self):
         loader = template.FileSystemLoader(DATADIR)
-        self._env = template.Environment(loader=loader)
+        self._env = template.Environment({"lib": template.StdLib() }, loader=loader)
 
     def tearDown(self):
         self._env = None
