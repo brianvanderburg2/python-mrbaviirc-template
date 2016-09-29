@@ -10,54 +10,16 @@ from .loaders import FileSystemLoader
 from .errors import *
 
 
-class Scope(object):
-    """ Represent a scope of variables. """
-
-    def __init__(self, parent=None):
-        """ Initialize our scope. """
-        self._context = {}
-        self._scope = [self._context]
-        if parent:
-            self._scope.extend(parent._scope)
-
-    def create(self):
-        """ Create a child scope. """
-        return Scope(self)
-
-    def set(self, name, value):
-        """ Set a value in the context. """
-        self._context[name] = value
-
-    def update(self, values):
-        """ Update values in the context. """
-        self._context.update(values)
-
-    def clear(self):
-        """ Clear the current context. """
-        self._context.clear()
-
-    def get(self, var):
-        """ Get a dotted variable. """
-        for context in self._scope:
-            if not var[0] in context:
-                continue
-
-            value = context
-            for dot in var:
-                value = value[dot]
-
-            return value
-
-        raise KeyError(var[0])
-
-
 class Environment(object):
     """ represent a template environment. """
 
     def __init__(self, context=None, loader=None):
         """ Initialize the template environment. """
 
-        self._scope = Scope()
+        self._top = {}
+        self._scope = self._top
+        self._scope_stack = [self._top]
+
         if context:
             self._scope.update(context)
 
@@ -74,7 +36,45 @@ class Environment(object):
         """ Load a template from a string. """
         return Template(self, text=text)
 
-    def get_scope(self):
-        """ Return the scope. """
+    def _push_scope(self):
+        """ Create a new scope. """
+        self._scope = {}
+        self._scope_stack.append(self._scope)
+
         return self._scope
+
+    def _pop_scope(self):
+        """ Pop a scope off the stack. """
+        self._scope_stack.pop()
+        self._scope = self._scope_stack[-1]
+
+    def set(self, name, value, glbl=False):
+        """ Set a value in the current scope. """
+        if glbl:
+            self._top[name] = value
+        else:
+            self._scope[name] = value
+
+    def update(self, values):
+        """ Update values in the context. """
+        self._scope.update(values)
+
+    def clear(self):
+        """ Clear the current context. """
+        self._scope.clear()
+
+    def get(self, var):
+        """ Get a dotted variable. """
+        for scope in reversed(self._scope_stack):
+            if not var[0] in scope:
+                continue
+
+            value = scope
+            for dot in var:
+                value = value[dot]
+
+            return value
+
+        raise KeyError(var[0])
+
 

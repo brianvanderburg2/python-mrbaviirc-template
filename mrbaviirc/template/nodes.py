@@ -78,18 +78,17 @@ class IfNode(Node):
 class ForNode(Node):
     """ A node for handling for loops. """
 
-    def __init__(self, template, line, var, cvar, expr, scope):
+    def __init__(self, template, line, var, cvar, expr):
         """ Initialize the for node. """
         Node.__init__(self, template, line)
         self._var = var
         self._cvar = cvar
         self._expr = expr
         self._nodes = []
-        self._scope = scope
 
     def render(self, renderer):
         """ Render the for node. """
-        scope = self._scope
+        env = self._env
 
         # Iterate over each value
         values = self._expr.eval()
@@ -97,8 +96,8 @@ class ForNode(Node):
             index = 0
             for var in values:
                 if self._cvar:
-                    scope.set(self._cvar, index)
-                scope.set(self._var, var)
+                    env.set(self._cvar, index)
+                env.set(self._var, var)
                 index += 1
                                     
                 # Execute each sub-node
@@ -152,18 +151,18 @@ class IncludeNode(Node):
 class AssignNode(Node):
     """ Set a variable to a subvariable. """
 
-    def __init__(self, template, line, assigns, scope):
+    def __init__(self, template, line, assigns, glbl):
         """ Initialize. """
         Node.__init__(self, template, line)
-        self._scope = scope
         self._assigns = assigns
+        self._glbl = glbl
 
     def render(self, renderer):
         """ Set the value. """
-        scope = self._scope
+        env = self._env
 
         for (var, expr) in self._assigns:
-            scope.set(var, expr.eval())
+            env.set(var, expr.eval(), self._glbl)
 
 
 class SectionNode(Node):
@@ -203,14 +202,24 @@ class UseSectionNode(Node):
 
 
 class ScopeNode(Node):
-    """ A node with a scope context. """
+    """ Create and remove scopes. """
 
-    def __init__(self, template, line, scope):
+    def __init__(self, template, line, assigns):
         """ Initialize. """
         Node.__init__(self, template, line)
-        self._scope = scope
+        self._assigns = assigns
+        self._nodes = []
 
     def render(self, renderer):
         """ Render the scope. """
-        self._scope.clear()
+        env = self._env
+        env._push_scope()
+        try:
+            for (var, expr) in self._assigns:
+                env.set(var, expr.eval())
+
+            for node in self._nodes:
+                node.render(renderer)
+        finally:
+            env._pop_scope()
 
