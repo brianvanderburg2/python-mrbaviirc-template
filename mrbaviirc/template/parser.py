@@ -126,7 +126,7 @@ class Tokenizer(object):
         # Get whitespace control
         if self._text[pos + 2:pos + 3] == "-":
             wscontrol = 1
-        elif self._text[pos + 2:pos + 3] == "<":
+        elif self._text[pos + 2:pos + 3] in "<!^":
             wscontrol = 2
         else:
             wscontrol = 0
