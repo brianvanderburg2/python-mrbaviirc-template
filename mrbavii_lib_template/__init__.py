@@ -4,6 +4,8 @@ __author__      = "Brian Allen Vanderburg II"
 __copyright__   = "Copyright 2016"
 __license__     = "Apache License 2.0"
 
+from ._version import __version__
+
 
 from .errors import *
 from .renderers import *
