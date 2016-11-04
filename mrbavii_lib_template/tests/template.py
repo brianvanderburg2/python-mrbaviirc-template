@@ -12,7 +12,7 @@ import glob
 import unittest
 
 
-from .. import template
+from .. import FileSystemLoader, Environment, StdLib, StringRenderer
 
 
 DATADIR = os.path.join(os.path.dirname(__file__), "template_data")
@@ -20,8 +20,8 @@ DATADIR = os.path.join(os.path.dirname(__file__), "template_data")
 class TemplateTest(unittest.TestCase):
 
     def setUp(self):
-        loader = template.FileSystemLoader(DATADIR)
-        self._env = template.Environment({"lib": template.StdLib() }, loader=loader)
+        loader = FileSystemLoader(DATADIR)
+        self._env = Environment({"lib": StdLib() }, loader=loader)
 
     def tearDown(self):
         self._env = None
@@ -36,7 +36,7 @@ class TemplateTest(unittest.TestCase):
             source = path
 
             tmpl = self._env.load_file(filename=source)
-            rndr = template.StringRenderer()
+            rndr = StringRenderer()
             tmpl.render(rndr, data)
 
             target = source[:-5] + ".txt"
