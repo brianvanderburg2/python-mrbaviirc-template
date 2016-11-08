@@ -13,12 +13,13 @@ from .errors import *
 class Environment(object):
     """ represent a template environment. """
 
-    def __init__(self, context=None, loader=None):
+    def __init__(self, context=None, loader=None, callbacks=None):
         """ Initialize the template environment. """
 
         self._top = {}
         self._scope = self._top
         self._scope_stack = [self._top]
+        self._callbacks = {}
 
         if context:
             self._scope.update(context)
@@ -27,6 +28,9 @@ class Environment(object):
             self._loader = loader
         else:
             self._loader = FileSystemLoader()
+
+        if callbacks:
+            self._callbacks.update(callbacks)
 
     def load_file(self, filename, parent=None):
         """ Load a template from a file. """

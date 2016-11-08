@@ -6,7 +6,7 @@ __license__     = "Apache License 2.0"
 
 __all__ = [
     "Node", "TextNode", "IfNode", "ForNode", "VarNode", "IncludeNode",
-    "AssignNode", "SectionNode", "UseSectionNode", "ScopeNode"
+    "AssignNode", "SectionNode", "UseSectionNode", "ScopeNode", "CallbackNode"
 ]
 
 
@@ -222,4 +222,23 @@ class ScopeNode(Node):
                 node.render(renderer)
         finally:
             env._pop_scope()
+
+
+class CallbackNode(Node):
+    """ Execute a callbackup function. """
+
+    def __init__(self, template, line, callback, nodes):
+        """ Initialize. """
+        Node.__init__(self, template, line)
+        self._callback = callback
+        self._nodes = nodes
+
+    def render(self, renderer):
+        """ Call the custom exec function. """
+
+        params = [node.eval() for node in self._nodes]
+        result = self._callback(self._env, self._template._filename, params)
+
+        if not result is None:
+            renderer.render(str(result))
 

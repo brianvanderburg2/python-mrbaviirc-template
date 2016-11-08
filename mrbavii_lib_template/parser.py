@@ -492,6 +492,8 @@ class TemplateParser(object):
             self._auto_strip = True
         elif action == "no_autostrip":
             self._auto_strip = False
+        elif action == "callback":
+            pos = self._parse_action_callback(pos)
         else:
             raise SyntaxError(
                 "Unknown action tag: {0}".format(action),
@@ -757,6 +759,36 @@ class TemplateParser(object):
 
         self._auto_strip = self._auto_strip_stack.pop()
         return start
+
+    def _parse_action_callback(self, start):
+        """ Call a registered callback function. """
+
+        token = self._get_token(start, "Expected calback function name.")
+        callback = token._value
+
+        callbacks = self._template._env._callbacks
+        if not callback in callbacks:
+            raise SyntaxError(
+                "Unknown callback function: {0}".format(callback),
+                self._template._filename,
+                token._line
+            )
+
+        token = self._get_token(start + 1, "Expected '(' or closing tag")
+        if token._type == Token.TYPE_START_FUNC:
+            (nodes, pos) = self._parse_expr_items(start + 2, Token.TYPE_END_FUNC)
+        else:
+            nodes = []
+            pos = start + 1
+
+        node = CallbackNode(self._template,
+            token._line,
+            callbacks[callback],
+            nodes)
+
+        self._stack[-1].append(node)
+
+        return pos
 
     def _parse_tag_emitter(self, start):
         """ Parse an emitter tag. """
