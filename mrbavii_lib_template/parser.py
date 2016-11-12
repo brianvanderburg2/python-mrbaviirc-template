@@ -496,6 +496,8 @@ class TemplateParser(object):
             pos = self._parse_action_var(pos)
         elif action == "callback":
             pos = self._parse_action_callback(pos)
+        elif action == "error":
+            pos = self._parse_action_error(pos)
         elif action.startswith("end"):
             pos = self._parse_action_end(pos, action)
         elif action == "push_autostrip":
@@ -755,6 +757,16 @@ class TemplateParser(object):
             callbacks[callback],
             nodes)
 
+        self._stack[-1].append(node)
+
+        return pos
+
+    def _parse_action_error(self, start):
+        """ Raise an error from the template. """
+        line = self._token._line
+
+        (expr, pos) = self._parse_expr(start)
+        node = ErrorNode(self._template, line, expr)
         self._stack[-1].append(node)
 
         return pos

@@ -7,7 +7,7 @@ __license__     = "Apache License 2.0"
 __all__ = [
     "Node", "TextNode", "IfNode", "ForNode", "EmitNode", "IncludeNode",
     "AssignNode", "SectionNode", "UseSectionNode", "ScopeNode", "CallbackNode",
-    "VarNode"
+    "VarNode", "ErrorNode"
 ]
 
 
@@ -261,4 +261,20 @@ class VarNode(Node):
             node.render(new_renderer)
 
         self._env.set(self._var, new_renderer.get())
+
+class ErrorNode(Node):
+    """ Raise an error from the template. """
+
+    def __init__(self, template, line, expr):
+        """ Initialize. """
+        Node.__init__(self, template, line)
+        self._expr = expr
+
+    def render(self, renderer):
+        """ Raise the error. """
+        raise RaisedError(
+            str(self._expr.eval()),
+            self._template._filename,
+            self._line
+        )
 
