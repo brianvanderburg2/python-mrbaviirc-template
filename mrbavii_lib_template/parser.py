@@ -128,6 +128,8 @@ class Tokenizer(object):
             wscontrol = 1
         elif self._text[pos + 2:pos + 3] in "<!^":
             wscontrol = 2
+        elif self._text[pos + 2:pos + 3] == "+":
+            wscontrol = 3
         else:
             wscontrol = 0
 
@@ -161,6 +163,8 @@ class Tokenizer(object):
         else:
             if pos > start and self._text[pos - 1] == "-":
                 wscontrol = 1
+            elif pos > start and self._text[pos - 1] == "+":
+                wscontrol = 3
             else:
                 wscontrol = 0
 
@@ -210,10 +214,13 @@ class Tokenizer(object):
                 continue
 
             # Ending tag
-            if ch in ("-", "%", "#", "}"):
+            if ch in ("-", "+", "%", "#", "}"):
 
                 if ch == "-":
                     wscontrol = 1
+                    pos += 1
+                elif ch == "+":
+                    wscontrol = 3
                     pos += 1
                 else:
                     wscontrol = 0
@@ -350,7 +357,7 @@ class TemplateParser(object):
 
         # Buffer for plain text segments
         self._buffer = []
-        self._pre_strip = False
+        self._pre_ws_control = 0
         self._auto_strip = False
         self._auto_strip_stack = []
 
@@ -401,12 +408,7 @@ class TemplateParser(object):
                               Token.TYPE_START_ACTION,
                               Token.TYPE_START_EMITTER):
                 # Handle flushing the buffer
-                if token._value == 0:
-                    self._flush_buffer(False, False)
-                elif token._value == 1:
-                    self._flush_buffer(True, True)
-                else:
-                    self._flush_buffer(True, False)
+                self._flush_buffer(token._value)
 
                 # Parse the tag
                 if token._type == Token.TYPE_START_COMMENT:
@@ -435,10 +437,7 @@ class TemplateParser(object):
                 token._line
             )
 
-        if token._value == 1:
-            self._pre_strip = True
-        else:
-            self._pre_strip = False
+        self._pre_ws_control = token._value
 
         return start + 1
 
@@ -953,8 +952,9 @@ class TemplateParser(object):
 
         return (result, start + 1)
 
-    def _flush_buffer(self, post_strip=False, post_strip_nl=False):
+    def _flush_buffer(self, post_ws_control=0):
         """ Flush the buffer to output. """
+        text = ""
         if self._buffer:
             text = "".join(self._buffer)
 
@@ -972,7 +972,7 @@ class TemplateParser(object):
                         need_nl = True
                 text = "".join(tmp)
             else:
-                if self._pre_strip:
+                if self._pre_ws_control == 1:
                     # If the previous tag had a white-space control {{ ... -}}
                     # trim the start of this buffer up to/including a new line
                     first_nl = text.find("\n")
@@ -981,7 +981,7 @@ class TemplateParser(object):
                     else:
                         text = text[:first_nl + 1].lstrip() + text[first_nl + 1:]
 
-                if post_strip:
+                if post_ws_control in (1, 2):
                     # If the current tag has a white-space control {{- ... }}
                     # trim the end of the buffer up to/including a new line
                     # If the current tag has a white-space control {{< .. }}
@@ -990,12 +990,18 @@ class TemplateParser(object):
                     if last_nl == -1:
                         text = text.rstrip()
                     else:
-                        nl = 0 if post_strip_nl else 1
+                        nl = 0 if post_ws_control == 1 else 1
                         text = text[:last_nl + nl] + text[last_nl + nl:].rstrip()
             
-            if text:
-                node = TextNode(self._template, self._token._line, text)
-                self._stack[-1].append(node)
+        if self._pre_ws_control == 3:
+                text = "\n" + text
+
+        if post_ws_control == 3:
+                text = text + "\n"
+
+        if text:
+            node = TextNode(self._template, self._token._line, text)
+            self._stack[-1].append(node)
 
         self._buffer = []
 

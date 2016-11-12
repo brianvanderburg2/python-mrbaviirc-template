@@ -21,8 +21,8 @@ TEMPLATE: BLOCK*
 
 BLOCK: TEXTBLOCK | COMMENTBLOCK | ACTIONBLOCK | EMITTERBLOCK
 
-WS1CONTROL = "" | "-" | "<" | "!" | "^"
-WS2CONTROL = "" | "-"
+WS1CONTROL = "" | "+" | "-" | "<" | "!" | "^"
+WS2CONTROL = "" | "+" | "-"
 
 TEXTBLOCK: All text up to a starting tag "{"
 
