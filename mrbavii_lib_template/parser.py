@@ -484,6 +484,8 @@ class TemplateParser(object):
             pos = self._parse_action_call(pos)
         elif action == "var":
             pos = self._parse_action_var(pos)
+        elif action == "trim":
+            pos = self._parse_action_trim(pos)
         elif action.startswith("end"):
             pos = self._parse_action_end(pos, action)
         elif action == "push_autostrip":
@@ -716,6 +718,17 @@ class TemplateParser(object):
         self._stack.append(node._nodes)
 
         return pos
+
+    def _parse_action_trim(self, start):
+        """ Trim up lines and remove empty lines. """
+        line = self._token._line
+
+        node = TrimNode(self._template, line)
+        self._ops_stack.append(("trim", line))
+        self._stack[-1].append(node)
+        self._stack.append(node._nodes)
+
+        return start
 
     def _parse_action_end(self, start, action):
         """ Parse an end tag """
