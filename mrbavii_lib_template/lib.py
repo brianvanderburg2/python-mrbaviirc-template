@@ -87,17 +87,47 @@ class _StringLib(Library):
         """ Strip from the start of value. """
         return value.lstrip(what)
 
+    def lib_substr(self, value, start, end=None):
+        """ Get a substring from start up to but not including end. """
+        if end is None:
+            return value[start:]
+        else:
+            return value[start:end]
+
 
 class _HtmlLib(Library):
     """ An HTML library for escaping values. """
 
-    def lib_esc(self, value):
+    def lib_esc(self, value, quote=False):
         """ Escape for HTML. """
-        return cgi.escape(value)
+        return cgi.escape(value, quote)
 
-    def lib_escattr(self, value):
-        """ Escape for HTML attribute. """
-        return cgi.escape(value, True)
+
+class _IndentLib(Library):
+    """ Manage an indenter. """
+
+    def __init__(self, indent):
+        """ Initialize the indentor """
+        Library.__init__(self)
+        self._indent = str(indent)
+        self._count = 0
+        self._value = ""
+
+    def lib_more(self):
+        """ Increase the indent. """
+        self._count += 1
+        self._value = self._indent * self._count
+        return ""
+
+    def lib_less(self):
+        """ Decrease the indent. """
+        self._count -= 1
+        self._value = self._indent * self._count
+        return ""
+
+    def __str__(self):
+        """ Return the indent. """
+        return self._value
 
 
 class StdLib(Library):
@@ -129,6 +159,10 @@ class StdLib(Library):
             self._html = _HtmlLib()
 
         return self._html
+
+    def lib_indenter(self, indent):
+        """ Return a new indenter. """
+        return _IndentLib(indent)
 
     def lib_str(self, value):
         """ Return the string of an value. """
@@ -177,4 +211,20 @@ class StdLib(Library):
     def lib_ne(self, value1, value2):
         """ Determine if two values are not equal. """
         return value1 != value2
+
+    def lib_lt(self, value1, value2):
+        """ Determine if value1 is < value2 """
+        return value1 < value2
+
+    def lib_gt(self, value1, value2):
+        """ Determine if value1 is > value2 """
+        return value1 > value2
+
+    def lib_le(self, value1, value2):
+        """ Determine if value1 is <= value2 """
+        return value1 <= value2
+
+    def lib_ge(self, value1, value2):
+        """ Determine if value1 is >= value2 """
+        return value1 >= value2
 
