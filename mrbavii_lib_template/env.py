@@ -75,7 +75,10 @@ class Environment(object):
 
             value = scope
             for dot in var:
-                value = value[dot]
+                try:
+                    value = value[dot]
+                except:
+                    raise KeyError(dot)
 
             return value
 
