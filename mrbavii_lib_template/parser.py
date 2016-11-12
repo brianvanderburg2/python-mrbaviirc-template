@@ -484,8 +484,8 @@ class TemplateParser(object):
             pos = self._parse_action_call(pos)
         elif action == "var":
             pos = self._parse_action_var(pos)
-        elif action == "trim":
-            pos = self._parse_action_trim(pos)
+        elif action == "callback":
+            pos = self._parse_action_callback(pos)
         elif action.startswith("end"):
             pos = self._parse_action_end(pos, action)
         elif action == "push_autostrip":
@@ -493,11 +493,11 @@ class TemplateParser(object):
         elif action == "pop_autostrip":
             pos = self._parse_action_pop_autostrip(pos)
         elif action == "autostrip":
-            self._auto_strip = True
+            self._auto_strip = 1
+        elif action == "autotrim":
+            self._auto_strip = 2
         elif action == "no_autostrip":
-            self._auto_strip = False
-        elif action == "callback":
-            pos = self._parse_action_callback(pos)
+            self._auto_strip = 0
         else:
             raise SyntaxError(
                 "Unknown action tag: {0}".format(action),
@@ -719,16 +719,35 @@ class TemplateParser(object):
 
         return pos
 
-    def _parse_action_trim(self, start):
-        """ Trim up lines and remove empty lines. """
-        line = self._token._line
+    def _parse_action_callback(self, start):
+        """ Call a registered callback function. """
 
-        node = TrimNode(self._template, line)
-        self._ops_stack.append(("trim", line))
+        token = self._get_token(start, "Expected calback function name.")
+        callback = token._value
+
+        callbacks = self._template._env._callbacks
+        if not callback in callbacks:
+            raise SyntaxError(
+                "Unknown callback function: {0}".format(callback),
+                self._template._filename,
+                token._line
+            )
+
+        token = self._get_token(start + 1, "Expected '(' or closing tag")
+        if token._type == Token.TYPE_START_FUNC:
+            (nodes, pos) = self._parse_expr_items(start + 2, Token.TYPE_END_FUNC)
+        else:
+            nodes = []
+            pos = start + 1
+
+        node = CallbackNode(self._template,
+            token._line,
+            callbacks[callback],
+            nodes)
+
         self._stack[-1].append(node)
-        self._stack.append(node._nodes)
 
-        return start
+        return pos
 
     def _parse_action_end(self, start, action):
         """ Parse an end tag """
@@ -764,14 +783,20 @@ class TemplateParser(object):
             # No change
             return start
 
-        if token._type != Token.TYPE_WORD or not token._value in ("on", "off"):
+        if token._type != Token.TYPE_WORD or not token._value in ("on", "off", "trim"):
             raise SyntaxError(
                 "Expected on or off",
                 self._template._filename,
                 token._line
             )
 
-        self._auto_strip = (token._value == "on")
+        if token._value == "on":
+            self._auto_strip = 1
+        elif token._value == "trim":
+            self._auto_strip = 2
+        else:
+            self._auto_strip = 0
+
         return start + 1
 
     def _parse_action_pop_autostrip(self, start):
@@ -786,36 +811,6 @@ class TemplateParser(object):
 
         self._auto_strip = self._auto_strip_stack.pop()
         return start
-
-    def _parse_action_callback(self, start):
-        """ Call a registered callback function. """
-
-        token = self._get_token(start, "Expected calback function name.")
-        callback = token._value
-
-        callbacks = self._template._env._callbacks
-        if not callback in callbacks:
-            raise SyntaxError(
-                "Unknown callback function: {0}".format(callback),
-                self._template._filename,
-                token._line
-            )
-
-        token = self._get_token(start + 1, "Expected '(' or closing tag")
-        if token._type == Token.TYPE_START_FUNC:
-            (nodes, pos) = self._parse_expr_items(start + 2, Token.TYPE_END_FUNC)
-        else:
-            nodes = []
-            pos = start + 1
-
-        node = CallbackNode(self._template,
-            token._line,
-            callbacks[callback],
-            nodes)
-
-        self._stack[-1].append(node)
-
-        return pos
 
     def _parse_tag_emitter(self, start):
         """ Parse an emitter tag. """
@@ -963,8 +958,19 @@ class TemplateParser(object):
         if self._buffer:
             text = "".join(self._buffer)
 
-            if self._auto_strip:
+            if self._auto_strip == 1:
                 text = text.strip()
+            elif self._auto_strip == 2:
+                tmp = []
+                need_nl = False
+                for line in text.splitlines():
+                    line = line.strip()
+                    if line:
+                        if need_nl:
+                            tmp.append("\n")
+                        tmp.append(line)
+                        need_nl = True
+                text = "".join(tmp)
             else:
                 if self._pre_strip:
                     # If the previous tag had a white-space control {{ ... -}}

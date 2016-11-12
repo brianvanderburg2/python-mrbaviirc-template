@@ -21,7 +21,7 @@ TEMPLATE: BLOCK*
 
 BLOCK: TEXTBLOCK | COMMENTBLOCK | ACTIONBLOCK | EMITTERBLOCK
 
-WS1CONTROL = "" | "-" | "<"
+WS1CONTROL = "" | "-" | "<" | "!" | "^"
 WS2CONTROL = "" | "-"
 
 TEXTBLOCK: All text up to a starting tag "{"
@@ -41,22 +41,25 @@ ACTION:
     "else"
     "endif"
     "for" + VARPART [+ "," + VARPART]? + "in" + EXPRESSION
-    "forlocal" + VARPART [+ "," + VARPART]? + "in" + EXPRESSION
     "endfor"
     "set" + MULTIASSIGNMENT
-    "setlocal" + MULTIASSIGNMENT
+    "global" + MULTIASSIGNMENT
     "scope"
     "endscope"
-    "def" +  STRING
-    "enddef"
-    "call" + STRING
+    "include" + EXPRESSION [+ "with" + MULTIASSIGNMENT]?
     "section" + EXPRESSION
     "endsection"
     "use" + EXPRESSION
-    "include" + EXPRESSION [+ "with" + MULTIASSIGNMENT]?
+    "def" +  STRING
+    "enddef"
+    "call" + STRING
+    "var" + VARPART
+    "endvar"
+    "callback" + VARPART [ + "(" +MULTIEXPRESSION? + ")" ]
     "autostrip"
+    "autotrim"
     "no_autostrip"
-    "push_autostrip" + ("on" | "off")
+    "push_autostrip" + ("on" | "off" | "trim")
     "pop_autostrip"
 
 MULTIEXPRESSION: EXPRESSION [+ "," + EXPRESSION]*

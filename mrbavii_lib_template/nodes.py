@@ -7,7 +7,7 @@ __license__     = "Apache License 2.0"
 __all__ = [
     "Node", "TextNode", "IfNode", "ForNode", "EmitNode", "IncludeNode",
     "AssignNode", "SectionNode", "UseSectionNode", "ScopeNode", "CallbackNode",
-    "VarNode", "TrimNode"
+    "VarNode"
 ]
 
 
@@ -261,34 +261,4 @@ class VarNode(Node):
             node.render(new_renderer)
 
         self._env.set(self._var, new_renderer.get())
-
-
-class TrimNode(Node):
-    """ Trim up lines in the output. """
-
-    def __init__(self, template, line):
-        """ Initialize. """
-        Node.__init__(self, template, line)
-        self._nodes = []
-
-    def render(self, renderer):
-        """ Render the trimmed results. """
-
-        new_renderer = StringRenderer()
-        for node in self._nodes:
-            node.render(new_renderer)
-
-        contents = new_renderer.get()
-
-        # Only output newlines between the lines, not at the start or end
-        # of the trimmed block
-
-        need_nl = False
-        for line in contents.splitlines():
-            line = line.strip()
-            if line:
-                if need_nl:
-                    renderer.render("\n")
-                renderer.render(line)
-                need_nl = True
 
