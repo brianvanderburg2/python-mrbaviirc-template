@@ -216,6 +216,11 @@ class Tokenizer(object):
             # Ending tag
             if ch in ("-", "+", "%", "#", "}"):
 
+                # Check for number first if starts with "-" or "+"
+                if ch in ("-", "+") and self._text[pos + 1:pos + 2] in self._digit:
+                    pos = self._parse_number(pos)
+                    continue
+
                 if ch == "-":
                     wscontrol = 1
                     pos += 1
@@ -254,6 +259,12 @@ class Tokenizer(object):
         """ Parse a number. """
         result = []
         found_dot = False
+
+        if self._text[start] == "-":
+            start += 1
+            result.append("-")
+        elif self._text[start] == "+":
+            start += 1
 
         for pos in range(start, len(self._text)):
             ch = self._text[pos]
