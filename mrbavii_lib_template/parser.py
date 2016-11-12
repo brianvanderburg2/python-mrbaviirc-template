@@ -482,6 +482,8 @@ class TemplateParser(object):
             pos = self._parse_action_def(pos)
         elif action == "call":
             pos = self._parse_action_call(pos)
+        elif action == "var":
+            pos = self._parse_action_var(pos)
         elif action.startswith("end"):
             pos = self._parse_action_end(pos, action)
         elif action == "push_autostrip":
@@ -702,6 +704,18 @@ class TemplateParser(object):
 
         return start + 1
 
+    def _parse_action_var(self, start):
+        """ Parse a block to store rendered output in a variable. """
+        line = self._token._line
+
+        (var, pos) = self._parse_var(start, False)
+
+        node = VarNode(self._template, line, var)
+        self._ops_stack.append(("var", line))
+        self._stack[-1].append(node)
+        self._stack.append(node._nodes)
+
+        return pos
 
     def _parse_action_end(self, start, action):
         """ Parse an end tag """
@@ -800,7 +814,7 @@ class TemplateParser(object):
         if isinstance(expr, ValueExpr):
             node = TextNode(self._template, line, str(expr.eval()))
         else:
-            node = VarNode(self._template, line, expr)
+            node = EmitNode(self._template, line, expr)
         self._stack[-1].append(node)
         return pos
         

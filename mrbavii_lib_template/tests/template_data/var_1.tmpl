@@ -1,0 +1,15 @@
+{% autostrip %}
+
+{% var test %}
+This is a test
+{% endvar %}
+
+{% var test2 %}
+{{ test }}
+{{ test }}
+{% endvar %}
+
+{{ test2 }}
+{{ test2 }}
+
+{% no_autostrip %}
