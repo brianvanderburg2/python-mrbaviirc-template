@@ -378,7 +378,7 @@ class TemplateParser(object):
             raise SyntaxError(
                 errmsg,
                 self._template._filename,
-                self._token.line if self._token else 0
+                self._token._line if self._token else 0
             )
 
         self._token = self._tokens[pos]
