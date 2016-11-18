@@ -117,3 +117,16 @@ concat(value...) - Concatenate multiple strings together
 Library Objects
 ===============
 
+
+
+Planned Changes/Ideas
+=====================
+
+NodeList
+========
+
+Provide a NodeList object instead of a directly list for storing nodes.
+This would allow to add methods that operation on all nodes, such as
+node_list.render(renderer)
+
+

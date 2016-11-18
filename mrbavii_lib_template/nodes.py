@@ -86,7 +86,15 @@ class ForNode(Node):
         self._var = var
         self._cvar = cvar
         self._expr = expr
-        self._nodes = []
+
+        self._for = []
+        self._else = None
+        self._nodes = self._for
+
+    def add_else(self):
+        """ Add an else section. """
+        self._else = []
+        self._nodes = self._else
 
     def render(self, renderer):
         """ Render the for node. """
@@ -94,17 +102,23 @@ class ForNode(Node):
 
         # Iterate over each value
         values = self._expr.eval()
+        do_else = True
         if values:
             index = 0
             for var in values:
+                do_else = False
                 if self._cvar:
                     env.set(self._cvar, index)
                 env.set(self._var, var)
                 index += 1
                                     
                 # Execute each sub-node
-                for node in self._nodes:
+                for node in self._for:
                     node.render(renderer)
+
+        if do_else and self._else:
+            for node in self._else:
+                node.render(renderer)
 
 
 class EmitNode(Node):

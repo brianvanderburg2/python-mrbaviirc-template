@@ -569,13 +569,14 @@ class TemplateParser(object):
             )
 
         what = self._ops_stack[-1]
-        if what[0] != "if":
+        if not what[0] in ("if", "for"):
             raise SyntaxError(
                 "Mismatched else",
                 self._template._filename,
                 line
             )
 
+        # Both if and for do this the same way
         self._stack.pop()
         node = self._stack[-1][-1]
         node.add_else()
