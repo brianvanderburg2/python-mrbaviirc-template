@@ -41,6 +41,7 @@ ACTION:
     "else"
     "endif"
     "for" + VARPART [+ "," + VARPART]? + "in" + EXPRESSION
+    "else"
     "endfor"
     "set" + MULTIASSIGNMENT
     "global" + MULTIASSIGNMENT
