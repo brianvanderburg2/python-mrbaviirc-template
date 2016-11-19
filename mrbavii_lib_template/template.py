@@ -74,8 +74,7 @@ class Template(object):
             if not context is None:
                 scope.update(context)
 
-            for node in self._nodes:
-                node.render(renderer)
+            self._nodes.render(renderer)
         finally:
             env._pop_scope()
 

@@ -363,7 +363,7 @@ class TemplateParser(object):
         
         # Stack and line number
         self._ops_stack = []
-        self._nodes = []
+        self._nodes = NodeList()
         self._stack = [self._nodes]
 
         # Buffer for plain text segments
@@ -690,7 +690,7 @@ class TemplateParser(object):
 
         self._ops_stack.append(("def", line))
 
-        nodes = self._template._defines.setdefault(token._value, [])
+        nodes = self._template._defines.setdefault(token._value, NodeList())
         self._stack.append(nodes)
 
         return start + 1

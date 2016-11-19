@@ -5,7 +5,7 @@ __copyright__   = "Copyright 2016"
 __license__     = "Apache License 2.0"
 
 __all__ = [
-    "Node", "TextNode", "IfNode", "ForNode", "EmitNode", "IncludeNode",
+    "Node", "NodeList",  "TextNode", "IfNode", "ForNode", "EmitNode", "IncludeNode",
     "AssignNode", "SectionNode", "UseSectionNode", "ScopeNode", "CallbackNode",
     "VarNode", "ErrorNode"
 ]
@@ -29,6 +29,30 @@ class Node(object):
         raise NotImplementedError
 
 
+class NodeList(object):
+    """ A list of nodes. """
+
+    def __init__(self):
+        """Initialize. """
+        self._nodes = []
+
+    def append(self, node):
+        """ Append a node to the list. """
+        self._nodes.append(node)
+
+    def extend(self, nodelist):
+        """ Extend one node list with another. """
+        self._nodes.extend(nodelist._nodes)
+
+    def render(self, renderer):
+        """ Render all nodes. """
+        for node in self._nodes:
+            node.render(renderer)
+
+    def __getitem__(self, n):
+        return self._nodes[n]
+
+
 class TextNode(Node):
     """ A node that represents a raw block of text. """
 
@@ -48,19 +72,19 @@ class IfNode(Node):
     def __init__(self, template, line, expr):
         """ Initialize the if node. """
         Node.__init__(self, template, line)
-        self._ifs = [(expr, [])]
+        self._ifs = [(expr, NodeList())]
         self._else = None
         self._nodes = self._ifs[0][1]
 
     def add_elif(self, expr):
         """ Add an if section. """
         # TODO: error if self._else exists
-        self._ifs.append((expr, []))
+        self._ifs.append((expr, NodeList()))
         self._nodes = self._ifs[-1][1]
 
     def add_else(self):
         """ Add an else. """
-        self._else = []
+        self._else = NodeList()
         self._nodes = self._else
 
     def render(self, renderer):
@@ -68,13 +92,11 @@ class IfNode(Node):
         for (expr, nodes) in self._ifs:
             result = expr.eval()
             if result:
-                for node in nodes:
-                    node.render(renderer)
+                nodes.render(renderer)
                 return
 
         if self._else:
-            for node in self._else:
-                node.render(renderer)
+            self._else.render(renderer)
 
 
 class ForNode(Node):
@@ -87,13 +109,13 @@ class ForNode(Node):
         self._cvar = cvar
         self._expr = expr
 
-        self._for = []
+        self._for = NodeList()
         self._else = None
         self._nodes = self._for
 
     def add_else(self):
         """ Add an else section. """
-        self._else = []
+        self._else = NodeList()
         self._nodes = self._else
 
     def render(self, renderer):
@@ -113,12 +135,10 @@ class ForNode(Node):
                 index += 1
                                     
                 # Execute each sub-node
-                for node in self._for:
-                    node.render(renderer)
+                self._for.render(renderer)
 
         if do_else and self._else:
-            for node in self._else:
-                node.render(renderer)
+            self._else.render(renderer)
 
 
 class EmitNode(Node):
@@ -188,17 +208,14 @@ class SectionNode(Node):
         """ Initialize. """
         Node.__init__(self, template, line)
         self._expr = expr
-        self._nodes = []
+        self._nodes = NodeList()
 
     def render(self, renderer):
         """ Redirect output to a section. """
 
         section = str(self._expr.eval())
         renderer.push_section(section)
-
-        for node in self._nodes:
-            node.render(renderer)
-
+        self._nodes.render(renderer)
         renderer.pop_section()
 
 
@@ -224,7 +241,7 @@ class ScopeNode(Node):
         """ Initialize. """
         Node.__init__(self, template, line)
         self._assigns = assigns
-        self._nodes = []
+        self._nodes = NodeList()
 
     def render(self, renderer):
         """ Render the scope. """
@@ -234,8 +251,7 @@ class ScopeNode(Node):
             for (var, expr) in self._assigns:
                 env.set(var, expr.eval())
 
-            for node in self._nodes:
-                node.render(renderer)
+            self._nodes.render(renderer)
         finally:
             env._pop_scope()
 
@@ -265,15 +281,13 @@ class VarNode(Node):
         """ Initialize. """
         Node.__init__(self, template, line)
         self._var = var
-        self._nodes = []
+        self._nodes = NodeList()
 
     def render(self, renderer):
         """ Render the results and capture into a variable. """
 
         new_renderer = StringRenderer()
-        for node in self._nodes:
-            node.render(new_renderer)
-
+        self._nodes.render(new_renderer)
         self._env.set(self._var, new_renderer.get())
 
 class ErrorNode(Node):
