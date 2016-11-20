@@ -19,10 +19,15 @@ General Syntax Definition
 
 TEMPLATE: BLOCK*
 
-BLOCK: TEXTBLOCK | COMMENTBLOCK | ACTIONBLOCK | EMITTERBLOCK
+BLOCK: (TEXTBLOCK | COMMENTBLOCK | ACTIONSEGMENT | EMITTERBLOCK)
 
-WS1CONTROL = "" | "+" | "-" | "<" | "!" | "^"
-WS2CONTROL = "" | "+" | "-"
+WSNOTHING = ""
+WSTRIMTONL = "-"
+WSTRIMTONL_PRESERVENL = ("<" | "!" | "^")
+WSADDNL = "+"
+
+WS1CONTROL = (WSNOTHING | WSTRIMTONL | WSTRIMTONL_PRESERVENL | WSADDNL)
+WS2CONTROL = (WSNOTHING | WSTRIMTONL | WSADDNL)
 
 TEXTBLOCK: All text up to a starting tag "{"
 
@@ -33,59 +38,129 @@ ACTIONBLOCK: "{%" + WS1CONTROL + ACTION + WS2CONTROL + "%}"
 EMITTERBLOCK: "{{" + WS1CONTROL + EXPRESSION + WS2CONTROL + "}}"
 
 ASSIGNMENT: VARPART + "=" + EXPRESSION
-MULTIASSIGNMENT: ASSIGNMENT [+ "," + ASSIGNMENT]*
+MULTIASSIGNMENT: ASSIGNMENT + ["," + ASSIGNMENT]*
 
 ACTION:
-    "if" + EXPRESSION
-    "elif" + EXPRESSION
-    "else"
-    "endif"
-    "for" + VARPART [+ "," + VARPART]? + "in" + EXPRESSION
-    "else"
-    "endfor"
-    "switch" + EXPRESSION
-    "lt" + EXPRESSION
-    "le" + EXPRESSION
-    "gt" + EXPRESSION
-    "ge" + EXPRESSION
-    "ne" + EXPRESSION
-    "eq" + EXPRESSION
-    "bt" + EXPRESSION + "," + EXPRESSION
-    "endswitch"
-    "set" + MULTIASSIGNMENT
-    "global" + MULTIASSIGNMENT
-    "scope"
-    "endscope"
-    "include" + EXPRESSION [+ "with" + MULTIASSIGNMENT]?
-    "section" + EXPRESSION
-    "endsection"
-    "use" + EXPRESSION
-    "def" +  STRING
-    "enddef"
-    "call" + STRING
-    "var" + VARPART
-    "endvar"
-    "callback" + VARPART [ + "(" +MULTIEXPRESSION? + ")" ]
-    "error" + EXPRESSION
-    "autostrip"
-    "autotrim"
-    "no_autostrip"
-    "push_autostrip" + ("on" | "off" | "trim")
-    "pop_autostrip"
+    IF: "if" + EXPRESSION
+    ELIF: "elif" + EXPRESSION
+    ELSE: "else"
+    ENDIF: "endif"
+    FOR: "for" + VARPART + ["," + VARPART]? + "in" + EXPRESSION
+    ENDFOR: "endfor"
+    SWITCH: "switch" + EXPRESSION
+    LT: "lt" + EXPRESSION
+    LE: "le" + EXPRESSION
+    GT: "gt" + EXPRESSION
+    GE: "ge" + EXPRESSION
+    NE: "ne" + EXPRESSION
+    EQ: "eq" + EXPRESSION
+    BT: "bt" + EXPRESSION + "," + EXPRESSION
+    ENDSWITCH: "endswitch"
+    SET: "set" + MULTIASSIGNMENT
+    GLOBAL: "global" + MULTIASSIGNMENT
+    SCOPE: "scope"
+    ENDSCOPE: "endscope"
+    INCLUDE: "include" + EXPRESSION + ["with" + MULTIASSIGNMENT]?
+    SECTION: "section" + EXPRESSION
+    SECTION: "endsection"
+    USE: "use" + EXPRESSION
+    DEF: "def" +  STRING
+    ENDDEF: "enddef"
+    CALL: "call" + STRING
+    VAR: "var" + VARPART
+    ENDVAR: "endvar"
+    CALLBACK: "callback" + VARPART + ["(" +MULTIEXPRESSION? + ")" ]?
+    ERROR: "error" + EXPRESSION
+    AUTOSTRIP: "autostrip" | "autotrim" | "no_autostrip" |
+        "push_autostrip" + ("on" | "off" | "trim") |
+        "pop_autostrip"
 
-MULTIEXPRESSION: EXPRESSION [+ "," + EXPRESSION]*
+MULTIEXPRESSION: EXPRESSION + ["," + EXPRESSION]*
 EXPRESSION:
     STRING
     INTEGER
     FLOAT
     LIST
     VAR
+    VARINDEX
     FUNC
 
 LIST: "[" + MULTIEXPRESSION? + "]"
 VAR: VARPART + ["." + VARPART]*
+VARINDEX: VAR + "[" + MULTIEXPRESSION + "]"
 VARPART: regex [A-Za-z_][A-Za-z0-9_]*
 FUNC: VAR + "(" + MULTIEXPRESSION? + ")"
+
+ACTIONSEGMENT:
+    IFSEGMENT
+    FORSEGMENT
+    SWITCHSEGMENT
+    ACTIONBLOCK(ACTION:SET)
+    ACTIONBLOCK(ACTION:GLOBAL)
+    SCOPESEGMENT
+    ACTIONBLOCK(ACTION:INCLUDE)
+    SECTIONSEGMENT
+    ACTIONBLOCK(ACTION:USE)
+    DEFSEGMENT
+    ACTIONBLOCK(ACTION:CALL)
+    VARSEGMENT
+    ACTIONBLOCK(ACTION:CALLBACK)
+    ACTIONBLOCK(ACTION:ERROR)
+    ACTIONBLOCK(ACTION:AUTOSTRIP)
+
+IFSEGMENT:
+    ACTIONBLOCK(ACTION:IF) +
+    BLOCK* +
+    [
+        ACTIONBLOCK(ACTION:ELIF) +
+        BLOCK*
+    ]* +
+    [
+        ACTIONBLOCK(ACTION:ELSE) +
+        BLOCK*
+    ]? +
+    ACTIONBLOCK(ACTION:ENDIF)
+
+FORSEGMENT:
+    ACTIONBLOCK(ACTION:FOR) +
+    BLOCK* +
+    [
+        ACTIONBLOCK(ACTION:ELSE) +
+        BLOCK*
+    ]? +
+    ACTIONBLOCK(ACTION:ENDFOR)
+
+SWITCHSEGMENT:
+    ACTIONBLOCK(ACTION:SWITCH) +
+    BLOCK* +
+    [
+        (ACTIONBLOCK(ACTION:LT) | ACTIONBLOCK(ACTION:LE) |
+         ACTIONBLOCK(ACTION:GT) | ACTIONBLOCK(ACTION:GE) |
+         ACTIONBLOCK(ACTION:NE) | ACTIONBLOCK(ACTION:EQ) |
+         ACTIONBLOCK(ACTION:BT)) +
+        BLOCK*
+    ]* +
+    ACTIONBLOCK(ACTION:ENDSWITCH]
+
+SCOPESEGMENT:
+    ACTIONBLOCK(ACTION:SCOPE) +
+    BLOCK* +
+    ACTIONBLOCK(ACTION:ENDSCOPE)
+
+SECTIONSEGMENT:
+    ACTIONBLOCK(ACTION:SECTION) +
+    BLOCK* +
+    ACTIONBLOCK(ACTION:ENDSECTION)
+
+DEFSEGMENT:
+    ACTIONBLOCK(ACTION:DEF) +
+    BLOCK* +
+    ACTIONBLOCK(ACTION:ENDDEF)
+
+VARSEGMENT:
+    ACTIONBLOCK(ACTION:VAR) +
+    BLOCK* +
+    ACTIONBLOCK(ACTION:ENDVAR)
 
 
 Functions
