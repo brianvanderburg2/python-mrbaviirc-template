@@ -5,9 +5,9 @@ __copyright__   = "Copyright 2016"
 __license__     = "Apache License 2.0"
 
 __all__ = [
-    "Node", "NodeList",  "TextNode", "IfNode", "ForNode", "EmitNode", "IncludeNode",
-    "AssignNode", "SectionNode", "UseSectionNode", "ScopeNode", "CallbackNode",
-    "VarNode", "ErrorNode"
+    "Node", "NodeList",  "TextNode", "IfNode", "ForNode", "SwitchNode",
+    "EmitNode", "IncludeNode", "AssignNode", "SectionNode", "UseSectionNode",
+    "ScopeNode", "CallbackNode", "VarNode", "ErrorNode"
 ]
 
 
@@ -139,6 +139,46 @@ class ForNode(Node):
 
         if do_else and self._else:
             self._else.render(renderer)
+
+
+class SwitchNode(Node):
+    """ A node for basic if/elif/elif/else nesting. """
+    types = ["lt", "le", "gt", "ge", "ne", "eq", "bt"]
+    argc = [1, 1, 1, 1, 1, 1, 2]
+    cbs = [
+        lambda *args: args[0] < args[1],
+        lambda *args: args[0] <= args[1],
+        lambda *args: args[0] > args[1],
+        lambda *args: args[0] >= args[1],
+        lambda *args: args[0] != args[1],
+        lambda *args: args[0] == args[1],
+        lambda *args: args[0] >= args[1] and args[0] <= args[2]
+    ]
+
+    def __init__(self, template, line, expr):
+        """ Initialize the switch node. """
+        Node.__init__(self, template, line)
+        self._expr = expr
+        self._default = NodeList()
+        self._cases = []
+        self._nodes = self._default
+
+    def add_case(self, cb, exprs):
+        """ Add a case node. """
+        self._cases.append((cb, NodeList(), exprs))
+        self._nodes = self._cases[-1][1]
+
+    def render(self, renderer):
+        """ Render the node. """
+        value = self._expr.eval()
+
+        for cb, nodes, exprs in self._cases:
+            params = [expr.eval() for expr in exprs]
+            if cb(value, *params):
+                nodes.render(renderer)
+                return
+
+        self._default.render(renderer)
 
 
 class EmitNode(Node):

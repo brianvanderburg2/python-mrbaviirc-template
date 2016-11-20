@@ -476,6 +476,10 @@ class TemplateParser(object):
             pos =  self._parse_action_else(pos)
         elif action == "for":
             pos = self._parse_action_for(pos)
+        elif action == "switch":
+            pos = self._parse_action_switch(pos)
+        elif action in SwitchNode.types:
+            pos = self._parse_action_switch_item(pos, action)
         elif action == "set":
             pos = self._parse_action_set(pos, False)
         elif action == "global":
@@ -611,7 +615,58 @@ class TemplateParser(object):
         self._stack.append(node._nodes)
 
         return pos
-    
+
+    def _parse_action_switch(self, start):
+        """ Parse a switch statement. """
+        line = self._token._line
+        (expr, pos) = self._parse_expr(start)
+
+        node = SwitchNode(self._template, line, expr)
+        self._ops_stack.append(("switch", line))
+        self._stack[-1].append(node)
+        self._stack.append(node._nodes)
+
+        return pos
+
+    def _parse_action_switch_item(self, start, item):
+        """ Parse the switch item. """
+        line = self._token._line
+
+        if not self._ops_stack:
+            raise SyntaxError(
+                "{0} can only occur in switch".format(item),
+                self._template._filename,
+                line
+            )
+
+        what = self._ops_stack[-1]
+        if what[0] != "switch":
+            raise SyntaxError(
+                "{0} can only occur in switch".format(item),
+                self._template._filename,
+                line
+            )
+
+        offset = SwitchNode.types.index(item)
+        argc = SwitchNode.argc[offset]
+
+        (exprs, pos) = self._parse_expr_items(start, Token.TYPE_END_ACTION)
+        pos -= 1 # Need to back up so parse_action will handle ending tag
+
+        if len(exprs) != argc:
+            raise SyntaxError(
+                "Switch clause {0} takes {1} argument".format(item, argc),
+                self._template._filename,
+                line
+            )
+
+        self._stack.pop()
+        node = self._stack[-1][-1]
+        node.add_case(SwitchNode.cbs[offset], exprs)
+        self._stack.append(node._nodes)
+
+        return pos
+
     def _parse_action_set(self, start, use_global):
         """ Parse a set statement. """
         line = self._token._line

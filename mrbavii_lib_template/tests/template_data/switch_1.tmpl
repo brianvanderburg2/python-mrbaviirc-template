@@ -1,0 +1,25 @@
+{% autostrip %}
+
+{% switch 12 %}
+    The default
+{% endswitch +%}
+
+{% switch 13 %}
+    The default
+    {% lt 12 %}
+    Not so
+    {% lt 26 %}
+    Is so
+{% endswitch +%}
+
+{% switch 19 %}
+    Another Default
+    {% lt 12 %}
+    I don't think so
+    {% gt 49 %}
+    Nope
+    {% bt 18, 21 %}
+    Yes
+{% endswitch %}
+
+{# Newline needed at end +#}
