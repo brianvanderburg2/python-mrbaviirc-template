@@ -9,17 +9,21 @@ from .template import Template
 from .loaders import FileSystemLoader
 from .errors import *
 
+from .lib import StdLib
+
 
 class Environment(object):
     """ represent a template environment. """
 
-    def __init__(self, context=None, loader=None, callbacks=None):
+    def __init__(self, context=None, loader=None, callbacks=None, importers=None):
         """ Initialize the template environment. """
 
         self._top = {}
         self._scope = self._top
         self._scope_stack = [self._top]
         self._callbacks = {}
+        self._importers = { "mrbavii_lib_template.stdlib": StdLib }
+        self._imported = {}
 
         if context:
             self._scope.update(context)
@@ -31,6 +35,9 @@ class Environment(object):
 
         if callbacks:
             self._callbacks.update(callbacks)
+
+        if importers:
+            self._importers.update(importers)
 
     def load_file(self, filename, parent=None):
         """ Load a template from a file. """
@@ -83,5 +90,16 @@ class Environment(object):
             return value
 
         raise KeyError(var[0])
+
+    def load_import(self, name):
+        """ Load a lib from an importer. """
+
+        if not name in self._imported:
+            if not name in self._importers:
+                raise KeyError(name)
+
+            self._imported[name] = self._importers[name]()
+
+        return self._imported[name]
 
 

@@ -502,6 +502,10 @@ class TemplateParser(object):
             pos = self._parse_action_callback(pos)
         elif action == "error":
             pos = self._parse_action_error(pos)
+        elif action == "import":
+            pos = self._parse_action_import(pos, False)
+        elif action == "gimport":
+            pos = self._parse_action_import(pos, True)
         elif action.startswith("end"):
             pos = self._parse_action_end(pos, action)
         elif action == "push_autostrip":
@@ -823,6 +827,16 @@ class TemplateParser(object):
 
         (expr, pos) = self._parse_expr(start)
         node = ErrorNode(self._template, line, expr)
+        self._stack[-1].append(node)
+
+        return pos
+
+    def _parse_action_import(self, start, glbl):
+        """ Parse an import action. """
+
+        (assigns, pos) = self._parse_multi_assign(start)
+
+        node = ImportNode(self._template, self._token._line, assigns, glbl)
         self._stack[-1].append(node)
 
         return pos

@@ -1,0 +1,21 @@
+{% autostrip %}
+
+{% set mylib = "50" %}
+
+{% scope %}
+
+{% import
+    mylib = "mrbavii_lib_template.stdlib",
+    yourlib = "mrbavii_lib_template.stdlib"
+%}
+{% gimport otherlib = "mrbavii_lib_template.stdlib" %}
+
+{{ mylib.string.concat("Hello", "World", "Goodbye", "World") +}}
+{{ yourlib.string.concat("Feed", "Me") +}}
+{{ otherlib.string.concat("Feed", "Me", "Pizza") +}}
+
+{% endscope %}
+
+{{ otherlib.string.concat("FeedMe", mylib, "Pizzas") }}
+
+{# Give ending newline +#}

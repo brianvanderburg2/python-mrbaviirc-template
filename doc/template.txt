@@ -71,6 +71,7 @@ ACTION:
     ENDVAR: "endvar"
     CALLBACK: "callback" + VARPART + ["(" +MULTIEXPRESSION? + ")" ]?
     ERROR: "error" + EXPRESSION
+    IMPORT: ("import" | "gimport") + MULTIASSIGNMENT
     AUTOSTRIP: "autostrip" | "autotrim" | "no_autostrip" |
         "push_autostrip" + ("on" | "off" | "trim") |
         "pop_autostrip"
@@ -106,6 +107,7 @@ ACTIONSEGMENT:
     VARSEGMENT
     ACTIONBLOCK(ACTION:CALLBACK)
     ACTIONBLOCK(ACTION:ERROR)
+    ACTIONBLOCK(ACTION:IMPORT)
     ACTIONBLOCK(ACTION:AUTOSTRIP)
 
 IFSEGMENT:

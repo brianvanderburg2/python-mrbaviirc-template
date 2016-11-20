@@ -51,6 +51,10 @@ class UnknownIndexError(TemplateError):
     """ Represent an unknown index into a variable. """
     pass
 
+class UnknownImportError(TemplateError):
+    """ Represent an import of an unknown name. """
+    pass
+
 class RaisedError(TemplateError):
     """ Represent an error raised from the template itself. """
     pass

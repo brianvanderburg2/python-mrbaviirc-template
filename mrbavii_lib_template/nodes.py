@@ -7,7 +7,7 @@ __license__     = "Apache License 2.0"
 __all__ = [
     "Node", "NodeList",  "TextNode", "IfNode", "ForNode", "SwitchNode",
     "EmitNode", "IncludeNode", "AssignNode", "SectionNode", "UseSectionNode",
-    "ScopeNode", "CallbackNode", "VarNode", "ErrorNode"
+    "ScopeNode", "CallbackNode", "VarNode", "ErrorNode", "ImportNode"
 ]
 
 
@@ -345,4 +345,28 @@ class ErrorNode(Node):
             self._template._filename,
             self._line
         )
+
+class ImportNode(Node):
+    """ Import a library to a variable in the current scope. """
+    def __init__(self, template, line, assigns, glbl=False):
+        Node.__init__(self, template, line)
+        self._assigns = assigns
+        self._glbl = glbl
+
+    def render(self, renderer):
+        """ Do the import. """
+        glbl = self._glbl
+        env = self._env
+
+        for (var, expr) in self._assigns:
+            name = expr.eval()
+            try:
+                imp = env.load_import(name)
+                env.set(var, imp, glbl)
+            except KeyError:
+                raise UnknownImportError(
+                    "No such import: {0}".format(name),
+                    self._template._filename,
+                    self._line
+                )
 
