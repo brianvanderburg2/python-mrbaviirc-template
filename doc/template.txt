@@ -58,9 +58,11 @@ ACTION:
     ENDSWITCH: "endswitch"
     SET: "set" + MULTIASSIGNMENT
     GLOBAL: "global" + MULTIASSIGNMENT
+    TEMPLATE: "template" + MULTIASSIGNMENT
     SCOPE: "scope"
     ENDSCOPE: "endscope"
     INCLUDE: "include" + EXPRESSION + ["with" + MULTIASSIGNMENT]?
+    RETURN: "return" + MULTIASSIGNMENT
     SECTION: "section" + EXPRESSION
     SECTION: "endsection"
     USE: "use" + EXPRESSION

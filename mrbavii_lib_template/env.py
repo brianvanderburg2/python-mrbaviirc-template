@@ -11,6 +11,28 @@ from .errors import *
 
 from .lib import StdLib
 
+class Scope(object):
+    """ Represent the different variable levels at the current scope. """
+
+    def __init__(self, parent=None, template=False):
+        """ Initialize the current scope. """
+
+        # We always have the local scope variables
+        self._local = {}
+
+        # Set global and template
+        if parent:
+            self._global = parent._global
+
+            if template:
+                # We are starting a template scope
+                self._template = self._local
+            else:
+                self._template = parent._template
+        else:
+            self._global = self._local
+            self._template = self._local
+
 
 class Environment(object):
     """ represent a template environment. """
@@ -18,15 +40,14 @@ class Environment(object):
     def __init__(self, context=None, loader=None, callbacks=None, importers=None):
         """ Initialize the template environment. """
 
-        self._top = {}
-        self._scope = self._top
-        self._scope_stack = [self._top]
+        self._scope = Scope()
+        self._scope_stack = [self._scope]
         self._callbacks = {}
         self._importers = { "mrbavii_lib_template.stdlib": StdLib }
         self._imported = {}
 
         if context:
-            self._scope.update(context)
+            self._scope._local.update(context)
 
         if loader:
             self._loader = loader
@@ -49,7 +70,7 @@ class Environment(object):
 
     def _push_scope(self):
         """ Create a new scope. """
-        self._scope = {}
+        self._scope = Scope(self._scope)
         self._scope_stack.append(self._scope)
 
         return self._scope
@@ -59,24 +80,28 @@ class Environment(object):
         self._scope_stack.pop()
         self._scope = self._scope_stack[-1]
 
-    def set(self, name, value, glbl=False):
-        """ Set a value in the current scope. """
-        if glbl:
-            self._top[name] = value
+    def set(self, name, value, where=0):
+        """ Set a value in the a scope. """
+        if where == 0:
+            self._scope._local[name] = value
+        elif where == 1:
+            self._scope._global[name] = value
         else:
-            self._scope[name] = value
+            self._scope._template[name] = value
 
     def update(self, values):
         """ Update values in the context. """
-        self._scope.update(values)
+        self._scope._local.update(values)
 
     def clear(self):
         """ Clear the current context. """
-        self._scope.clear()
+        self._scope._local.clear()
 
     def get(self, var):
         """ Get a dotted variable. """
-        for scope in reversed(self._scope_stack):
+        for entry in reversed(self._scope_stack):
+            scope = entry._local
+
             if not var[0] in scope:
                 continue
 

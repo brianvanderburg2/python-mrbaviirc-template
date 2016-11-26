@@ -481,13 +481,17 @@ class TemplateParser(object):
         elif action in SwitchNode.types:
             pos = self._parse_action_switch_item(pos, action)
         elif action == "set":
-            pos = self._parse_action_set(pos, False)
+            pos = self._parse_action_set(pos, 0)
         elif action == "global":
-            pos = self._parse_action_set(pos, True)
+            pos = self._parse_action_set(pos, 1)
+        elif action == "template":
+            pos = self._parse_action_set(pos, 2)
         elif action == "scope":
             pos = self._parse_action_scope(pos)
         elif action == "include":
             pos = self._parse_action_include(pos)
+        elif action == "return":
+            pos = self._parse_action_return(pos)
         elif action == "section":
             pos = self._parse_action_section(pos)
         elif action == "use":
@@ -671,13 +675,13 @@ class TemplateParser(object):
 
         return pos
 
-    def _parse_action_set(self, start, use_global):
+    def _parse_action_set(self, start, where):
         """ Parse a set statement. """
         line = self._token._line
 
         (assigns, pos) = self._parse_multi_assign(start)
 
-        node = AssignNode(self._template, line, assigns, use_global)
+        node = AssignNode(self._template, line, assigns, where)
         self._stack[-1].append(node)
 
         return pos
@@ -707,6 +711,17 @@ class TemplateParser(object):
             (assigns, pos) = self._parse_multi_assign(pos + 1)
 
         node = IncludeNode(self._template, line, expr, assigns)
+        self._stack[-1].append(node)
+
+        return pos
+
+    def _parse_action_return(self, start):
+        """ Parse a return variable node. """
+        line = self._token._line
+
+        (assigns, pos) = self._parse_multi_assign(start)
+
+        node = ReturnNode(self._template, line, assigns)
         self._stack[-1].append(node)
 
         return pos

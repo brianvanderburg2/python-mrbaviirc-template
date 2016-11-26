@@ -72,9 +72,12 @@ class Template(object):
         scope = env._push_scope()
         try:
             if not context is None:
-                scope.update(context)
+                scope._local.update(context)
 
             self._nodes.render(renderer)
         finally:
             env._pop_scope()
+
+        # Set up any return values:
+        env.set("return", scope._template.get(":return:", {}))
 

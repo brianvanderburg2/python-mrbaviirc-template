@@ -6,8 +6,9 @@ __license__     = "Apache License 2.0"
 
 __all__ = [
     "Node", "NodeList",  "TextNode", "IfNode", "ForNode", "SwitchNode",
-    "EmitNode", "IncludeNode", "AssignNode", "SectionNode", "UseSectionNode",
-    "ScopeNode", "CallbackNode", "VarNode", "ErrorNode", "ImportNode"
+    "EmitNode", "IncludeNode", "ReturnNode", "AssignNode", "SectionNode",
+    "UseSectionNode", "ScopeNode", "CallbackNode", "VarNode", "ErrorNode",
+    "ImportNode"
 ]
 
 
@@ -224,21 +225,39 @@ class IncludeNode(Node):
         template.render(renderer, context)
 
 
-class AssignNode(Node):
-    """ Set a variable to a subvariable. """
+class ReturnNode(Node):
+    """ A node to set a return variable. """
 
-    def __init__(self, template, line, assigns, glbl):
+    def __init__(self, template, line, assigns):
         """ Initialize. """
         Node.__init__(self, template, line)
         self._assigns = assigns
-        self._glbl = glbl
+
+    def render(self, renderer):
+        """ Set the return nodes. """
+
+        result = {}
+        for (var, expr) in self._assigns:
+            result[var] = expr.eval()
+
+        self._env.set(":return:", result, 2)
+
+
+class AssignNode(Node):
+    """ Set a variable to a subvariable. """
+
+    def __init__(self, template, line, assigns, where):
+        """ Initialize. """
+        Node.__init__(self, template, line)
+        self._assigns = assigns
+        self._where = where
 
     def render(self, renderer):
         """ Set the value. """
         env = self._env
 
         for (var, expr) in self._assigns:
-            env.set(var, expr.eval(), self._glbl)
+            env.set(var, expr.eval(), self._where)
 
 
 class SectionNode(Node):
