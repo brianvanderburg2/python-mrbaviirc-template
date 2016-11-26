@@ -1,11 +1,11 @@
 {% autostrip %}
 
-{% include "return_1.inc" with a = 5, b = 10 %}
+{% include "return_1.inc" return result with a = 5, b = 10 %}
 
-{{ return.a +}}
-{{ return.b +}}
+{{ result.a +}}
+{{ result.b +}}
 
-{% include "return_1.inc" with a = 10, b = 5 %}
+{% include "return_1.inc" return gamma with a = 10, b = 5 %}
 
-{{ return.a +}}
-{{ return.b +}}
+{{ gamma.a +}}
+{{ gamma.b +}}

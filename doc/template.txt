@@ -61,7 +61,7 @@ ACTION:
     TEMPLATE: "template" + MULTIASSIGNMENT
     SCOPE: "scope"
     ENDSCOPE: "endscope"
-    INCLUDE: "include" + EXPRESSION + ["with" + MULTIASSIGNMENT]?
+    INCLUDE: "include" + EXPRESSION + ["return" + VARPART]? + ["with" + MULTIASSIGNMENT]?
     RETURN: "return" + MULTIASSIGNMENT
     SECTION: "section" + EXPRESSION
     SECTION: "endsection"

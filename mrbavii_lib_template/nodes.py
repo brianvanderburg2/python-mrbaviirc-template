@@ -198,11 +198,12 @@ class EmitNode(Node):
 class IncludeNode(Node):
     """ A node to include another template. """
 
-    def __init__(self, template, line, expr, assigns):
+    def __init__(self, template, line, expr, assigns, retvar):
         """ Initialize the include node. """
         Node.__init__(self, template, line)
         self._expr = expr
         self._assigns = assigns
+        self._retvar = retvar
 
     def render(self, renderer):
         """ Actually do the work of including the template. """
@@ -222,7 +223,7 @@ class IncludeNode(Node):
         for (var, expr) in self._assigns:
             context[var] = expr.eval()
 
-        template.render(renderer, context)
+        template.render(renderer, context, self._retvar)
 
 
 class ReturnNode(Node):

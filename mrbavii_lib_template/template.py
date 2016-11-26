@@ -66,7 +66,7 @@ class Template(object):
         parser = TemplateParser(self, text)
         self._nodes = parser.parse()
 
-    def render(self, renderer, context=None):
+    def render(self, renderer, context=None, retvar=None):
         """ Render the template. """
         env = self._env
         scope = env._push_scope()
@@ -79,5 +79,6 @@ class Template(object):
             env._pop_scope()
 
         # Set up any return values:
-        env.set("return", scope._template.get(":return:", {}))
+        if retvar:
+            env.set(retvar, scope._template.get(":return:", {}))
 
