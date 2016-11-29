@@ -33,13 +33,22 @@ class FileSystemLoader(Loader):
 
     def __init__(self, root=None):
         """ Initialze the loader. """
-        self._root = os.path.join(os.path.realpath(root), '') if root else None
+        if root:
+            if not isinstance(root, (tuple, list)):
+                root = [root]
+            self._root = tuple([os.path.join(os.path.realpath(i), '') for i in root])
+        else:
+            self._root = None
+
         self._cache = {}
+        self._find_cache = {}
 
     def load_template(self, env, filename, parent=None):
         """ Load a template. """
 
-        if parent:
+        if filename[0] == '@':
+            filename = self._find_template(filename[1:])
+        elif parent:
             filename = os.path.join(
                 os.path.dirname(parent),
                 *(filename.split("/"))
@@ -60,7 +69,34 @@ class FileSystemLoader(Loader):
 
         return self._cache[filename]
 
+    def _find_template(self, filename):
+        """ Find a template along root paths. """
+
+        filename = filename.replace("/", os.sep)
+
+        if not self._root:
+            raise RestrictedError(
+                "Attempt to load template from empty search path: {0}".format(filename)
+            )
+
+        if not filename in self._find_cache:
+            for root in self._root:
+                new_filename = os.path.join(root, filename)
+                if os.path.isfile(new_filename):
+                    self._find_cache[filename] = new_filename
+                    break
+            else:
+                raise RestrictedError(
+                    "Template not found along search path: {0}".format(filename)
+                )
+
+        return self._find_cache[filename]
+
     def _check(self, filename):
         """ Check the filename is under the root. """
-        return os.path.commonprefix([self._root, filename]) == self._root
+        for root in self._root:
+            if os.path.commonprefix([root, filename]) == root:
+                return True
+
+        return False
 
