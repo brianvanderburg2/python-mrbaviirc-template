@@ -96,11 +96,39 @@ class Tokenizer(object):
 
     def _parse_mode_text(self, start):
         """ Parse while in text mode. """
-        pos = self._text.find("{", start)
+        # Search for escape and open block
+        buffer = []
+        while True:
+            pos = self._text.find("{", start)
+            pos2 = self._text.find("\\", start)
+
+            if pos2 >= 0 and (pos2 < pos or pos < 0):
+                # Found an escape item before a block
+                if pos2 > start:
+                    buffer.append(self._text[start:pos2])
+
+                if self._text[pos2 + 1:pos2 + 2] in ("{", "}", "\\"):
+                    buffer.append(self._text[pos2 + 1:pos2 + 2])
+                else:
+                    raise SyntaxError(
+                        "Invalid escape in text body",
+                        self._filename,
+                        self._line
+                    )
+
+                start = pos2 + 2
+            else:
+                if pos == -1:
+                    buffer.append(self._text[start:])
+                else:
+                    buffer.append(self._text[start:pos])
+
+                break
+
+        body = "".join(buffer)
 
         if pos == -1:
             # No more tags
-            body = self._text[start:]
             if body:
                 token = Token(Token.TYPE_TEXT, self._line, body)
                 self._tokens.append(token)
@@ -109,7 +137,6 @@ class Tokenizer(object):
             return len(self._text)
         else:
             # Found a tag
-            body = self._text[start:pos]
             if body:
                 token = Token(Token.TYPE_TEXT, self._line, body)
                 self._tokens.append(token)
