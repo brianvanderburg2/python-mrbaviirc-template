@@ -97,19 +97,26 @@ class Tokenizer(object):
     def _parse_mode_text(self, start):
         """ Parse while in text mode. """
         # Search for escape and open block
-        buffer = []
         while True:
             pos = self._text.find("{", start)
             pos2 = self._text.find("\\", start)
 
             if pos2 >= 0 and (pos2 < pos or pos < 0):
-                # Found an escape item before a block
+                # Found an escape item before a tag
                 if pos2 > start:
-                    buffer.append(self._text[start:pos2])
+                    # Create text from everything up to the escape
+                    block = self._text[start:pos2]
+                    token = Token(Token.TYPE_TEXT, self._line, block)
+                    self._tokens.append(token)
+                    self._line += block.count("\n")
 
-                if self._text[pos2 + 1:pos2 + 2] in ("{", "}", "\\"):
-                    buffer.append(self._text[pos2 + 1:pos2 + 2])
+                # Create a text from the escaped character
+                block = self._text[pos2 + 1:pos2 + 2]
+                if block in ("{", "}", "\\"):
+                    token = Token(Token.TYPE_TEXT, self._line, block)
+                    self._tokens.append(token)
                 else:
+                    # Invalid escape
                     raise SyntaxError(
                         "Invalid escape in text body",
                         self._filename,
@@ -119,28 +126,20 @@ class Tokenizer(object):
                 start = pos2 + 2
             else:
                 if pos == -1:
-                    buffer.append(self._text[start:])
+                    block = self._text[start:]
                 else:
-                    buffer.append(self._text[start:pos])
+                    block = self._text[start:pos]
+
+                if block:
+                    token = Token(Token.TYPE_TEXT, self._line, block)
+                    self._tokens.append(token)
+                    self._line += block.count("\n")
 
                 break
 
-        body = "".join(buffer)
-
         if pos == -1:
             # No more tags
-            if body:
-                token = Token(Token.TYPE_TEXT, self._line, body)
-                self._tokens.append(token)
-                self._line += body.count("\n")
-
             return len(self._text)
-        else:
-            # Found a tag
-            if body:
-                token = Token(Token.TYPE_TEXT, self._line, body)
-                self._tokens.append(token)
-                self._line += body.count("\n")
 
         # Verify correct tag
         tag = self._text[pos:pos + 2]
