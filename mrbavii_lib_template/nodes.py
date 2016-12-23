@@ -368,21 +368,21 @@ class ErrorNode(Node):
 
 class ImportNode(Node):
     """ Import a library to a variable in the current scope. """
-    def __init__(self, template, line, assigns, glbl=False):
+    def __init__(self, template, line, assigns, where=0):
         Node.__init__(self, template, line)
         self._assigns = assigns
-        self._glbl = glbl
+        self._where = where
 
     def render(self, renderer):
         """ Do the import. """
-        glbl = self._glbl
+        where = self._where
         env = self._env
 
         for (var, expr) in self._assigns:
             name = expr.eval()
             try:
                 imp = env.load_import(name)
-                env.set(var, imp, glbl)
+                env.set(var, imp, where)
             except KeyError:
                 raise UnknownImportError(
                     "No such import: {0}".format(name),

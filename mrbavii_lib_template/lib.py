@@ -172,6 +172,10 @@ class StdLib(Library):
         """ Return the interger of a value. """
         return int(value)
 
+    def lib_float(self, value):
+        """ Return the float of a value. """
+        return float(value)
+
     def lib_count(self, value):
         """ Return how many things are in a value. """
         return len(value)
