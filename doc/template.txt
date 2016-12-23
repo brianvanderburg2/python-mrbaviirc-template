@@ -14,6 +14,13 @@ tag in the template..  Everything before that becomes a TEXTBLOCK.  Then
 parsing handles the tag as the correct type, and continues until the end of the
 input.
 
+Within a text block certain characters can be escaped:
+
+    "\\" produces a literal "\"
+    "\{" produces a literal "{"
+    "\}" produces a literal "}"
+
+
 General Syntax Definition
 =========================
 
@@ -168,27 +175,67 @@ VARSEGMENT:
     ACTIONBLOCK(ACTION:ENDVAR)
 
 
-Functions
-=========
+Whitespace Control
+==================
 
-Template functions are provided by passing variables to the environment.  If
-a variable is called as a function, then it will be attempted to use it as
-a function and pass any arguments supported to it.
+{% autostrip %} will turn on auto-stripping for any text blocks following.
+{% autotrim %} will turn on auto-trimming for any text blocks following.
+{% no_autostrip %} will turn off auto-strip or auto-trim.
 
-Some internal library functions are provided in the mrbavii.template.StdLib
-class.  To pass these, just assign an instance of this class to a context
-variable:
+In autostrip mode, whitespace at the start and end of each text block is
+removed.  In autotrim mode, the block is split into lines, blank lines are
+removed, and leading whitespace from each line is removed.
 
-    env = Environment({"lib": StdLib()})
+A block can also have whitespace control characters to control how to treat
+the ending of the previous text block and the start of the next next block:
 
+    {{<endflag> ... <startflag>}}
+    {%<endflag> ... <startflag>%}
+    {#<endflag> ... <startflag>#}
+
+endflag can be blank or one of "-", "<", "!", "^", or "+"
+startflag can be "-" or "+"
+
+"-" is used to remove all whitespace at the end of the previous block (endflag)
+or the start of the next block (startflag), up to and including the newline.
+This has no effect if autostrip or autotrim is enabled.
+
+"<", "!", "^" is used to remove all white space at end of the previous block
+up to but not including a newline.  This has no effect if autostrip or autotrim
+is enabled.
+
+"+" is used to insert a new line at the end of the previous block (endflag) or
+at the start of the next block (startflag).  This will have an effect even if
+autostrip ro autotrim is enabled.
+
+
+Functions Libraries
+===================
+
+Function libraries can be imported into the current scope or global scope.
+
+    {% import lib="name" %}
+    {% gimport lib="name" %}
+
+Currently provided libraries are:
+
+    mrbavii_lib_template.stdlib
 
 Library Functions
 =================
+
+import "mrbavii_lib_template.stdlib"
+------------------------------------
+
+path - Return the stdlib.path library
+string - Return the stdlib.string library
+html - Return the stdlib.html library
 
 str(value) - Return the string form of a value
 int(value) - Return the interger form of a value
 float(value) - Return the float form of a value
 
+count(value) - Return how the lenght of a value
 add(value1, value2) - Add two values: value1 + value2
 sub(value2, value2) - Subtract two values: value1 - value2
 mul(value1, value2) - Multiply two values: value1 * value2
@@ -199,70 +246,39 @@ iseven(value) - Return true if a value is even
 isodd(value) - Return true if a value is odd
 eq(value1, value2) - Return true if two values are equal
 ne(value1, value2) - Return true if two values are not equal)
+lt(value1, value2) - Returns true if value1 is less than value2
+gt(value1, value2) - Returns true if value1 is greater than value2
+le(value1, value2) - Returns true if value1 is less than or equal to value2
+ge(value1, value2) - Returns true if value1 is greater than or equal to value2
 
-concat(value...) - Concatenate multiple strings together
+library "stdlib.path"
+---------------------
 
+sep - The path separator
+join(*parts) - Return the path parts joined together
+split(path) - Return a list of [head, tail] with the part of a path split
+              from the head.
+splitext(path) - Returns a list of [path, ext] where ext will contain at most
+               one "."
+dirname(path) - Return the directory part of the path
+basename(path) - Return the filename part of the path
+relpath(target, fromdir) - Return the relative path to the target starting
+                         in the fromdir
 
+library "stdlib.string"
+-----------------------
+concat(*parts) - Return the concatenation of all parts
+split(sep, value) - Return a list of the string split by a separator
+join(self, sep, values) - Return the list of values joined by the separator
+strip(value, what=None) - Return the strip with the start and ending stripped.
+                          If what is not specified whitespace is stripped.
+lstrip(value, what=None) - Return a string with the start of the string stripped.
+rstrip(value, what=None) - Return a string wtih the end of the string stripped.
+substr(self, value, start, end=None) - Return a substring of the string.
 
-Library Objects
-===============
+library "stdlib.html"
+---------------------
+esc(value, quote=False) - Return a value quoted for HTML.  If quote is true,
+                          it will be escaped will be escaped in such a way
+                          that it can be used in quoted attributes.
 
-
-
-Planned Changes/Ideas
-=====================
-
-Importable functions
-====================
-
-Status: Idea
-
-Register function libraries with more meaningful names. Allows template author
-to import to a specific variable if needed:
-
-
-fn()
-    return lib
-
-env.register("unique-name", fn)
-env.register("another-nane", fn2)
-
-
-{% import lib1 "unique-name" %}
-
-{% set data = lib1.getdata(...) %}
- 
-Standard functions at top level
-===============================
-
-Status: Idea
-
-comparision:
-    lt(x, y)  x < y
-    le(x, y)  x <= y
-    gt(x, y)  x > y
-    ge(x, y)  x >= y
-    eq(x, y)  x == y
-    ne(x, y)  x != y
-    bt(x, y, z)  x >= y && x <= z
-
-operators
-    add(x, y)  x + y
-    sub(x, y)  x - y
-    mul(x, y)  x * y
-    div(x, y)  x / y
-    mod(x, y)  x % y
-    neg(x)     -x
-    inv(x)     ~x
-
-logic
-    not(x)     !x
-    and(x, y)  x and y
-    or(x, y)   x or y
-    xor(x, y)  x xor y
-
-conversion
-    str(x)
-    int(x)
-    float(x)
-    bool(x)
