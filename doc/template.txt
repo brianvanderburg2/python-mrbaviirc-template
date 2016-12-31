@@ -275,6 +275,9 @@ strip(value, what=None) - Return the strip with the start and ending stripped.
 lstrip(value, what=None) - Return a string with the start of the string stripped.
 rstrip(value, what=None) - Return a string wtih the end of the string stripped.
 substr(self, value, start, end=None) - Return a substring of the string.
+find(value, what, pos=None) - Find a substring starting at pos, -1 if not found.
+rfind(value, what, pos=None) - Find a sbustring start at pos from the right,
+                              -1 if not found.
 
 library "stdlib.html"
 ---------------------

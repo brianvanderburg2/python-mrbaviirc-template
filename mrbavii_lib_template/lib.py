@@ -94,6 +94,14 @@ class _StringLib(Library):
         else:
             return value[start:end]
 
+    def lib_find(self, value, what, pos=None):
+        """ Find a value, -1 if not found. """
+        return value.find(what, pos)
+
+    def lib_rfind(self, value, what, pos=None):
+        """ Find a vlue, -1 if not found. """
+        return value.rfind(what, 0, pos)
+
 
 class _HtmlLib(Library):
     """ An HTML library for escaping values. """
