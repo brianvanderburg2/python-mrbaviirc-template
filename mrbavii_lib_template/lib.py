@@ -289,5 +289,5 @@ class StdLib(Library):
 
     def lib_seq(self, start, end, step=None):
         """ Return a generater sequence from start up to end. """
-        return range(start, end, step=1)
+        return range(start, end, 1)
 
