@@ -533,9 +533,11 @@ class TemplateParser(object):
         elif action == "error":
             pos = self._parse_action_error(pos)
         elif action == "import":
-            pos = self._parse_action_import(pos, False)
+            pos = self._parse_action_import(pos, 0)
         elif action == "gimport":
-            pos = self._parse_action_import(pos, True)
+            pos = self._parse_action_import(pos, 1)
+        elif action == "do":
+            pos = self._parse_action_do(pos)
         elif action.startswith("end"):
             pos = self._parse_action_end(pos, action)
         elif action == "push_autostrip":
@@ -886,6 +888,15 @@ class TemplateParser(object):
         self._stack[-1].append(node)
 
         return pos
+
+    def _parse_action_do(self, start):
+        """ Parse a do tag. """
+
+        (nodes, pos) = self._parse_expr_items(start, Token.TYPE_END_ACTION)
+        node = DoNode(self._template, self._token._line, nodes)
+        self._stack[-1].append(node)
+
+        return pos - 1 # -1 to go back to the end action tag
 
     def _parse_action_end(self, start, action):
         """ Parse an end tag """

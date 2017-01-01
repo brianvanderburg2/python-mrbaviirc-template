@@ -8,7 +8,7 @@ __all__ = [
     "Node", "NodeList",  "TextNode", "IfNode", "ForNode", "SwitchNode",
     "EmitNode", "IncludeNode", "ReturnNode", "AssignNode", "SectionNode",
     "UseSectionNode", "ScopeNode", "CallbackNode", "VarNode", "ErrorNode",
-    "ImportNode"
+    "ImportNode", "DoNode"
 ]
 
 
@@ -389,4 +389,17 @@ class ImportNode(Node):
                     self._template._filename,
                     self._line
                 )
+
+class DoNode(Node):
+    """ Evaluate expressions and discard the rsults. """
+
+    def __init__(self, template, line, nodes):
+        """ Initialize. """
+        Node.__init__(self, template, line)
+        self._nodes = nodes
+
+    def render(self, renderer):
+        """ Set the value. """
+        for node in self._nodes:
+            node.eval();
 
