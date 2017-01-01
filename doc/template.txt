@@ -251,6 +251,8 @@ gt(value1, value2) - Returns true if value1 is greater than value2
 le(value1, value2) - Returns true if value1 is less than or equal to value2
 ge(value1, value2) - Returns true if value1 is greater than or equal to value2
 
+seq(start, stop, step=1) - Return a sequence from start to but not including end.
+
 library "stdlib.path"
 ---------------------
 
@@ -278,6 +280,18 @@ substr(self, value, start, end=None) - Return a substring of the string.
 find(value, what, pos=None) - Find a substring starting at pos, -1 if not found.
 rfind(value, what, pos=None) - Find a sbustring start at pos from the right,
                               -1 if not found.
+
+library "stdlib.list"
+---------------------
+append(l, x) - Append x to l
+extend(l, l2) - Extend l by l2
+insert(l, i, x) - Insert x at position i in l
+remove(l, x) - Remove the first item x from the list.  Error if it does not exist
+pop(l, i=-1) - Pop and return an item from the list
+reverse(l) - Reverse the list
+count(l, x) - Count the number of items in a list
+contains(l, x) - Return if list l contains x
+splice(l, start, end) - Return a section of list from start to but not icluding end
 
 library "stdlib.html"
 ---------------------

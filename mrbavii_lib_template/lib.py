@@ -103,6 +103,46 @@ class _StringLib(Library):
         return value.rfind(what, 0, pos)
 
 
+class _ListLib(Library):
+    """ A library for dealing with lists. """
+
+    def lib_append(self, l, x):
+        """ Append x to l """
+        l.append(x)
+
+    def lib_extend(self, l, l2):
+        """ Extend l with l2"""
+        l.extend(l2)
+
+    def lib_insert(self, l, i, x):
+        """ Insert x into l at a given position. """
+        l.insert(i, x)
+
+    def lib_remove(self, l, x):
+        """ Remove item the first item x from the list. """
+        l.remove(x)
+
+    def lib_pop(self, l, i=-1):
+        """ Pop and return an item. """
+        return l.pop(i)
+
+    def lib_reverse(self, l):
+        """ Return items in the list. """
+        l.reverse()
+
+    def lib_count(self, l, x):
+        """ Return the number of occurrences of x. """
+        return l.count(x)
+
+    def lib_contains(self, l, x):
+        """ Returns if the list contains x. """
+        return x in l
+
+    def lib_splice(self, l, start, end):
+        """ Return a sublist from start up to but not including end. """
+        return l[start:end]
+
+
 class _HtmlLib(Library):
     """ An HTML library for escaping values. """
 
@@ -145,6 +185,7 @@ class StdLib(Library):
         """ Initialize the standard library. """
         self._path = None
         self._string = None
+        self._list = None
         self._html = None
 
     def call_path(self):
@@ -160,6 +201,12 @@ class StdLib(Library):
             self._string = _StringLib()
 
         return self._string
+
+    def call_list(self):
+        if self._list is None:
+            self._list = _ListLib()
+
+        return self._list
 
     def call_html(self):
         """ Return the HTML library. """
@@ -239,4 +286,8 @@ class StdLib(Library):
     def lib_ge(self, value1, value2):
         """ Determine if value1 is >= value2 """
         return value1 >= value2
+
+    def lib_seq(self, start, end, step=None):
+        """ Return a generater sequence from start up to end. """
+        return range(start, end, step=1)
 
