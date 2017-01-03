@@ -107,6 +107,19 @@ class Environment(object):
 
             value = scope
             for dot in var:
+                # Return an attribute directly (can be used to return functions)
+                attr = "lib_" + dot
+                if hasattr(value, attr):
+                    value = getattr(value, attr)
+                    continue
+
+                # Call a function and return the value
+                attr = "call_" + dot
+                if hasattr(value, attr):
+                    value = getattr(value, attr)()
+                    continue
+
+                # Try to acess the item directly
                 try:
                     value = value[dot]
                 except:

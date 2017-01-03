@@ -9,22 +9,15 @@ import os
 
 
 class Library(object):
-    """ Represent a library of functions. """
-
-    def __getitem__(self, name):
-        """ Get an item. """
-        try:
-            return getattr(self, "lib_" + name)
-        except AttributeError:
-            try:
-                fn = getattr(self, "call_" + name)
-            except AttributeError:
-                raise KeyError(name)
-
-            return fn()
+    """ Represent a library of functions.  Originally used to provide helpers
+        for accessing attributes.  This function has been moved directly to
+        Environment.get and the use of this as a base class is now obsolete.
+    """
+    pass
 
 
-class _PathLib(Library):
+
+class _PathLib(object):
     """ Path based functions. """
 
     def call_sep(self):
@@ -56,7 +49,7 @@ class _PathLib(Library):
         return os.path.relpath(target, fromdir)
 
 
-class _StringLib(Library):
+class _StringLib(object):
     """ String based functions. """
 
     def lib_concat(self, *values):
@@ -103,7 +96,7 @@ class _StringLib(Library):
         return value.rfind(what, 0, pos)
 
 
-class _ListLib(Library):
+class _ListLib(object):
     """ A library for dealing with lists. """
 
     def lib_append(self, l, x):
@@ -143,7 +136,7 @@ class _ListLib(Library):
         return l[start:end]
 
 
-class _HtmlLib(Library):
+class _HtmlLib(object):
     """ An HTML library for escaping values. """
 
     def lib_esc(self, value, quote=False):
@@ -151,12 +144,12 @@ class _HtmlLib(Library):
         return cgi.escape(value, quote)
 
 
-class _IndentLib(Library):
+class _IndentLib(object):
     """ Manage an indenter. """
 
     def __init__(self, indent):
         """ Initialize the indentor """
-        Library.__init__(self)
+        super(_IndentLib, self).__init__()
         self._indent = str(indent)
         self._count = 0
         self._value = ""
@@ -178,11 +171,12 @@ class _IndentLib(Library):
         return self._value
 
 
-class StdLib(Library):
+class StdLib(object):
     """ Represent the top-level standard library. """
 
     def __init__(self):
         """ Initialize the standard library. """
+        super(StdLib, self).__init__()
         self._path = None
         self._string = None
         self._list = None
