@@ -69,10 +69,13 @@ class Template(object):
     def render(self, renderer, context=None, retvar=None):
         """ Render the template. """
         env = self._env
-        scope = env._push_scope()
+        scope = env._push_scope(True)
         try:
             if not context is None:
                 scope._local.update(context)
+
+            # set certain variables
+            scope._template["__filename__"] = self._filename
 
             self._nodes.render(renderer)
         finally:

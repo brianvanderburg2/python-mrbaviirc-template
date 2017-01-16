@@ -17,26 +17,12 @@ from .. import FileSystemLoader, Environment, StdLib, StringRenderer
 
 DATADIR = os.path.join(os.path.dirname(__file__), "template_data")
 
-def inc_cb(env, source, params):
-    """ A test callback. """
-
-    results = []
-    for param in params:
-        fn = os.path.join(os.path.dirname(source), param.replace("/", os.sep))
-        renderer = StringRenderer()
-
-        template = env.load_file(fn)
-        template.render(renderer)
-        results.append(renderer.get())
-
-    return "".join(results)
-
 
 class TemplateTest(unittest.TestCase):
 
     def setUp(self):
         loader = FileSystemLoader(DATADIR)
-        self._env = Environment({"lib": StdLib() }, loader=loader, callbacks={"include": inc_cb})
+        self._env = Environment({"lib": StdLib() }, loader=loader)
 
     def tearDown(self):
         self._env = None

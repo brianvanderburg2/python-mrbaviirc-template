@@ -37,12 +37,11 @@ class Scope(object):
 class Environment(object):
     """ represent a template environment. """
 
-    def __init__(self, context=None, loader=None, callbacks=None, importers=None):
+    def __init__(self, context=None, loader=None, importers=None):
         """ Initialize the template environment. """
 
         self._scope = Scope()
         self._scope_stack = [self._scope]
-        self._callbacks = {}
         self._importers = { "mrbavii_lib_template.stdlib": StdLib }
         self._imported = {}
 
@@ -53,9 +52,6 @@ class Environment(object):
             self._loader = loader
         else:
             self._loader = FileSystemLoader()
-
-        if callbacks:
-            self._callbacks.update(callbacks)
 
         if importers:
             self._importers.update(importers)
@@ -68,9 +64,9 @@ class Environment(object):
         """ Load a template from a string. """
         return Template(self, text=text)
 
-    def _push_scope(self):
+    def _push_scope(self, template=False):
         """ Create a new scope. """
-        self._scope = Scope(self._scope)
+        self._scope = Scope(self._scope, template)
         self._scope_stack.append(self._scope)
 
         return self._scope

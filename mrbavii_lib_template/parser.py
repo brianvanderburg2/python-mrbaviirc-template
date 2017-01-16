@@ -528,8 +528,6 @@ class TemplateParser(object):
             pos = self._parse_action_call(pos)
         elif action == "var":
             pos = self._parse_action_var(pos)
-        elif action == "callback":
-            pos = self._parse_action_callback(pos)
         elif action == "error":
             pos = self._parse_action_error(pos)
         elif action == "import":
@@ -836,36 +834,6 @@ class TemplateParser(object):
         self._ops_stack.append(("var", line))
         self._stack[-1].append(node)
         self._stack.append(node._nodes)
-
-        return pos
-
-    def _parse_action_callback(self, start):
-        """ Call a registered callback function. """
-
-        token = self._get_token(start, "Expected calback function name.")
-        callback = token._value
-
-        callbacks = self._template._env._callbacks
-        if not callback in callbacks:
-            raise SyntaxError(
-                "Unknown callback function: {0}".format(callback),
-                self._template._filename,
-                token._line
-            )
-
-        token = self._get_token(start + 1, "Expected '(' or closing tag")
-        if token._type == Token.TYPE_START_FUNC:
-            (nodes, pos) = self._parse_expr_items(start + 2, Token.TYPE_END_FUNC)
-        else:
-            nodes = []
-            pos = start + 1
-
-        node = CallbackNode(self._template,
-            token._line,
-            callbacks[callback],
-            nodes)
-
-        self._stack[-1].append(node)
 
         return pos
 
