@@ -8,3 +8,14 @@
 {% endscope -%}
 {{ v1 }}
 {{ v2 }}
+{% private v3="Value 4" -%}
+{{ v3 }}
+{% scope -%}
+{# Template scope is "higher" than private scope. So set a variable to see
+   Which we get.  We should skip over the private variable v4 above. -#}
+{% template v3="Value 5" -%}
+{{ v3 }}
+{% private v3="Value 6" -%}
+{{ v3 }}
+{% endscope -%}
+{{ v3 }}

@@ -11,6 +11,7 @@ import re
 from .errors import *
 from .nodes import *
 from .expr import *
+from .scope import *
 
 
 class Token(object):
@@ -507,11 +508,13 @@ class TemplateParser(object):
         elif action in SwitchNode.types:
             pos = self._parse_action_switch_item(pos, action)
         elif action == "set":
-            pos = self._parse_action_set(pos, 0)
+            pos = self._parse_action_set(pos, Scope.SCOPE_LOCAL)
         elif action == "global":
-            pos = self._parse_action_set(pos, 1)
+            pos = self._parse_action_set(pos, Scope.SCOPE_GLOBAL)
         elif action == "template":
-            pos = self._parse_action_set(pos, 2)
+            pos = self._parse_action_set(pos, Scope.SCOPE_TEMPLATE)
+        elif action == "private":
+            pos = self._parse_action_set(pos, Scope.SCOPE_PRIVATE)
         elif action == "scope":
             pos = self._parse_action_scope(pos)
         elif action == "include":

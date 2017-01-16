@@ -6,33 +6,11 @@ __license__     = "Apache License 2.0"
 
 
 from .template import Template
+from .scope import Scope
 from .loaders import FileSystemLoader
 from .errors import *
 
 from .lib import StdLib
-
-class Scope(object):
-    """ Represent the different variable levels at the current scope. """
-
-    def __init__(self, parent=None, template=False):
-        """ Initialize the current scope. """
-
-        # We always have the local scope variables
-        self._local = {}
-
-        # Set global and template
-        if parent:
-            self._global = parent._global
-
-            if template:
-                # We are starting a template scope
-                self._template = self._local
-            else:
-                self._template = parent._template
-        else:
-            self._global = self._local
-            self._template = self._local
-
 
 class Environment(object):
     """ represent a template environment. """
@@ -76,14 +54,19 @@ class Environment(object):
         self._scope_stack.pop()
         self._scope = self._scope_stack[-1]
 
-    def set(self, name, value, where=0):
+    def set(self, name, value, where=Scope.SCOPE_LOCAL):
         """ Set a value in the a scope. """
-        if where == 0:
+        if where == Scope.SCOPE_LOCAL:
             self._scope._local[name] = value
-        elif where == 1:
+        elif where == Scope.SCOPE_GLOBAL:
             self._scope._global[name] = value
-        else:
+        elif where == Scope.SCOPE_TEMPLATE:
             self._scope._template[name] = value
+        elif where == Scope.SCOPE_PRIVATE:
+            self._scope._private[name] = value
+        else:
+            # Shold never happen, but default to local
+            self._scope._local[name] = value
 
     def update(self, values):
         """ Update values in the context. """
@@ -95,35 +78,46 @@ class Environment(object):
 
     def get(self, var):
         """ Get a dotted variable. """
-        for entry in reversed(self._scope_stack):
-            scope = entry._local
 
-            if not var[0] in scope:
+        # Find the scope dict it is in
+        first = True
+        for entry in reversed(self._scope_stack):
+            if first:
+                first = False
+                # Try private scope first
+                scope = entry._private
+                if var[0] in scope:
+                    break
+
+            scope = entry._local
+            if var[0] in scope:
+                break
+        else:
+            raise KeyError(var[0])
+
+        # Solve dotted variables
+        value = scope[var[0]]
+        for dot in var[1:]:
+            # Return an attribute directly (can be used to return functions)
+            attr = "lib_" + dot
+            if hasattr(value, attr):
+                value = getattr(value, attr)
                 continue
 
-            value = scope
-            for dot in var:
-                # Return an attribute directly (can be used to return functions)
-                attr = "lib_" + dot
-                if hasattr(value, attr):
-                    value = getattr(value, attr)
-                    continue
+            # Call a function and return the value
+            attr = "call_" + dot
+            if hasattr(value, attr):
+                value = getattr(value, attr)()
+                continue
 
-                # Call a function and return the value
-                attr = "call_" + dot
-                if hasattr(value, attr):
-                    value = getattr(value, attr)()
-                    continue
+            # Try to acess the item directly
+            try:
+                value = value[dot]
+            except:
+                raise KeyError(dot)
 
-                # Try to acess the item directly
-                try:
-                    value = value[dot]
-                except:
-                    raise KeyError(dot)
+        return value
 
-            return value
-
-        raise KeyError(var[0])
 
     def load_import(self, name):
         """ Load a lib from an importer. """
