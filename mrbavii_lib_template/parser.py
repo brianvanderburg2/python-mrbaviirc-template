@@ -33,6 +33,12 @@ class Token(object):
     TYPE_EQUAL          = 16
     TYPE_WORD           = 17
 
+    WS_NONE = 0
+    WS_TRIMTONL = 1
+    WS_TRIMTONL_PRESERVENL = 2
+    WS_ADDNL = 3
+    WS_ADDSP = 4
+
     def __init__(self, type, line, value=None):
         """ Initialize a token. """
         self._type = type
@@ -65,6 +71,13 @@ class Tokenizer(object):
         "#}": Token.TYPE_END_COMMENT,
         "%}": Token.TYPE_END_ACTION,
         "}}": Token.TYPE_END_EMITTER
+    }
+
+    _ws_map = {
+        "-": Token.WS_TRIMTONL,
+        "^": Token.WS_TRIMTONL_PRESERVENL,
+        "+": Token.WS_ADDNL,
+        "*": Token.WS_ADDSP
     }
 
     def __init__(self, text, filename):
@@ -150,14 +163,7 @@ class Tokenizer(object):
                 self._line)
 
         # Get whitespace control
-        if self._text[pos + 2:pos + 3] == "-":
-            wscontrol = 1
-        elif self._text[pos + 2:pos + 3] in "<!^":
-            wscontrol = 2
-        elif self._text[pos + 2:pos + 3] == "+":
-            wscontrol = 3
-        else:
-            wscontrol = 0
+        wscontrol = self._ws_map.get(self._text[pos + 2:pos + 3], Token.WS_NONE)
 
         # Create token
         type = self._tag_map[tag]
@@ -169,7 +175,7 @@ class Tokenizer(object):
             self._mode = self.MODE_OTHER
 
         # Return next position
-        if wscontrol > 0:
+        if wscontrol != Token.WS_NONE:
             return pos + 3
         else:
             return pos + 2
@@ -187,12 +193,7 @@ class Tokenizer(object):
             return len(self._text)
 
         else:
-            if pos > start and self._text[pos - 1] == "-":
-                wscontrol = 1
-            elif pos > start and self._text[pos - 1] == "+":
-                wscontrol = 3
-            else:
-                wscontrol = 0
+            wscontrol = self._ws_map.get(self._text[pos - 1], Token.WS_NONE)
 
             self._line += self._text[start:pos].count("\n")
             token = Token(Token.TYPE_END_COMMENT, self._line, wscontrol)
@@ -240,21 +241,16 @@ class Tokenizer(object):
                 continue
 
             # Ending tag
-            if ch in ("-", "+", "%", "#", "}"):
+            if ch in ("-", "^", "+", "*", "%", "#", "}"):
 
                 # Check for number first if starts with "-" or "+"
                 if ch in ("-", "+") and self._text[pos + 1:pos + 2] in self._digit:
                     pos = self._parse_number(pos)
                     continue
 
-                if ch == "-":
-                    wscontrol = 1
+                wscontrol = self._ws_map.get(ch, Token.WS_NONE)
+                if wscontrol != Token.WS_NONE:
                     pos += 1
-                elif ch == "+":
-                    wscontrol = 3
-                    pos += 1
-                else:
-                    wscontrol = 0
 
                 tag = self._text[pos:pos + 2]
                 if not tag in ("#}", "%}", "}}"):
@@ -379,6 +375,10 @@ class Tokenizer(object):
 class TemplateParser(object):
     """ A base tokenizer. """
 
+    AUTOSTRIP_NONE = 0
+    AUTOSTRIP_STRIP = 1
+    AUTOSTRIP_TRIM = 2
+
     def __init__(self, template, text):
         """ Initialize the parser. """
 
@@ -394,8 +394,8 @@ class TemplateParser(object):
 
         # Buffer for plain text segments
         self._buffer = []
-        self._pre_ws_control = 0
-        self._auto_strip = False
+        self._pre_ws_control = Token.WS_NONE
+        self._auto_strip = self.AUTOSTRIP_NONE
         self._auto_strip_stack = []
 
     def _get_token(self, pos, errmsg="Expected token"):
@@ -541,11 +541,11 @@ class TemplateParser(object):
         elif action == "pop_autostrip":
             pos = self._parse_action_pop_autostrip(pos)
         elif action == "autostrip":
-            self._auto_strip = 1
+            self._auto_strip = self.AUTOSTRIP_STRIP
         elif action == "autotrim":
-            self._auto_strip = 2
+            self._auto_strip = self.AUTOSTRIP_TRIM
         elif action == "no_autostrip":
-            self._auto_strip = 0
+            self._auto_strip = self.AUTOSTRIP_NONE
         else:
             raise SyntaxError(
                 "Unknown action tag: {0}".format(action),
@@ -906,11 +906,11 @@ class TemplateParser(object):
             )
 
         if token._value == "on":
-            self._auto_strip = 1
+            self._auto_strip = self.AUTOSTRIP_STRIP
         elif token._value == "trim":
-            self._auto_strip = 2
+            self._auto_strip = self.AUTOSTRIP_TRIM
         else:
-            self._auto_strip = 0
+            self._auto_strip = self.AUTOSTRIP_NONE
 
         return start + 1
 
@@ -1068,15 +1068,15 @@ class TemplateParser(object):
 
         return (result, start + 1)
 
-    def _flush_buffer(self, post_ws_control=0):
+    def _flush_buffer(self, post_ws_control=Token.WS_NONE):
         """ Flush the buffer to output. """
         text = ""
         if self._buffer:
             text = "".join(self._buffer)
 
-            if self._auto_strip == 1:
+            if self._auto_strip == self.AUTOSTRIP_STRIP:
                 text = text.strip()
-            elif self._auto_strip == 2:
+            elif self._auto_strip == self.AUTOSTRIP_TRIM:
                 tmp = []
                 need_nl = False
                 for line in text.splitlines():
@@ -1088,16 +1088,17 @@ class TemplateParser(object):
                         need_nl = True
                 text = "".join(tmp)
             else:
-                if self._pre_ws_control == 1:
+                if self._pre_ws_control in (Token.WS_TRIMTONL, Token.WS_TRIMTONL_PRESERVENL):
                     # If the previous tag had a white-space control {{ ... -}}
                     # trim the start of this buffer up to/including a new line
                     first_nl = text.find("\n")
                     if first_nl == -1:
                         text = text.lstrip()
                     else:
-                        text = text[:first_nl + 1].lstrip() + text[first_nl + 1:]
+                        nl = 1 if self._pre_ws_control == Token.WS_TRIMTONL else 0
+                        text = text[:first_nl + nl].lstrip() + text[first_nl + nl:]
 
-                if post_ws_control in (1, 2):
+                if post_ws_control in (Token.WS_TRIMTONL, Token.WS_TRIMTONL_PRESERVENL):
                     # If the current tag has a white-space control {{- ... }}
                     # trim the end of the buffer up to/including a new line
                     # If the current tag has a white-space control {{< .. }}
@@ -1106,14 +1107,18 @@ class TemplateParser(object):
                     if last_nl == -1:
                         text = text.rstrip()
                     else:
-                        nl = 0 if post_ws_control == 1 else 1
+                        nl = 0 if post_ws_control == Token.WS_TRIMTONL else 1
                         text = text[:last_nl + nl] + text[last_nl + nl:].rstrip()
             
-        if self._pre_ws_control == 3:
-                text = "\n" + text
+        if self._pre_ws_control == Token.WS_ADDNL:
+            text = "\n" + text
+        elif self._pre_ws_control == Token.WS_ADDSP:
+            text = " " + text
 
-        if post_ws_control == 3:
-                text = text + "\n"
+        if post_ws_control == Token.WS_ADDNL:
+            text = text + "\n"
+        elif post_ws_control == Token.WS_ADDSP:
+            text = text + " "
 
         if text:
             node = TextNode(self._template, self._token._line, text)
