@@ -531,9 +531,7 @@ class TemplateParser(object):
         elif action == "error":
             pos = self._parse_action_error(pos)
         elif action == "import":
-            pos = self._parse_action_import(pos, 0)
-        elif action == "gimport":
-            pos = self._parse_action_import(pos, 1)
+            pos = self._parse_action_import(pos)
         elif action == "do":
             pos = self._parse_action_do(pos)
         elif action.startswith("end"):
@@ -847,12 +845,12 @@ class TemplateParser(object):
 
         return pos
 
-    def _parse_action_import(self, start, glbl):
+    def _parse_action_import(self, start):
         """ Parse an import action. """
 
         (assigns, pos) = self._parse_multi_assign(start)
 
-        node = ImportNode(self._template, self._token._line, assigns, glbl)
+        node = ImportNode(self._template, self._token._line, assigns)
         self._stack[-1].append(node)
 
         return pos
