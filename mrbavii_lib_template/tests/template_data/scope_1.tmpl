@@ -16,6 +16,11 @@
 {% template v3="Value 5" -%}
 {{ v3 }}
 {% private v3="Value 6" -%}
+{% set v3="Value 7" -%}
+{{ v3 }}
+{% unset v3 -%}
+{{ v3 }}
+{% set v3="Value 7" -%}
 {{ v3 }}
 {% endscope -%}
 {{ v3 }}

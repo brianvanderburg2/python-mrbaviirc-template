@@ -72,9 +72,15 @@ class Environment(object):
         """ Update values in the context. """
         self._scope._local.update(values)
 
+    def unset(self, name):
+        """ Unset a variable from the current scope. """
+        self._scope._local.pop(name, None)
+        self._scope._private.pop(name, None)
+
     def clear(self):
         """ Clear the current context. """
         self._scope._local.clear()
+        self._scope._private.clear()
 
     def get(self, var):
         """ Get a dotted variable. """
@@ -117,7 +123,6 @@ class Environment(object):
                 raise KeyError(dot)
 
         return value
-
 
     def load_import(self, name):
         """ Load a lib from an importer. """

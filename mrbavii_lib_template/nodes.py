@@ -8,7 +8,7 @@ __all__ = [
     "Node", "NodeList",  "TextNode", "IfNode", "ForNode", "SwitchNode",
     "EmitNode", "IncludeNode", "ReturnNode", "AssignNode", "SectionNode",
     "UseSectionNode", "ScopeNode", "VarNode", "ErrorNode","ImportNode",
-    "DoNode"
+    "DoNode", "UnsetNode"
 ]
 
 
@@ -371,7 +371,7 @@ class ImportNode(Node):
                 )
 
 class DoNode(Node):
-    """ Evaluate expressions and discard the rsults. """
+    """ Evaluate expressions and discard the results. """
 
     def __init__(self, template, line, nodes):
         """ Initialize. """
@@ -382,4 +382,18 @@ class DoNode(Node):
         """ Set the value. """
         for node in self._nodes:
             node.eval();
+
+class UnsetNode(Node):
+    """ Unset variable at the current scope rsults. """
+
+    def __init__(self, template, line, varlist):
+        """ Initialize. """
+        Node.__init__(self, template, line)
+        self._varlist = varlist
+
+    def render(self, renderer):
+        """ Set the value. """
+        env = self._env
+        for item in self._varlist:
+            env.unset(item)
 

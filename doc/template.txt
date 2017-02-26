@@ -46,6 +46,7 @@ EMITTERBLOCK: "{{" + WSCONTROL + EXPRESSION + WSCONTROL + "}}"
 
 ASSIGNMENT: VARPART + "=" + EXPRESSION
 MULTIASSIGNMENT: ASSIGNMENT + ["," + ASSIGNMENT]*
+MULTIVARPART: VARPART + ["," + VARPART]*
 
 ACTION:
     IF: "if" + EXPRESSION
@@ -67,6 +68,7 @@ ACTION:
     GLOBAL: "global" + MULTIASSIGNMENT
     TEMPLATE: "template" + MULTIASSIGNMENT
     PRIVATE: "private" + MULTIASSIGNMENT
+    UNSET: "unset" + MULTIVARPART
     SCOPE: "scope"
     ENDSCOPE: "endscope"
     INCLUDE: "include" + EXPRESSION + ["return" + VARPART]? + ["with" + MULTIASSIGNMENT]?
@@ -81,6 +83,7 @@ ACTION:
     ENDVAR: "endvar"
     ERROR: "error" + EXPRESSION
     IMPORT: "import" + MULTIASSIGNMENT
+    DO: "do" + MULTIEXPRESSION
     AUTOSTRIP: "autostrip" | "autotrim" | "no_autostrip" |
         "push_autostrip" + ("on" | "off" | "trim") |
         "pop_autostrip"
@@ -109,8 +112,10 @@ ACTIONSEGMENT:
     ACTIONBLOCK(ACTION:GLOBAL)
     ACTIONBLOCK(ACTION:TEMPLATE)
     ACTIONBLOCK(ACTION:PRIVATE)
+    ACTIONBLOCK(ACTION:UNSET)
     SCOPESEGMENT
     ACTIONBLOCK(ACTION:INCLUDE)
+    ACTIONBLOCK(ACTION:RETURN)
     SECTIONSEGMENT
     ACTIONBLOCK(ACTION:USE)
     DEFSEGMENT
@@ -118,6 +123,7 @@ ACTIONSEGMENT:
     VARSEGMENT
     ACTIONBLOCK(ACTION:ERROR)
     ACTIONBLOCK(ACTION:IMPORT)
+    ACTIONBLOCK(ACTION:DO)
     ACTIONBLOCK(ACTION:AUTOSTRIP)
 
 IFSEGMENT:
@@ -193,29 +199,37 @@ the ending of the previous text block and the start of the next next block:
     {%<endflag> ... <startflag>%}
     {#<endflag> ... <startflag>#}
 
-endflag can be blank or one of "-", "<", "!", "^", or "+"
-startflag can be "-" or "+"
+endflag and startflag can be blank or one of "-", "^", "+", or "*"
 
 "-" is used to remove all whitespace at the end of the previous block (endflag)
 or the start of the next block (startflag), up to and including the newline.
 This has no effect if autostrip or autotrim is enabled.
 
-"<", "!", "^" is used to remove all white space at end of the previous block
-up to but not including a newline.  This has no effect if autostrip or autotrim
-is enabled.
+"^" is used to remove all white space at end of the previous block (endflag)
+or the start of the next block (start flag), up to but not including a newline.
+This has no effect if autostrip or autotrim is enabled.
 
 "+" is used to insert a new line at the end of the previous block (endflag) or
 at the start of the next block (startflag).  This will have an effect even if
-autostrip ro autotrim is enabled.
+autostrip or autotrim is enabled.
+
+"*" is used to insert a space at the end of the previous block (endflag) or at
+the start of the next block (startflag).  This will have an effect even if
+autostrip or autotrim is enabled.
 
 
 Functions Libraries
 ===================
 
-Function libraries can be imported into the current scope or global scope.
+Function libraries can be imported into the current scope:
 
     {% import lib="name" %}
-    {% gimport lib="name" %}
+
+To set a library at the global scope, you can then assign the name at a global
+level:
+
+    {% global lib=lib %}
+    {% unset lib %}
 
 Currently provided libraries are:
 

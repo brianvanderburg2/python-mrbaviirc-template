@@ -515,6 +515,8 @@ class TemplateParser(object):
             pos = self._parse_action_set(pos, Scope.SCOPE_TEMPLATE)
         elif action == "private":
             pos = self._parse_action_set(pos, Scope.SCOPE_PRIVATE)
+        elif action == "unset":
+            pos = self._parse_action_unset(pos)
         elif action == "scope":
             pos = self._parse_action_scope(pos)
         elif action == "include":
@@ -709,6 +711,17 @@ class TemplateParser(object):
         (assigns, pos) = self._parse_multi_assign(start)
 
         node = AssignNode(self._template, line, assigns, where)
+        self._stack[-1].append(node)
+
+        return pos
+
+    def _parse_action_unset(self, start):
+        """ Parse an unset statement. """
+        line = self._token._line
+
+        (varlist, pos) = self._parse_multi_var(start, False)
+
+        node = UnsetNode(self._template, line, varlist);
         self._stack[-1].append(node)
 
         return pos
@@ -1071,6 +1084,32 @@ class TemplateParser(object):
 
         return (result, start + 1)
 
+    def _parse_multi_var(self, start, allow_dots=True):
+        """ Parse multiple variables and return (varlist, pos) """
+        varlist = []
+
+        pos = start
+        first = True
+        while True:
+            token = self._get_token(pos)
+            if token._type == Token.TYPE_END_ACTION:
+                return (varlist, pos)
+
+            if not first:
+                if not token._type == Token.TYPE_COMMA:
+                    raise SyntaxError(
+                        "Expecting comma",
+                        self._template._filename,
+                        token._line
+                    )
+                pos += 1
+            first = False
+
+            (var, pos) = self._parse_var(pos, allow_dots)
+            varlist.append(var)
+
+
+
     def _flush_buffer(self, post_ws_control=Token.WS_NONE):
         """ Flush the buffer to output. """
         text = ""
@@ -1094,6 +1133,8 @@ class TemplateParser(object):
                 if self._pre_ws_control in (Token.WS_TRIMTONL, Token.WS_TRIMTONL_PRESERVENL):
                     # If the previous tag had a white-space control {{ ... -}}
                     # trim the start of this buffer up to/including a new line
+                    # If the previous tag has a white-space control {{^ .. }}
+                    # trim the start of the buffer up to but excluding a new line
                     first_nl = text.find("\n")
                     if first_nl == -1:
                         text = text.lstrip()
@@ -1104,7 +1145,7 @@ class TemplateParser(object):
                 if post_ws_control in (Token.WS_TRIMTONL, Token.WS_TRIMTONL_PRESERVENL):
                     # If the current tag has a white-space control {{- ... }}
                     # trim the end of the buffer up to/including a new line
-                    # If the current tag has a white-space control {{< .. }}
+                    # If the current tag has a white-space control {{^ .. }}
                     # trim the end of the buffer up to but excluding a new line
                     last_nl = text.rfind("\n")
                     if last_nl == -1:
