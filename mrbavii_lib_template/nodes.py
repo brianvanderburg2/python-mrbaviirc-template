@@ -14,6 +14,7 @@ __all__ = [
 
 from .errors import *
 from .renderers import StringRenderer
+from .scope import *
 
 
 class Node(object):
@@ -241,7 +242,7 @@ class ReturnNode(Node):
         for (var, expr) in self._assigns:
             result[var] = expr.eval()
 
-        self._env.set(":return:", result, 2)
+        self._env.set(":return:", result, Scope.SCOPE_TEMPLATE)
 
 
 class AssignNode(Node):
@@ -381,7 +382,7 @@ class DoNode(Node):
     def render(self, renderer):
         """ Set the value. """
         for node in self._nodes:
-            node.eval();
+            node.eval()
 
 class UnsetNode(Node):
     """ Unset variable at the current scope rsults. """
