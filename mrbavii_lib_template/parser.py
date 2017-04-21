@@ -110,58 +110,37 @@ class Tokenizer(object):
 
     def _parse_mode_text(self, start):
         """ Parse while in text mode. """
-        # Search for escape and open block
+        # Search for open block. If not a tag, pass through as a normal block.
+        # Makes text containing { and } easier. To pass litteral {{, {#, or {%,
+        # use {{ "{{" }} in the template
+        pos = start
         while True:
-            pos = self._text.find("{", start)
-            pos2 = self._text.find("\\", start)
-
-            if pos2 >= 0 and (pos2 < pos or pos < 0):
-                # Found an escape item before a tag
-                if pos2 > start:
-                    # Create text from everything up to the escape
-                    block = self._text[start:pos2]
-                    token = Token(Token.TYPE_TEXT, self._line, block)
-                    self._tokens.append(token)
-                    self._line += block.count("\n")
-
-                # Create a text from the escaped character
-                block = self._text[pos2 + 1:pos2 + 2]
-                if block in ("{", "}", "\\"):
-                    token = Token(Token.TYPE_TEXT, self._line, block)
-                    self._tokens.append(token)
-                else:
-                    # Invalid escape
-                    raise SyntaxError(
-                        "Invalid escape in text body",
-                        self._filename,
-                        self._line
-                    )
-
-                start = pos2 + 2
-            else:
-                if pos == -1:
-                    block = self._text[start:]
-                else:
-                    block = self._text[start:pos]
-
-                if block:
-                    token = Token(Token.TYPE_TEXT, self._line, block)
-                    self._tokens.append(token)
-                    self._line += block.count("\n")
-
+            pos = self._text.find("{", pos)
+            if pos == -1:
                 break
+
+            tag = self._text[pos:pos + 2]
+
+            if tag in self._tag_map:
+                break
+                
+            pos += 2
+            continue
+
+        # Add any preceeding text
+        if pos == -1:
+            block = self._text[start:]
+        else:
+            block = self._text[start:pos]
+
+        if block:
+            token = Token(Token.TYPE_TEXT, self._line, block)
+            self._tokens.append(token)
+            self._line += block.count("\n")
 
         if pos == -1:
             # No more tags
             return len(self._text)
-
-        # Verify correct tag
-        tag = self._text[pos:pos + 2]
-        if not tag in ("{#", "{%", "{{"):
-            raise SyntaxError(
-                "Invalid tag: {0}".format(tag),
-                self._filename,
-                self._line)
 
         # Get whitespace control
         wscontrol = self._ws_map.get(self._text[pos + 2:pos + 3], Token.WS_NONE)
