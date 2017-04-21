@@ -1,6 +1,6 @@
 """ A collection of reusable code modules. """
 
-__version__     = "0.1.8"
+__version__     = "0.1.9"
 __author__      = "Brian Allen Vanderburg II"
 __copyright__   = "Copyright 2016-2017"
 __license__     = "Apache License 2.0"
