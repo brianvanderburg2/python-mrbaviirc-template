@@ -10,16 +10,13 @@ of blocks:
     EMITTERBLOCK - This block emittes output from an expression.
 
 Parsing is performed by searching for the first "{" character that starts a
-tag in the template..  Everything before that becomes a TEXTBLOCK.  Then
-parsing handles the tag as the correct type, and continues until the end of the
-input.
+tag in the template.  If it starts a valid tag, then everything up to that
+becomes a TEXTBLOCK and parsing handles the tag.  If not, then it searches for
+the next "{" after that and so on.  This allows characters "{" and "}" to
+easliy be placed in the templace as output with no need for escaping.  If
+a literal tag needs to be output, it can be placed in an emitter blocK:
 
-Within a text block certain characters can be escaped:
-
-    "\\" produces a literal "\"
-    "\{" produces a literal "{"
-    "\}" produces a literal "}"
-
+    {{ "{{" }}
 
 General Syntax Definition
 =========================
