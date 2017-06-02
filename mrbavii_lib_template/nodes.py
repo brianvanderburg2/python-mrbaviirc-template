@@ -211,7 +211,7 @@ class IncludeNode(Node):
         try:
             template = self._env.load_file(
                 str(self._expr.eval()),
-                self._template._filename
+                self._template
             )
         except (IOError, OSError, RestrictedError) as e:
             raise TemplateError(

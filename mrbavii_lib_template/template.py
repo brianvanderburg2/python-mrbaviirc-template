@@ -49,16 +49,14 @@ class Template(object):
         {%- ... %}
     """
 
-    def __init__(self, env, text=None, filename=None):
+    def __init__(self, env, text, filename, relname):
         """ Initialize a template with context variables. """
         
         # Initialize
         self._env = env
         self._text = text
         self._filename = filename
-
-        if text is None:
-            raise Error("Template text must be specified.")
+        self._relname = relname
 
         self._defines = {}
 
@@ -76,6 +74,7 @@ class Template(object):
 
             # set certain variables
             scope._template["__filename__"] = self._filename
+            scope._template["__relname__"] = self._relname
 
             self._nodes.render(renderer)
         finally:

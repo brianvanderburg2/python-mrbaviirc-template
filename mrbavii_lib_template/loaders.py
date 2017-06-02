@@ -7,6 +7,7 @@ __license__     = "Apache License 2.0"
 __all__ = ["Loader", "FileSystemLoader"]
 
 import os
+import posixpath
 
 from .template import Template
 from .errors import *
@@ -46,27 +47,59 @@ class FileSystemLoader(Loader):
     def load_template(self, env, filename, parent=None):
         """ Load a template. """
 
-        if filename[0] == '@':
-            filename = self._find_template(filename[1:])
-        elif parent:
-            filename = os.path.join(
-                os.path.dirname(parent),
-                *(filename.split("/"))
-            )
+        if filename[0:2] == '@/':
+            # Absolute relname to roots
+            relname = posixpath.normpath(filename[1:]).lstrip('/')
+            filename = self._find_template(relname)
 
-        filename = os.path.realpath(filename)
+            if filename in self._cache:
+                return self._cache[filename]
 
-        if not filename in self._cache:
-            if self._root and not self._check(filename):
-                raise RestrictedError(
-                    "Attempt to load template out of root: {0}".format(filename)
+        elif filename[0:1] == '@':
+            # Relative relname to roots relative to parent relname
+            relname = posixpath.normpath(posixpath.join(
+                '/',
+                posixpath.dirname(parent._relname) if parent else "",
+                filename[1:]
+            )).lstrip('/')
+            filename = self._find_template(relname)
+
+            if filename in self._cache:
+                return self._cache[filename]
+
+        else:
+            # Relative to current file or PWD
+            # Will find relname only if using roots
+            if parent:
+                filename = os.path.join(
+                    os.path.dirname(parent._filename),
+                    *(filename.split('/'))
                 )
 
-            with open(filename, "rU") as handle:
-                text = handle.read()
+            filename = os.path.realpath(filename)
+            if filename in self._cache:
+                return self._cache[filename]
 
-            self._cache[filename] = Template(env, text, filename)
+            # Check roots if need
+            if self._root:
+                for root in self._root:
+                    if os.path.commonprefix([filename, root]) == root and os.path.isfile(filename):
+                        relname = os.path.relpath(filename, root).replace(os.sep, '/')
+                        relname = posixpath.normpath(relname).lstrip('/')
+                        break
+                else:
+                    raise RestrictedError(
+                        "Attempt to load template out of root: {0}".format(filename)
+                    )
 
+            else:
+                relname = ""
+
+        # At this point we have the filename and relname to use
+        with open(filename, "rU") as handle:
+            text = handle.read()
+
+        self._cache[filename] = Template(env, text, filename, relname)
         return self._cache[filename]
 
     def _find_template(self, filename):
@@ -81,7 +114,7 @@ class FileSystemLoader(Loader):
 
         if not filename in self._find_cache:
             for root in self._root:
-                new_filename = os.path.join(root, filename)
+                new_filename = os.path.realpath(os.path.join(root, filename))
                 if os.path.isfile(new_filename):
                     self._find_cache[filename] = new_filename
                     break
@@ -91,12 +124,4 @@ class FileSystemLoader(Loader):
                 )
 
         return self._find_cache[filename]
-
-    def _check(self, filename):
-        """ Check the filename is under the root. """
-        for root in self._root:
-            if os.path.commonprefix([root, filename]) == root:
-                return True
-
-        return False
 

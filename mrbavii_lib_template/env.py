@@ -38,10 +38,6 @@ class Environment(object):
         """ Load a template from a file. """
         return self._loader.load_template(self, filename, parent)
 
-    def load_text(self, text):
-        """ Load a template from a string. """
-        return Template(self, text=text)
-
     def _push_scope(self, template=False):
         """ Create a new scope. """
         self._scope = Scope(self._scope, template)
