@@ -4,7 +4,7 @@ __author__      = "Brian Allen Vanderburg II"
 __copyright__   = "Copyright 2016"
 __license__     = "Apache License 2.0"
 
-__all__ = ["Loader", "FileSystemLoader"]
+__all__ = ["Loader", "UnrestrictedLoader", "SearchPathLoader"]
 
 import os
 import posixpath
@@ -29,92 +29,89 @@ class Loader(object):
         raise NotImplementedError
 
 
-class FileSystemLoader(Loader):
+class UnrestrictedLoader(Loader):
+    """ A loader that loads any template specified. """
+
+    def __init__(self):
+        """ Initialized the loader. """
+        Loader.__init__(self)
+
+        self._cache = {}
+
+    def load_template(self, env, filename, parent=None):
+        """ Load a template. """
+
+        # Determine filename from parent if needed
+        if parent:
+            filename = os.path.join(
+                os.path.dirname(parent._filename),
+                filename.replace("/", os.sep)
+            )
+
+        filename = os.path.realpath(filename)
+
+        # Available from cache?
+        if filename in self._cache:
+            return self._cache[filename]
+
+        # Load and return
+        with open(filename, "rU") as handle:
+            text = handle.read()
+
+        self._cache[filename] = Template(env, text, filename)
+        return self._cache[filename]
+
+
+class SearchPathLoader(Loader):
     """ A loader that loads the template from the file system. """
 
-    def __init__(self, root=None):
+    def __init__(self, path):
         """ Initialze the loader. """
-        if root:
-            if not isinstance(root, (tuple, list)):
-                root = [root]
-            self._root = tuple([os.path.join(os.path.realpath(i), '') for i in root])
-        else:
-            self._root = None
 
+        Loader.__init__(self)
+
+        if not isinstance(path, (tuple, list)):
+            path = [path]
+
+        self._path = tuple(os.path.realpath(i) for i in path)
         self._cache = {}
         self._find_cache = {}
 
     def load_template(self, env, filename, parent=None):
         """ Load a template. """
 
-        if filename[0:2] == '@/':
-            # Absolute relname to roots
-            relname = posixpath.normpath(filename[1:]).lstrip('/')
-            filename = self._find_template(relname)
+        # Determine filename from parent
+        filename = os.path.normpath(posixpath.join(
+            "/", # to make sure it's always absolute
+            posixpath.dirname(parent._filename) if parent else "/",
+            filename
+        ))
 
-            if filename in self._cache:
-                return self._cache[filename]
+        # Available from cache?
+        if filename in self._cache:
+            return self._cache[filename]
 
-        elif filename[0:1] == '@':
-            # Relative relname to roots relative to parent relname
-            relname = posixpath.normpath(posixpath.join(
-                '/',
-                posixpath.dirname(parent._relname) if parent else "",
-                filename[1:]
-            )).lstrip('/')
-            filename = self._find_template(relname)
-
-            if filename in self._cache:
-                return self._cache[filename]
-
-        else:
-            # Relative to current file or PWD
-            # Will find relname only if using roots
-            if parent:
-                filename = os.path.join(
-                    os.path.dirname(parent._filename),
-                    *(filename.split('/'))
-                )
-
-            filename = os.path.realpath(filename)
-            if filename in self._cache:
-                return self._cache[filename]
-
-            # Check roots if need
-            if self._root:
-                for root in self._root:
-                    if os.path.commonprefix([filename, root]) == root and os.path.isfile(filename):
-                        relname = os.path.relpath(filename, root).replace(os.sep, '/')
-                        relname = posixpath.normpath(relname).lstrip('/')
-                        break
-                else:
-                    raise RestrictedError(
-                        "Attempt to load template out of root: {0}".format(filename)
-                    )
-
-            else:
-                relname = ""
-
-        # At this point we have the filename and relname to use
-        with open(filename, "rU") as handle:
+        # Find the real file and load it
+        realname = self._find_template(filename)
+        with open(realname, "rU") as handle:
             text = handle.read()
 
-        self._cache[filename] = Template(env, text, filename, relname)
+        self._cache[filename] = Template(env, text, filename)
         return self._cache[filename]
 
     def _find_template(self, filename):
-        """ Find a template along root paths. """
+        """ Find a template along search path. """
 
-        filename = filename.replace("/", os.sep)
+        filename = filename.lstrip("/").replace("/", os.sep)
 
-        if not self._root:
+        if not self._path:
             raise RestrictedError(
                 "Attempt to load template from empty search path: {0}".format(filename)
             )
 
         if not filename in self._find_cache:
-            for root in self._root:
-                new_filename = os.path.realpath(os.path.join(root, filename))
+            for path in self._path:
+                new_filename = os.path.realpath(os.path.join(path, filename))
                 if os.path.isfile(new_filename):
                     self._find_cache[filename] = new_filename
                     break

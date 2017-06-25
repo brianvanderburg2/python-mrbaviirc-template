@@ -12,7 +12,7 @@ import glob
 import unittest
 
 
-from .. import FileSystemLoader, Environment, StdLib, StringRenderer
+from ..template import UnrestrictedLoader, SearchPathLoader, Environment, StdLib, StringRenderer
 
 
 DATADIR = os.path.join(os.path.dirname(__file__), "template_data")
@@ -21,13 +21,21 @@ DATADIR = os.path.join(os.path.dirname(__file__), "template_data")
 class TemplateTest(unittest.TestCase):
 
     def setUp(self):
-        loader = FileSystemLoader(DATADIR)
+        loader = UnrestrictedLoader()
         self._env = Environment({"lib": StdLib() }, loader=loader)
+
+        loader = SearchPathLoader(DATADIR)
+        self._env2 = Environment({"lib": StdLib() }, loader=loader)
 
     def tearDown(self):
         self._env = None
+        self._env2 = None
 
     def test_compare(self):
+        self.do_test_compare(self._env)
+        self.do_test_compare(self._env2)
+
+    def do_test_compare(self, env):
         """ Run tests by applying template to input and comparing output. """
 
         with open(os.path.join(DATADIR, "data.json"), "rU") as handle:
@@ -67,6 +75,38 @@ class TemplateTest(unittest.TestCase):
                         os.path.basename(path),
                         section
                 ))
+
+    def test_search_path(self):
+        """ Test the search path loader. """
+        paths = [
+            os.path.join(DATADIR, "searchpath/1"),
+            os.path.join(DATADIR, "searchpath/2"),
+            os.path.join(DATADIR, "searchpath/3")
+        ]
+
+        target = os.path.join(DATADIR, "searchpath/output.txt")
+        
+        loader=SearchPathLoader(paths)
+        env = Environment({"lib": StdLib()}, loader=loader)
+
+
+        with open(os.path.join(DATADIR, "data.json"), "rU") as handle:
+            data = json.load(handle)
+
+        tmpl = env.load_file("/main.tmpl")
+        rndr = StringRenderer()
+        tmpl.render(rndr, data)
+
+        contents = rndr.get()
+
+        with open(target, "rU") as handle:
+            target_contents = handle.read()
+
+        self.assertEqual(
+            contents,
+            target_contents,
+            "render compare failed during search path test"
+        )
 
 
 def suite():

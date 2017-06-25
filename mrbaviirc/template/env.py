@@ -7,7 +7,7 @@ __license__     = "Apache License 2.0"
 
 from .template import Template
 from .scope import Scope
-from .loaders import FileSystemLoader
+from .loaders import UnrestrictedLoader
 from .errors import *
 
 from .lib import StdLib
@@ -29,7 +29,7 @@ class Environment(object):
         if loader:
             self._loader = loader
         else:
-            self._loader = FileSystemLoader()
+            self._loader = UnrestrictedLoader()
 
         if importers:
             self._importers.update(importers)
