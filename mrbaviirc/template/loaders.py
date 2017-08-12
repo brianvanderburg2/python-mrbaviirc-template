@@ -4,7 +4,7 @@ __author__      = "Brian Allen Vanderburg II"
 __copyright__   = "Copyright 2016"
 __license__     = "Apache License 2.0"
 
-__all__ = ["Loader", "UnrestrictedLoader", "SearchPathLoader"]
+__all__ = ["Loader", "UnrestrictedLoader", "SearchPathLoader", "MemoryLoader"]
 
 import os
 import posixpath
@@ -81,7 +81,7 @@ class SearchPathLoader(Loader):
         """ Load a template. """
 
         # Determine filename from parent
-        filename = os.path.normpath(posixpath.join(
+        filename = posixpath.normpath(posixpath.join(
             "/", # to make sure it's always absolute
             posixpath.dirname(parent._filename) if parent else "/",
             filename
@@ -121,4 +121,42 @@ class SearchPathLoader(Loader):
                 )
 
         return self._find_cache[filename]
+
+
+class MemoryLoader(Loader):
+    """ Load from memory. """
+
+    def __init__(self):
+        """ Initialize the loader. """
+        Loader.__init__(self);
+        self._cache = {}
+        self._memory = {}
+
+    def add_template(self, name, contents):
+        """ Add an entry to the memory. """
+        self._memory[name] = contents
+
+    def load_template(self, env, filename, parent=None):
+        """ Load a template. """
+
+        # Determine filename from parent, if any
+        filename = posixpath.normpath(posixpath.join(
+            "/", # To make sure it's always absolute
+            posixpath.dirname(parent._filename) if parent else "/",
+            filename
+        ))
+
+        # Available in cache
+        if filename in self._cache:
+            return self._cache[filename]
+
+        if not filename in self._memory:
+            raise RestrictedError(
+                "Attempt to load non-existing template from memory: {0}".format(filename)
+            )
+
+        # Load the file
+        self._cache[filename] = Template(env, self._memory[filename], filename)
+        return self._cache[filename]
+
 
