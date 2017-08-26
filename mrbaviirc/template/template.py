@@ -58,6 +58,7 @@ class Template(object):
         self._filename = filename
 
         self._defines = {}
+        self._private = {}
 
         # Parse the template
         parser = TemplateParser(self, text)

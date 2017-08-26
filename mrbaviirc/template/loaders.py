@@ -80,47 +80,63 @@ class SearchPathLoader(Loader):
     def load_template(self, env, filename, parent=None):
         """ Load a template. """
 
-        # Determine filename from parent
-        filename = posixpath.normpath(posixpath.join(
-            "/", # to make sure it's always absolute
-            posixpath.dirname(parent._filename) if parent else "/",
-            filename
-        ))
+        if filename == ":next:":
+            if parent is None:
+                # :next: must be used from a found file, not directly by load_template
+                raise RestrictedError(":next: can only be included from an existing template.")
+
+            filename = parent._filename
+            search_index = parent._private["search_index"] + 1
+            cachename = ":@@{0}@@:{1}".format(search_index, filename)
+        else:
+            # Determine filename from parent
+            filename = posixpath.normpath(posixpath.join(
+                "/", # to make sure it's always absolute
+                posixpath.dirname(parent._filename) if parent else "/",
+                filename
+            ))
+            search_index = 0
+            cachename = filename
 
         # Available from cache?
-        if filename in self._cache:
-            return self._cache[filename]
+        if cachename in self._cache:
+            return self._cache[cachename]
 
         # Find the real file and load it
-        realname = self._find_template(filename)
+        (index, realname) = self._find_template(filename, search_index)
         with open(realname, "rU") as handle:
             text = handle.read()
 
-        self._cache[filename] = Template(env, text, filename)
-        return self._cache[filename]
+        # Create the template item
+        result = Template(env, text, filename)
+        result._private["search_index"] = index
 
-    def _find_template(self, filename):
+        self._cache[cachename] = result
+        return result
+
+    def _find_template(self, filename, start=0):
         """ Find a template along search path. """
 
         filename = filename.lstrip("/").replace("/", os.sep)
+        cachename = ":@@{0}@@:{1}".format(start, filename)
 
         if not self._path:
             raise RestrictedError(
                 "Attempt to load template from empty search path: {0}".format(filename)
             )
 
-        if not filename in self._find_cache:
-            for path in self._path:
+        if not cachename in self._find_cache:
+            for (index, path) in enumerate(self._path[start:], start):
                 new_filename = os.path.realpath(os.path.join(path, filename))
                 if os.path.isfile(new_filename):
-                    self._find_cache[filename] = new_filename
+                    self._find_cache[cachename] = (index, new_filename)
                     break
             else:
                 raise RestrictedError(
                     "Template not found along search path: {0}".format(filename)
                 )
 
-        return self._find_cache[filename]
+        return self._find_cache[cachename]
 
 
 class MemoryLoader(Loader):

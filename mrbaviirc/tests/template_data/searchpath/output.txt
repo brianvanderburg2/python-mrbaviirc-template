@@ -3,3 +3,8 @@
 2/sub/subitem2.tmpl
 3/next.tmpl
 3/next.tmpl
+1/sub/subitem3.tmpl
+2/sub/subitem3.tmpl
+3/sub/subitem3.tmpl
+2/sub/subitem3.tmpl
+1/sub/subitem3.tmpl
