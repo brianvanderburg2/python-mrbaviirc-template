@@ -20,7 +20,7 @@ class Environment(object):
 
         self._scope = Scope()
         self._scope_stack = [self._scope]
-        self._importers = { "mrbavii.lib.template.stdlib": StdLib }
+        self._importers = { "mrbaviirc.template.stdlib": StdLib }
         self._imported = {}
 
         if context:
