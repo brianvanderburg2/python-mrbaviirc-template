@@ -20,7 +20,7 @@ class Environment(object):
 
         self._scope = Scope()
         self._scope_stack = [self._scope]
-        self._importers = { "mrbavii_lib_template.stdlib": StdLib }
+        self._importers = { "mrbavii.lib.template.stdlib": StdLib }
         self._imported = {}
 
         if context:
@@ -100,6 +100,24 @@ class Environment(object):
         # Solve dotted variables
         value = scope[var[0]]
         for dot in var[1:]:
+            # The new way is to use attr_ for attributes and func_ for functions
+
+            # The function represents an attribute, so call it to get the value
+            tmp = getattr(value, "attr_" + dot, None)
+            if tmp is not None:
+                value = tmp()
+                continue
+
+            # The function represents a function, so just get it directly
+            tmp = getattr(value, "func_" + dot, None)
+            if tmp is not None:
+                value = tmp
+                continue
+
+            # The old way was to use call_ for attributes (meaning to call the
+            # function and return the value) and lib_ for attributes (meaning
+            # just return the value, which could have been a sub-library)
+
             # Return an attribute directly (can be used to return functions)
             attr = "lib_" + dot
             if hasattr(value, attr):
