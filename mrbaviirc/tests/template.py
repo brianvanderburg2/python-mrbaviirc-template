@@ -23,9 +23,11 @@ class TemplateTest(unittest.TestCase):
     def setUp(self):
         loader = UnrestrictedLoader()
         self._env = Environment({"lib": StdLib() }, loader=loader)
+        self._env.enable_code()
 
         loader = SearchPathLoader(DATADIR)
         self._env2 = Environment({"lib": StdLib() }, loader=loader)
+        self._env2.enable_code()
 
     def tearDown(self):
         self._env = None

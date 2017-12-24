@@ -1,0 +1,19 @@
+{% autostrip %}
+
+{% code return result %}
+
+value = "Hello"
+
+{% endcode %}
+{{ result.value +}}
+
+{% set name = "Allen" %}
+{% code return result with name=name, age=23 %}
+
+def get_result(name, age):
+    return name + str(age)
+value = get_result(name, age)
+del get_result
+
+{% endcode %}
+{{ result.value +}}

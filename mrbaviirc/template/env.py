@@ -22,6 +22,7 @@ class Environment(object):
         self._scope_stack = [self._scope]
         self._importers = { "mrbaviirc.template.stdlib": StdLib }
         self._imported = {}
+        self._code_enabled = False
 
         if context:
             self._scope._local.update(context)
@@ -33,6 +34,9 @@ class Environment(object):
 
         if importers:
             self._importers.update(importers)
+
+    def enable_code(self, enabled=True):
+        self._code_enabled = enabled
 
     def load_file(self, filename, parent=None):
         """ Load a template from a file. """

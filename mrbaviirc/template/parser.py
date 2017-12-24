@@ -390,6 +390,20 @@ class TemplateParser(object):
         self._token = self._tokens[pos]
         return self._token
 
+    def _expect_token(self, token, type, errmsg="Unexpected token"):
+        if token._type != type:
+            raise SyntaxError(
+                errmsg,
+                self._template._filename,
+                token._line if token else 0
+            )
+
+    def _get_expected_token(self, pos, type, errmsg="Unexpected token"):
+        """ Expect a specific type of token. """
+        token = self._get_token(pos)
+        self._expect_token(token, type, errmsg)
+        return token
+
     def parse(self):
         """ Parse the template and return the node list. """
         
@@ -416,7 +430,7 @@ class TemplateParser(object):
 
             token = self._token = self._tokens[pos]
 
-            if token._type == token.TYPE_TEXT:
+            if token._type == Token.TYPE_TEXT:
                 self._buffer.append(token._value)
                 pos += 1
                 continue
@@ -498,6 +512,9 @@ class TemplateParser(object):
             pos = self._parse_action_unset(pos)
         elif action == "scope":
             pos = self._parse_action_scope(pos)
+        elif action == "code":
+            # TODO: add some security option to disable this tag
+            pos = self._parse_action_code(pos)
         elif action == "include":
             pos = self._parse_action_include(pos)
         elif action == "return":
@@ -607,11 +624,11 @@ class TemplateParser(object):
     def _parse_action_for(self, start):
         """ Parse a for statement. """
         line = self._token._line
-        (var, pos) = self._parse_var(start, False)
+        (var, pos) = self._parse_topvar(start)
 
         token = self._get_token(pos, "Expected 'in'")
         if token._type == Token.TYPE_COMMA:
-            (cvar, pos) = self._parse_var(pos + 1, False)
+            (cvar, pos) = self._parse_topvar(pos + 1)
             token = self._get_token(pos, "Expected 'in'")
         else:
             cvar = None
@@ -666,8 +683,7 @@ class TemplateParser(object):
         offset = SwitchNode.types.index(item)
         argc = SwitchNode.argc[offset]
 
-        (exprs, pos) = self._parse_expr_items(start, Token.TYPE_END_ACTION)
-        pos -= 1 # Need to back up so parse_action will handle ending tag
+        (exprs, pos) = self._parse_multi_expr(start, Token.TYPE_END_ACTION)
 
         if len(exprs) != argc:
             raise SyntaxError(
@@ -687,7 +703,7 @@ class TemplateParser(object):
         """ Parse a set statement. """
         line = self._token._line
 
-        (assigns, pos) = self._parse_multi_assign(start)
+        (assigns, pos) = self._parse_multi_assign(start, Token.TYPE_END_ACTION)
 
         node = AssignNode(self._template, line, assigns, where)
         self._stack[-1].append(node)
@@ -698,7 +714,7 @@ class TemplateParser(object):
         """ Parse an unset statement. """
         line = self._token._line
 
-        (varlist, pos) = self._parse_multi_var(start, False)
+        (varlist, pos) = self._parse_multi_topvar(start, Token.TYPE_END_ACTION)
 
         node = UnsetNode(self._template, line, varlist);
         self._stack[-1].append(node)
@@ -709,10 +725,35 @@ class TemplateParser(object):
         """ Parse a scope statement. """
         line = self._token._line
 
-        (assigns, pos) = self._parse_multi_assign(start)
+        (assigns, pos) = self._parse_multi_assign(start, Token.TYPE_END_ACTION)
 
         node = ScopeNode(self._template, line, assigns)
         self._ops_stack.append(("scope", line))
+        self._stack[-1].append(node)
+        self._stack.append(node._nodes)
+
+        return pos
+
+    def _parse_action_code(self, start):
+        """ Parse a code node. """
+        line = self._token._line
+        pos = start
+
+        # disable autostrip for this block
+        self._auto_strip_stack.append(self.AUTOSTRIP_NONE)
+
+        retvar = None
+        token = self._get_token(pos)
+        if token._type == Token.TYPE_WORD and token._value == "return":
+            (retvar, pos) = self._parse_topvar(pos + 1)
+
+        assigns = []
+        token = self._get_token(pos)
+        if token._type == Token.TYPE_WORD and token._value == "with":
+            (assigns, pos) = self._parse_multi_assign(pos + 1, Token.TYPE_END_ACTION)
+
+        self._ops_stack.append(("code", line))
+        node = CodeNode(self._template, line, assigns, retvar)
         self._stack[-1].append(node)
         self._stack.append(node._nodes)
 
@@ -727,12 +768,12 @@ class TemplateParser(object):
         retvar = None
         token = self._get_token(pos)
         if token._type == Token.TYPE_WORD and token._value == "return":
-            (retvar, pos) = self._parse_var(pos + 1, False)
+            (retvar, pos) = self._parse_topvar(pos + 1)
 
         assigns = []
         token = self._get_token(pos)
         if token._type == Token.TYPE_WORD and token._value == "with":
-            (assigns, pos) = self._parse_multi_assign(pos + 1)
+            (assigns, pos) = self._parse_multi_assign(pos + 1, Token.TYPE_END_ACTION)
 
         node = IncludeNode(self._template, line, expr, assigns, retvar)
         self._stack[-1].append(node)
@@ -743,7 +784,7 @@ class TemplateParser(object):
         """ Parse a return variable node. """
         line = self._token._line
 
-        (assigns, pos) = self._parse_multi_assign(start)
+        (assigns, pos) = self._parse_multi_assign(start, Token.TYPE_END_ACTION)
 
         node = ReturnNode(self._template, line, assigns)
         self._stack[-1].append(node)
@@ -821,7 +862,7 @@ class TemplateParser(object):
         """ Parse a block to store rendered output in a variable. """
         line = self._token._line
 
-        (var, pos) = self._parse_var(start, False)
+        (var, pos) = self._parse_topvar(start)
 
         node = VarNode(self._template, line, var)
         self._ops_stack.append(("var", line))
@@ -843,7 +884,7 @@ class TemplateParser(object):
     def _parse_action_import(self, start):
         """ Parse an import action. """
 
-        (assigns, pos) = self._parse_multi_assign(start)
+        (assigns, pos) = self._parse_multi_assign(start, Token.TYPE_END_ACTION)
 
         node = ImportNode(self._template, self._token._line, assigns)
         self._stack[-1].append(node)
@@ -853,11 +894,11 @@ class TemplateParser(object):
     def _parse_action_do(self, start):
         """ Parse a do tag. """
 
-        (nodes, pos) = self._parse_expr_items(start, Token.TYPE_END_ACTION)
+        (nodes, pos) = self._parse_multi_expr(start, Token.TYPE_END_ACTION)
         node = DoNode(self._template, self._token._line, nodes)
         self._stack[-1].append(node)
 
-        return pos - 1 # -1 to go back to the end action tag
+        return pos
 
     def _parse_action_end(self, start, action):
         """ Parse an end tag """
@@ -880,6 +921,12 @@ class TemplateParser(object):
 
         self._ops_stack.pop()
         self._stack.pop()
+
+        # Handle certain tags
+
+        if what[0] == "endcode":
+            # Restore original auto strip value    
+            self._auto_strip = self._auto_strip_stack.pop()
 
         return start
 
@@ -950,10 +997,12 @@ class TemplateParser(object):
         (var, pos) = self._parse_var(start)
         next = self._get_token(pos)
         if next._type == Token.TYPE_START_FUNC:
-            (nodes, pos) = self._parse_expr_items(pos + 1, Token.TYPE_END_FUNC)
+            (nodes, pos) = self._parse_multi_expr(pos + 1, Token.TYPE_END_FUNC)
+            pos += 1 # skip past ")"
             node = FuncExpr(self._template, next._line, var, nodes)
         elif next._type == Token.TYPE_START_LIST:
-            (nodes, pos) = self._parse_expr_items(pos + 1, Token.TYPE_END_LIST)
+            (nodes, pos) = self._parse_multi_expr(pos + 1, Token.TYPE_END_LIST)
+            pos += 1 # skip past "]"
             node = IndexExpr(self._template, next._line, var, nodes)
         else:
             node = VarExpr(self._template, token._line, var)
@@ -962,7 +1011,8 @@ class TemplateParser(object):
 
     def _parse_expr_list(self, start):
         """ Pare an expression that's a list. """
-        (nodes, pos) = self._parse_expr_items(start, Token.TYPE_END_LIST)
+        (nodes, pos) = self._parse_multi_expr(start, Token.TYPE_END_LIST)
+        pos += 1 # skip past "]"
 
         if nodes and all(isinstance(node, ValueExpr) for node in nodes):
             node = ValueExpr(self._template, nodes[0]._line, [node.eval() for node in nodes])
@@ -970,8 +1020,10 @@ class TemplateParser(object):
             node = ListExpr(self._template, self._token._line, nodes)
         return (node, pos)
 
-    def _parse_expr_items(self, start, ending):
-        """ Parse a list of items """
+    def _parse_multi_expr(self, start, ending):
+        """ Parse a list of expressions
+            Note: Return pos points at ending token.
+        """
         items = []
 
         pos = start
@@ -979,7 +1031,7 @@ class TemplateParser(object):
         while True:
             token = self._get_token(pos)
             if token._type == ending:
-                return (items, pos + 1)
+                return (items, pos)
 
             if not first:
                 if token._type != Token.TYPE_COMMA:
@@ -998,29 +1050,25 @@ class TemplateParser(object):
         """ Parse a var = expr assignment, return (var, expr, pos) """
         line = self._token._line
 
-        (var, pos) = self._parse_var(start, False)
+        (var, pos) = self._parse_topvar(start)
 
-        token = self._get_token(pos, "Expected '='")
-        if token._type != Token.TYPE_EQUAL:
-            raise SyntaxError(
-                "Expected '='",
-                self._template._filename,
-                token._line
-            )
+        token = self._get_expected_token(pos, Token.TYPE_EQUAL, "Expected '='")
 
         (expr, pos) = self._parse_expr(pos + 1)
 
         return (var, expr, pos)
 
-    def _parse_multi_assign(self, start):
-        """ Parse multiple var = expr statemetns, return ( [(var, expr)], pos) """
+    def _parse_multi_assign(self, start, ending):
+        """ Parse multiple var = expr statemetns, return ( [(var, expr)], pos)
+            Note: Return pos points at ending token.
+        """
         assigns = []
 
         pos = start
         first = True
         while True:
             token = self._get_token(pos)
-            if token._type == Token.TYPE_END_ACTION:
+            if token._type == ending:
                 return (assigns, pos)
 
             if not first:
@@ -1063,15 +1111,21 @@ class TemplateParser(object):
 
         return (result, start + 1)
 
-    def _parse_multi_var(self, start, allow_dots=True):
-        """ Parse multiple variables and return (varlist, pos) """
+    def _parse_topvar(self, start):
+        """ Parse a top-level variable (no dots). """
+        return self._parse_var(start, False)
+
+    def _parse_multi_var(self, start, ending, allow_dots=True):
+        """ Parse multiple variables and return (varlist, pos)
+            Note: Return pos points at ending token.
+        """
         varlist = []
 
         pos = start
         first = True
         while True:
             token = self._get_token(pos)
-            if token._type == Token.TYPE_END_ACTION:
+            if token._type == ending:
                 return (varlist, pos)
 
             if not first:
@@ -1087,7 +1141,9 @@ class TemplateParser(object):
             (var, pos) = self._parse_var(pos, allow_dots)
             varlist.append(var)
 
-
+    def _parse_multi_topvar(self, start, ending):
+        """ Parse multiple topvars. """
+        return self._parse_multi_var(start, ending, False)
 
     def _flush_buffer(self, post_ws_control=Token.WS_NONE):
         """ Flush the buffer to output. """

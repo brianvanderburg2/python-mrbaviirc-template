@@ -8,7 +8,7 @@ __all__ = [
     "Node", "NodeList",  "TextNode", "IfNode", "ForNode", "SwitchNode",
     "EmitNode", "IncludeNode", "ReturnNode", "AssignNode", "SectionNode",
     "UseSectionNode", "ScopeNode", "VarNode", "ErrorNode","ImportNode",
-    "DoNode", "UnsetNode"
+    "DoNode", "UnsetNode", "CodeNode"
 ]
 
 
@@ -315,6 +315,64 @@ class ScopeNode(Node):
             self._nodes.render(renderer)
         finally:
             env._pop_scope()
+
+
+class CodeNode(Node):
+    """ A node to execute python code. """
+
+    def __init__(self, template, line, assigns, retvar):
+        """ Initialize the include node. """
+        Node.__init__(self, template, line)
+        self._assigns = assigns
+        self._retvar = retvar
+        self._nodes = NodeList()
+        self._code = None
+
+    def render(self, renderer):
+        """ Actually do the work of including the template. """
+
+        # Check if allowed
+        if not self._env._code_enabled:
+            raise TemplateError(
+                "Use of direct python code not allowed",
+                self._template._filename,
+                self._line
+            )
+
+        # Compile the code only once
+        if not self._code:
+            # Get the code
+            new_renderer = StringRenderer()
+            self._nodes.render(new_renderer)
+            code = new_renderer.get()
+
+            # Compile it
+            try:
+                self._code = compile(code, "<string>", "exec")
+            except Exception as e:
+                raise TemplateError(
+                    str(e),
+                    self._template._filename,
+                    self._line
+                )
+
+        # Execute the code
+        locals = {}
+        for (var, expr) in self._assigns:
+            locals[var] = expr.eval()
+
+        try:
+            exec(self._code, locals, locals)
+        except Exception as e:
+            raise TemplateError(
+                str(e),
+                self._template._filename,
+                self._line
+            )
+
+        # Handle return values
+        if self._retvar:
+            self._env.set(self._retvar, locals)
 
 
 class VarNode(Node):
