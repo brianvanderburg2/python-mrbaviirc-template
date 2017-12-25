@@ -70,6 +70,7 @@ ACTION:
     ENDSCOPE: "endscope"
     INCLUDE: "include" + EXPRESSION + ["return" + VARPART]? + ["with" + MULTIASSIGNMENT]?
     RETURN: "return" + MULTIASSIGNMENT
+    EXPAND: "expand" + EXPRESSION
     CODE: "code" + ["return" + VARPART]? + ["with" + MULTIASSIGNMENT]?
     ENDCODE: "endcode"
     SECTION: "section" + EXPRESSION
@@ -83,9 +84,9 @@ ACTION:
     ERROR: "error" + EXPRESSION
     IMPORT: "import" + MULTIASSIGNMENT
     DO: "do" + MULTIEXPRESSION
-    AUTOSTRIP: "autostrip" | "autotrim" | "no_autostrip" |
-        "push_autostrip" + ("on" | "off" | "trim") |
-        "pop_autostrip"
+    AUTOSTRIP: "autostrip" | "autotrim" | "no_autostrip"
+    STRIP: "strip" + ("on" | "off" | "trim")
+    ENDSTRIP: "endstrip"
 
 MULTIEXPRESSION: EXPRESSION + ["," + EXPRESSION]*
 EXPRESSION:
@@ -115,6 +116,7 @@ ACTIONSEGMENT:
     SCOPESEGMENT
     ACTIONBLOCK(ACTION:INCLUDE)
     ACTIONBLOCK(ACTION:RETURN)
+    ACTIONBLOCK(ACTION:EXPAND)
     CODESEGMENT
     SECTIONSEGMENT
     ACTIONBLOCK(ACTION:USE)
@@ -125,6 +127,7 @@ ACTIONSEGMENT:
     ACTIONBLOCK(ACTION:IMPORT)
     ACTIONBLOCK(ACTION:DO)
     ACTIONBLOCK(ACTION:AUTOSTRIP)
+    STRIPSEGMENT
 
 IFSEGMENT:
     ACTIONBLOCK(ACTION:IF) +
@@ -184,6 +187,11 @@ VARSEGMENT:
     ACTIONBLOCK(ACTION:VAR) +
     BLOCK* +
     ACTIONBLOCK(ACTION:ENDVAR)
+
+STRIPSEGMENT:
+    ACTIONBLOCK(ACTION:STRIP) +
+    BLOCK* +
+    ACTIONBLOCK(ACTION:ENDSTRIP)
 
 
 Whitespace Control

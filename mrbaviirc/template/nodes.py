@@ -8,7 +8,7 @@ __all__ = [
     "Node", "NodeList",  "TextNode", "IfNode", "ForNode", "SwitchNode",
     "EmitNode", "IncludeNode", "ReturnNode", "AssignNode", "SectionNode",
     "UseSectionNode", "ScopeNode", "VarNode", "ErrorNode","ImportNode",
-    "DoNode", "UnsetNode", "CodeNode"
+    "DoNode", "UnsetNode", "CodeNode", "ExpandNode"
 ]
 
 
@@ -243,6 +243,28 @@ class ReturnNode(Node):
             result[var] = expr.eval()
 
         self._env.set(":return:", result, Scope.SCOPE_TEMPLATE)
+
+
+class ExpandNode(Node):
+    """ A node to expand variables into the current scope. """
+
+    def __init__(self, template, line, expr):
+        """ Initialize """
+        Node.__init__(self, template, line)
+        self._expr = expr
+
+    def render(self, renderer):
+        """ Expand the variables. """
+
+        result = self._expr.eval()
+        try:
+            self._env.update(result)
+        except (KeyError, TypeError, ValueError) as e:
+            raise TemplateError(
+                str(e),
+                self._template._filename,
+                self._line
+            )
 
 
 class AssignNode(Node):

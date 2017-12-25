@@ -513,12 +513,13 @@ class TemplateParser(object):
         elif action == "scope":
             pos = self._parse_action_scope(pos)
         elif action == "code":
-            # TODO: add some security option to disable this tag
             pos = self._parse_action_code(pos)
         elif action == "include":
             pos = self._parse_action_include(pos)
         elif action == "return":
             pos = self._parse_action_return(pos)
+        elif action == "expand":
+            pos = self._parse_action_expand(pos)
         elif action == "section":
             pos = self._parse_action_section(pos)
         elif action == "use":
@@ -786,6 +787,17 @@ class TemplateParser(object):
         (assigns, pos) = self._parse_multi_assign(start, Token.TYPE_END_ACTION)
 
         node = ReturnNode(self._template, line, assigns)
+        self._stack[-1].append(node)
+
+        return pos
+
+    def _parse_action_expand(self, start):
+        """ Parse an expand node. """
+        line = self._token._line
+
+        (expr, pos) = self._parse_expr(start)
+
+        node = ExpandNode(self._template, line, expr)
         self._stack[-1].append(node)
 
         return pos

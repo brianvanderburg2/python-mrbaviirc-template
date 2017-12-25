@@ -36,6 +36,7 @@ class Environment(object):
             self._importers.update(importers)
 
     def enable_code(self, enabled=True):
+        """ Enable use of the code tag in templates. """
         self._code_enabled = enabled
 
     def load_file(self, filename, parent=None):
