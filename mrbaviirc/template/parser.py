@@ -340,7 +340,7 @@ class Tokenizer(object):
         for pos in range(start, len(self._text)):
             ch = self._text[pos]
 
-            if ch in self._alpha or ch in self._digit or ch in ("_", "."):
+            if ch in self._alpha or ch in self._digit or ch in ("_", ".", "@", "#"):
                 result.append(ch)
                 continue
             else:
@@ -1106,6 +1106,17 @@ class TemplateParser(object):
                 self._template._filename,
                 token._line
             )
+
+        for part in parts:
+            if part[0:1] in ("@", "#"):
+                part = part[1:]
+
+            if not re.match("[a-zA-Z_][a-zA-Z0-9_]*", part):
+                raise SyntaxError(
+                    "Invalid variable name: {0}".format(token._value),
+                    self._template._filename,
+                    token._line
+                )
 
         if allow_dots:
             result = parts

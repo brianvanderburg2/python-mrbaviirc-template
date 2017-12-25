@@ -101,7 +101,7 @@ EXPRESSION:
 LIST: "[" + MULTIEXPRESSION? + "]"
 VAR: VARPART + ["." + VARPART]*
 VARINDEX: VAR + "[" + MULTIEXPRESSION + "]"
-VARPART: regex [A-Za-z_][A-Za-z0-9_]*
+VARPART: ("@" | "#")? + regex([A-Za-z_][A-Za-z0-9_]*)
 FUNC: VAR + "(" + MULTIEXPRESSION? + ")"
 
 ACTIONSEGMENT:

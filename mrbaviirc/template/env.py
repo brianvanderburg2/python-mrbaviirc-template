@@ -105,41 +105,30 @@ class Environment(object):
         # Solve dotted variables
         value = scope[var[0]]
         for dot in var[1:]:
-            # The new way is to use attr_ for attributes and func_ for functions
 
-            # The function represents an attribute, so call it to get the value
-            tmp = getattr(value, "attr_" + dot, None)
-            if tmp is not None:
-                value = tmp()
-                continue
+            if dot[0:1] == "#":
+                # Requested direct dict item access
+                try:
+                    value = value[dot[1:]]
+                except:
+                    raise KeyError(dot)
 
-            # The function represents a function, so just get it directly
-            tmp = getattr(value, "func_" + dot, None)
-            if tmp is not None:
-                value = tmp
-                continue
+            elif dot[0:1] == "@":
+                # Requested direct attribute access
+                try:
+                    value = getattr(value, dot[1:])
+                except:
+                    raise KeyError(dot)
 
-            # The old way was to use call_ for attributes (meaning to call the
-            # function and return the value) and lib_ for attributes (meaning
-            # just return the value, which could have been a sub-library)
-
-            # Return an attribute directly (can be used to return functions)
-            attr = "lib_" + dot
-            if hasattr(value, attr):
-                value = getattr(value, attr)
-                continue
-
-            # Call a function and return the value
-            attr = "call_" + dot
-            if hasattr(value, attr):
-                value = getattr(value, attr)()
-                continue
-
-            # Try to acess the item directly
-            try:
-                value = value[dot]
-            except:
-                raise KeyError(dot)
+            else:
+                # Try to acess the item both ways
+                try:
+                    value = value[dot]
+                except:
+                    try:
+                        value = getattr(value, dot)
+                    except:
+                        raise KeyError(dot)
 
         return value
 

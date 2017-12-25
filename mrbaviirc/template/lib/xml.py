@@ -40,43 +40,49 @@ class ElementTreeWrapper(object):
     def __bool__(self):
         return True
 
-    def attr_tag(self):
+    @property
+    def tag(self):
         return self._node.tag
 
-    def attr_ns(self):
+    @property
+    def ns(self):
         return self._ns
 
-    def attr_tagname(self):
+    @property
+    def tagname(self):
         return self._tagname
 
-    def attr_text(self):
+    @property
+    def text(self):
         return self._node.text if self._node.text else ""
 
-    def attr_tail(self):
+    @property
+    def tail(self):
         return self._node.tail if self._node.tail else ""
 
-    def attr_alltext(self):
+    @property
+    def alltext(self):
         return "".join(self._node.itertext())
 
-    def func_attr(self, name, defval=None):
+    def attr(self, name, defval=None):
         return self._node.attrib.get(name, defval)
 
     def __iter__(self):
         for child in self._node:
             yield ElementTreeWrapper(child)
 
-    def func_findall(self, path):
+    def findall(self, path):
         for child in self._node.findall(path):
             yield ElementTreeWrapper(child)
 
-    def func_find(self, path):
+    def find(self, path):
         child = self._node.find(path)
         if not child is None:
             child = ElementTreeWrapper(child)
 
         return child
 
-    def func_str(self):
+    def str(self):
         return ET.tostring(self._node)
 
 
