@@ -375,8 +375,8 @@ class TemplateParser(object):
         # Buffer for plain text segments
         self._buffer = []
         self._pre_ws_control = Token.WS_NONE
-        self._auto_strip = self.AUTOSTRIP_NONE
-        self._auto_strip_stack = []
+        self._autostrip = self.AUTOSTRIP_NONE
+        self._autostrip_stack = []
 
     def _get_token(self, pos, errmsg="Expected token"):
         """ Get a token at a position. """
@@ -542,11 +542,11 @@ class TemplateParser(object):
         elif action == "pop_autostrip":
             pos = self._parse_action_pop_autostrip(pos)
         elif action == "autostrip":
-            self._auto_strip = self.AUTOSTRIP_STRIP
+            self._autostrip = self.AUTOSTRIP_STRIP
         elif action == "autotrim":
-            self._auto_strip = self.AUTOSTRIP_TRIM
+            self._autostrip = self.AUTOSTRIP_TRIM
         elif action == "no_autostrip":
-            self._auto_strip = self.AUTOSTRIP_NONE
+            self._autostrip = self.AUTOSTRIP_NONE
         else:
             raise SyntaxError(
                 "Unknown action tag: {0}".format(action),
@@ -740,7 +740,8 @@ class TemplateParser(object):
         pos = start
 
         # disable autostrip for this block
-        self._auto_strip_stack.append(self.AUTOSTRIP_NONE)
+        self._autostrip_stack.append(self._autostrip)
+        self._autostrip = self.AUTOSTRIP_NONE
 
         retvar = None
         token = self._get_token(pos)
@@ -924,16 +925,16 @@ class TemplateParser(object):
 
         # Handle certain tags
 
-        if what[0] == "endcode":
+        if what[0] == "code":
             # Restore original auto strip value    
-            self._auto_strip = self._auto_strip_stack.pop()
+            self._autostrip = self._autostrip_stack.pop()
 
         return start
 
     def _parse_action_push_autostrip(self, start):
         """ Push autostrip and change the state. """
 
-        self._auto_strip_stack.append(self._auto_strip)
+        self._autostrip_stack.append(self._autostrip)
 
         token = self._get_token(start, "Expected on or off")
         if token._type == Token.TYPE_END_ACTION:
@@ -948,25 +949,25 @@ class TemplateParser(object):
             )
 
         if token._value == "on":
-            self._auto_strip = self.AUTOSTRIP_STRIP
+            self._autostrip = self.AUTOSTRIP_STRIP
         elif token._value == "trim":
-            self._auto_strip = self.AUTOSTRIP_TRIM
+            self._autostrip = self.AUTOSTRIP_TRIM
         else:
-            self._auto_strip = self.AUTOSTRIP_NONE
+            self._autostrip = self.AUTOSTRIP_NONE
 
         return start + 1
 
     def _parse_action_pop_autostrip(self, start):
         """ Return the state of autostrip. """
 
-        if not self._auto_strip_stack:
+        if not self._autostrip_stack:
             raise SyntaxError(
                 "No currently pushed autostrip values.",
                 self._template._filename,
                 self._token._line
             )
 
-        self._auto_strip = self._auto_strip_stack.pop()
+        self._autostrip = self._autostrip_stack.pop()
         return start
 
     def _parse_tag_emitter(self, start):
@@ -1151,9 +1152,9 @@ class TemplateParser(object):
         if self._buffer:
             text = "".join(self._buffer)
 
-            if self._auto_strip == self.AUTOSTRIP_STRIP:
+            if self._autostrip == self.AUTOSTRIP_STRIP:
                 text = text.strip()
-            elif self._auto_strip == self.AUTOSTRIP_TRIM:
+            elif self._autostrip == self.AUTOSTRIP_TRIM:
                 tmp = []
                 need_nl = False
                 for line in text.splitlines():
