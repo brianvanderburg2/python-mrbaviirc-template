@@ -537,10 +537,8 @@ class TemplateParser(object):
             pos = self._parse_action_do(pos)
         elif action.startswith("end"):
             pos = self._parse_action_end(pos, action)
-        elif action == "push_autostrip":
-            pos = self._parse_action_push_autostrip(pos)
-        elif action == "pop_autostrip":
-            pos = self._parse_action_pop_autostrip(pos)
+        elif action == "strip":
+            pos = self._parse_action_strip(pos)
         elif action == "autostrip":
             self._autostrip = self.AUTOSTRIP_STRIP
         elif action == "autotrim":
@@ -921,29 +919,34 @@ class TemplateParser(object):
             )
 
         self._ops_stack.pop()
-        self._stack.pop()
 
         # Handle certain tags
 
-        if what[0] == "code":
-            # Restore original auto strip value    
+        # Pop node stack for any op that created a new node stack
+        if not what[0] == "strip":
+            self._stack.pop()
+
+        # Restore autostrip value for any op that pushed the value
+        if what[0] in ("strip", "code"):
             self._autostrip = self._autostrip_stack.pop()
 
         return start
 
-    def _parse_action_push_autostrip(self, start):
+    def _parse_action_strip(self, start):
         """ Push autostrip and change the state. """
+        line = self._token._line
 
         self._autostrip_stack.append(self._autostrip)
+        self._ops_stack.append(("strip", line))
 
-        token = self._get_token(start, "Expected on or off")
+        token = self._get_token(start, "Expected on, off, or trim")
         if token._type == Token.TYPE_END_ACTION:
             # No change
             return start
 
         if token._type != Token.TYPE_WORD or not token._value in ("on", "off", "trim"):
             raise SyntaxError(
-                "Expected on or off",
+                "Expected on, off, or trim",
                 self._template._filename,
                 token._line
             )
@@ -956,19 +959,6 @@ class TemplateParser(object):
             self._autostrip = self.AUTOSTRIP_NONE
 
         return start + 1
-
-    def _parse_action_pop_autostrip(self, start):
-        """ Return the state of autostrip. """
-
-        if not self._autostrip_stack:
-            raise SyntaxError(
-                "No currently pushed autostrip values.",
-                self._template._filename,
-                self._token._line
-            )
-
-        self._autostrip = self._autostrip_stack.pop()
-        return start
 
     def _parse_tag_emitter(self, start):
         """ Parse an emitter tag. """
