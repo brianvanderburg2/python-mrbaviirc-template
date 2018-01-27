@@ -9,7 +9,7 @@ import os
 import json
 import glob
 
-from ..template import UnrestrictedLoader, SearchPathLoader, Environment, StdLib, StringRenderer
+from ...template import UnrestrictedLoader, SearchPathLoader, Environment, StdLib, StringRenderer
 
 DATADIR = os.path.join(os.path.dirname(__file__), "template_data")
 
