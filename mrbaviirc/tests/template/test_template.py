@@ -1,7 +1,7 @@
 """ pytest-capable tests for the template engine. """
 
 __author__      = "Brian Allen Vanderburg II"
-__copyright__   = "Copyright 2016"
+__copyright__   = "Copyright 2016-2018"
 __license__     = "Apache License 2.0"
 
 
@@ -14,7 +14,6 @@ from ...template import UnrestrictedLoader, SearchPathLoader, Environment, StdLi
 DATADIR = os.path.join(os.path.dirname(__file__), "template_data")
 
 
-# setup
 def test_compare_unrestricted_loader():
     loader = UnrestrictedLoader()
     env = Environment({"lib": StdLib() }, loader=loader)
