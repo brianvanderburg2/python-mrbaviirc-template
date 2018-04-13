@@ -10,7 +10,7 @@ import json
 import glob
 
 from ...template import UnrestrictedLoader, SearchPathLoader, Environment, StdLib, StringRenderer
-from ...template import PrefixLoader, PrefixPathLoader
+from ...template import PrefixLoader, PrefixPathLoader, SearchPathLoader2
 
 DATADIR = os.path.join(os.path.dirname(__file__), "template_data")
 
@@ -22,12 +22,14 @@ def test_compare_unrestricted_loader():
 
     do_test_compare(env, False)
 
+
 def test_compare_search_path_loader():
     loader = SearchPathLoader(DATADIR)
     env = Environment({"lib": StdLib() }, loader=loader)
     env.enable_code()
 
     do_test_compare(env, True)
+
 
 def test_compare_prefix_loader():
     loader = PrefixLoader()
@@ -37,6 +39,7 @@ def test_compare_prefix_loader():
     env.enable_code()
 
     do_test_compare(env, True)
+
 
 def do_test_compare(env, search_path_loader):
     """ Run tests by applying template to input and comparing output. """
@@ -82,7 +85,6 @@ def do_test_compare(env, search_path_loader):
             #))
 
 
-
 def test_search_path():
     """ Test the search path loader. """
     paths = [
@@ -93,6 +95,19 @@ def test_search_path():
     loader = SearchPathLoader(paths)
 
     return do_test_search_path(loader)
+
+
+def test_search_path2():
+    """ Test the search path loader. """
+    paths = [
+        os.path.join(DATADIR, "searchpath/1"),
+        os.path.join(DATADIR, "searchpath/2"),
+        os.path.join(DATADIR, "searchpath/3")
+    ]
+    loader = SearchPathLoader2(paths)
+
+    return do_test_search_path(loader)
+
 
 def test_prefix_path():
     """ Test the prefix loader. """
@@ -128,11 +143,5 @@ def do_test_search_path(loader):
         target_contents = handle.read()
 
     assert contents == target_contents
-    #self.assertEqual(
-    #    contents,
-    #    target_contents,
-    #    "render compare failed during search path test"
-    #)
-
 
 

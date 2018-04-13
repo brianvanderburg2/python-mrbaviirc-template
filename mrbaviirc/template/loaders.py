@@ -373,14 +373,14 @@ class PrefixMemoryLoader(PrefixSubLoader):
         return None
 
 
-class SearchPathLoader2(PrefixSubLoader):
+class SearchPathLoader2(PrefixLoader):
     """ This path implements SearchPathLoader as a prefix loader.
         It is only temporary until the prefix loaders are more tested.
         Then SearchPathLoader will be made to use PrefixLoader). """
 
     def __init__(self, path):
         """ Initialize the loader. """
-        PrefixSubLoader.__init__(self)
+        PrefixLoader.__init__(self)
 
         for part in path:
             self.add_prefix("", PrefixPathLoader(part))
