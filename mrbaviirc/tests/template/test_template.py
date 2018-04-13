@@ -10,6 +10,7 @@ import json
 import glob
 
 from ...template import UnrestrictedLoader, SearchPathLoader, Environment, StdLib, StringRenderer
+from ...template import PrefixLoader, PrefixPathLoader
 
 DATADIR = os.path.join(os.path.dirname(__file__), "template_data")
 
@@ -23,6 +24,15 @@ def test_compare_unrestricted_loader():
 
 def test_compare_search_path_loader():
     loader = SearchPathLoader(DATADIR)
+    env = Environment({"lib": StdLib() }, loader=loader)
+    env.enable_code()
+
+    do_test_compare(env, True)
+
+def test_compare_prefix_loader():
+    loader = PrefixLoader()
+    loader.add_prefix("", PrefixPathLoader(DATADIR))
+
     env = Environment({"lib": StdLib() }, loader=loader)
     env.enable_code()
 
@@ -71,6 +81,8 @@ def do_test_compare(env, search_path_loader):
             #        section
             #))
 
+
+
 def test_search_path():
     """ Test the search path loader. """
     paths = [
@@ -78,10 +90,28 @@ def test_search_path():
         os.path.join(DATADIR, "searchpath/2"),
         os.path.join(DATADIR, "searchpath/3")
     ]
+    loader = SearchPathLoader(paths)
 
+    return do_test_search_path(loader)
+
+def test_prefix_path():
+    """ Test the prefix loader. """
+    paths = [
+        os.path.join(DATADIR, "searchpath/1"),
+        os.path.join(DATADIR, "searchpath/2"),
+        os.path.join(DATADIR, "searchpath/3")
+    ]
+    loader = PrefixLoader()
+
+    for path in paths:
+        loader.add_prefix("", PrefixPathLoader(path))
+
+    return do_test_search_path(loader)
+
+
+def do_test_search_path(loader):
+    """ Test the search path loader. """
     target = os.path.join(DATADIR, "searchpath/output.txt")
-    
-    loader=SearchPathLoader(paths)
     env = Environment({"lib": StdLib()}, loader=loader)
 
 
