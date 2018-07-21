@@ -14,10 +14,9 @@ from ...template import PrefixLoader, PrefixPathLoader, SearchPathLoader2
 
 DATADIR = os.path.join(os.path.dirname(__file__), "template_data")
 
-
 def test_compare_unrestricted_loader():
     loader = UnrestrictedLoader()
-    env = Environment({"lib": StdLib() }, loader=loader)
+    env = Environment(loader=loader)
     env.enable_code()
 
     do_test_compare(env, False)
@@ -25,7 +24,7 @@ def test_compare_unrestricted_loader():
 
 def test_compare_search_path_loader():
     loader = SearchPathLoader(DATADIR)
-    env = Environment({"lib": StdLib() }, loader=loader)
+    env = Environment(loader=loader)
     env.enable_code()
 
     do_test_compare(env, True)
@@ -35,7 +34,7 @@ def test_compare_prefix_loader():
     loader = PrefixLoader()
     loader.add_prefix("", PrefixPathLoader(DATADIR))
 
-    env = Environment({"lib": StdLib() }, loader=loader)
+    env = Environment(loader=loader)
     env.enable_code()
 
     do_test_compare(env, True)
@@ -46,6 +45,8 @@ def do_test_compare(env, search_path_loader):
 
     with open(os.path.join(DATADIR, "data.json"), "rU") as handle:
         data = json.load(handle)
+
+    data["lib"] = StdLib()
 
     for path in sorted(glob.glob(os.path.join(DATADIR, "*.tmpl"))):
         source = path if not search_path_loader else os.path.basename(path)
@@ -127,11 +128,13 @@ def test_prefix_path():
 def do_test_search_path(loader):
     """ Test the search path loader. """
     target = os.path.join(DATADIR, "searchpath/output.txt")
-    env = Environment({"lib": StdLib()}, loader=loader)
+    env = Environment(loader=loader)
 
 
     with open(os.path.join(DATADIR, "data.json"), "rU") as handle:
         data = json.load(handle)
+
+    data["lib"] = StdLib()
 
     tmpl = env.load_file("/main.tmpl")
     rndr = StringRenderer()

@@ -15,17 +15,12 @@ from .lib import StdLib
 class Environment(object):
     """ represent a template environment. """
 
-    def __init__(self, context=None, loader=None, importers=None):
+    def __init__(self, loader=None, importers=None):
         """ Initialize the template environment. """
 
-        self._scope = Scope()
-        self._scope_stack = [self._scope]
         self._importers = { "mrbaviirc.template.stdlib": StdLib }
         self._imported = {}
         self._code_enabled = False
-
-        if context:
-            self._scope._local.update(context)
 
         if loader:
             self._loader = loader
@@ -35,6 +30,10 @@ class Environment(object):
         if importers:
             self._importers.update(importers)
 
+    def register_importer(self, name, importer):
+        """ Register an importer """
+        self._importers[name] = importer
+
     def enable_code(self, enabled=True):
         """ Enable use of the code tag in templates. """
         self._code_enabled = enabled
@@ -42,95 +41,6 @@ class Environment(object):
     def load_file(self, filename, parent=None):
         """ Load a template from a file. """
         return self._loader.load_template(self, filename, parent)
-
-    def _push_scope(self, template=False):
-        """ Create a new scope. """
-        self._scope = Scope(self._scope, template)
-        self._scope_stack.append(self._scope)
-
-        return self._scope
-
-    def _pop_scope(self):
-        """ Pop a scope off the stack. """
-        self._scope_stack.pop()
-        self._scope = self._scope_stack[-1]
-
-    def set(self, name, value, where=Scope.SCOPE_LOCAL):
-        """ Set a value in the a scope. """
-        if where == Scope.SCOPE_LOCAL:
-            self._scope._local[name] = value
-        elif where == Scope.SCOPE_GLOBAL:
-            self._scope._global[name] = value
-        elif where == Scope.SCOPE_TEMPLATE:
-            self._scope._template[name] = value
-        elif where == Scope.SCOPE_PRIVATE:
-            self._scope._private[name] = value
-        else:
-            # Shold never happen, but default to local
-            self._scope._local[name] = value
-
-    def update(self, values):
-        """ Update values in the context. """
-        self._scope._local.update(values)
-
-    def unset(self, name):
-        """ Unset a variable from the current scope. """
-        self._scope._local.pop(name, None)
-        self._scope._private.pop(name, None)
-
-    def clear(self):
-        """ Clear the current context. """
-        self._scope._local.clear()
-        self._scope._private.clear()
-
-    def get(self, var):
-        """ Get a dotted variable. """
-
-        # Find the scope dict it is in
-        first = True
-        for entry in reversed(self._scope_stack):
-            if first:
-                first = False
-                # Try private scope first
-                scope = entry._private
-                if var[0] in scope:
-                    break
-
-            scope = entry._local
-            if var[0] in scope:
-                break
-        else:
-            raise KeyError(var[0])
-
-        # Solve dotted variables
-        value = scope[var[0]]
-        for dot in var[1:]:
-
-            if dot[0:1] == "#":
-                # Requested direct dict item access
-                try:
-                    value = value[dot[1:]]
-                except:
-                    raise KeyError(dot)
-
-            elif dot[0:1] == "@":
-                # Requested direct attribute access
-                try:
-                    value = getattr(value, dot[1:])
-                except:
-                    raise KeyError(dot)
-
-            else:
-                # Try to acess the item both ways
-                try:
-                    value = value[dot]
-                except:
-                    try:
-                        value = getattr(value, dot)
-                    except:
-                        raise KeyError(dot)
-
-        return value
 
     def load_import(self, name):
         """ Load a lib from an importer. """

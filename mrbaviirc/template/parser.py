@@ -524,10 +524,6 @@ class TemplateParser(object):
             pos = self._parse_action_section(pos)
         elif action == "use":
             pos = self._parse_action_use(pos)
-        elif action == "def":
-            pos = self._parse_action_def(pos)
-        elif action == "call":
-            pos = self._parse_action_call(pos)
         elif action == "var":
             pos = self._parse_action_var(pos)
         elif action == "error":
@@ -826,49 +822,6 @@ class TemplateParser(object):
 
         return pos
 
-    def _parse_action_def(self, start):
-        """ Parse a local or global def. """
-        line = self._token._line
-
-        token = self._get_token(start, "Expected string")
-        if token._type != Token.TYPE_STRING:
-            raise SyntaxError(
-                "Expected string",
-                self._template._filename,
-                line
-            )
-
-        self._ops_stack.append(("def", line))
-
-        nodes = self._template._defines.setdefault(token._value, NodeList())
-        self._stack.append(nodes)
-
-        return start + 1
-
-    def _parse_action_call(self, start):
-        """ Parse a call to a local or global def. """
-        line = self._token._line
-
-        token = self._get_token(start, "Expected string")
-        if token._type != Token.TYPE_STRING:
-            raise SyntaxError(
-                "Expected string",
-                self._template._filename,
-                line
-            )
-
-        nodes = self._template._defines.get(token._value, None)
-        if nodes is None:
-            raise UnknownDefineError(
-                name,
-                self._template._filename,
-                line
-            )
-
-        self._stack[-1].extend(nodes)
-
-        return start + 1
-
     def _parse_action_var(self, start):
         """ Parse a block to store rendered output in a variable. """
         line = self._token._line
@@ -980,7 +933,7 @@ class TemplateParser(object):
         pos = self._parse_tag_ending(pos, Token.TYPE_END_EMITTER)
 
         if isinstance(expr, ValueExpr):
-            node = TextNode(self._template, line, str(expr.eval()))
+            node = TextNode(self._template, line, str(expr.eval(None)))
         else:
             node = EmitNode(self._template, line, expr)
         self._stack[-1].append(node)
@@ -1018,7 +971,7 @@ class TemplateParser(object):
         pos += 1 # skip past "]"
 
         if nodes and all(isinstance(node, ValueExpr) for node in nodes):
-            node = ValueExpr(self._template, nodes[0]._line, [node.eval() for node in nodes])
+            node = ValueExpr(self._template, nodes[0]._line, [node.eval(None) for node in nodes])
         else:
             node = ListExpr(self._template, self._token._line, nodes)
         return (node, pos)

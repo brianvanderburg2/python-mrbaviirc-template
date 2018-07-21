@@ -26,7 +26,7 @@ class Node(object):
         self._line = line
         self._env = template._env
 
-    def render(self, renderer):
+    def render(self, renderer, scope):
         """ Render the node to a renderer. """
         raise NotImplementedError
 
@@ -46,10 +46,10 @@ class NodeList(object):
         """ Extend one node list with another. """
         self._nodes.extend(nodelist._nodes)
 
-    def render(self, renderer):
+    def render(self, renderer, scope):
         """ Render all nodes. """
         for node in self._nodes:
-            node.render(renderer)
+            node.render(renderer, scope)
 
     def __getitem__(self, n):
         return self._nodes[n]
@@ -63,7 +63,7 @@ class TextNode(Node):
         Node.__init__(self, template, line)
         self._text = text
 
-    def render(self, renderer):
+    def render(self, renderer, scope):
         """ Render content from a text node. """
         renderer.render(self._text)
 
@@ -89,16 +89,16 @@ class IfNode(Node):
         self._else = NodeList()
         self._nodes = self._else
 
-    def render(self, renderer):
+    def render(self, renderer, scope):
         """ Render the if node. """
         for (expr, nodes) in self._ifs:
-            result = expr.eval()
+            result = expr.eval(scope)
             if result:
-                nodes.render(renderer)
+                nodes.render(renderer, scope)
                 return
 
         if self._else:
-            self._else.render(renderer)
+            self._else.render(renderer, scope)
 
 
 class ForNode(Node):
@@ -120,27 +120,27 @@ class ForNode(Node):
         self._else = NodeList()
         self._nodes = self._else
 
-    def render(self, renderer):
+    def render(self, renderer, scope):
         """ Render the for node. """
         env = self._env
 
         # Iterate over each value
-        values = self._expr.eval()
+        values = self._expr.eval(scope)
         do_else = True
         if values:
             index = 0
             for var in values:
                 do_else = False
                 if self._cvar:
-                    env.set(self._cvar, index)
-                env.set(self._var, var)
+                    scope.set(self._cvar, index)
+                scope.set(self._var, var)
                 index += 1
                                     
                 # Execute each sub-node
-                self._for.render(renderer)
+                self._for.render(renderer, scope)
 
         if do_else and self._else:
-            self._else.render(renderer)
+            self._else.render(renderer, scope)
 
 
 class SwitchNode(Node):
@@ -170,17 +170,17 @@ class SwitchNode(Node):
         self._cases.append((cb, NodeList(), exprs))
         self._nodes = self._cases[-1][1]
 
-    def render(self, renderer):
+    def render(self, renderer, scope):
         """ Render the node. """
-        value = self._expr.eval()
+        value = self._expr.eval(scope)
 
         for cb, nodes, exprs in self._cases:
-            params = [expr.eval() for expr in exprs]
+            params = [expr.eval(scope) for expr in exprs]
             if cb(value, *params):
-                nodes.render(renderer)
+                nodes.render(renderer, scope)
                 return
 
-        self._default.render(renderer)
+        self._default.render(renderer, scope)
 
 
 class EmitNode(Node):
@@ -191,9 +191,9 @@ class EmitNode(Node):
         Node.__init__(self, template, line)
         self._expr = expr
 
-    def render(self, renderer):
+    def render(self, renderer, scope):
         """ Render the output. """
-        renderer.render(str(self._expr.eval()))
+        renderer.render(str(self._expr.eval(scope)))
 
 
 class IncludeNode(Node):
@@ -206,11 +206,11 @@ class IncludeNode(Node):
         self._assigns = assigns
         self._retvar = retvar
 
-    def render(self, renderer):
+    def render(self, renderer, scope):
         """ Actually do the work of including the template. """
         try:
             template = self._env.load_file(
-                str(self._expr.eval()),
+                str(self._expr.eval(scope)),
                 self._template
             )
         except (IOError, OSError, RestrictedError) as e:
@@ -222,9 +222,11 @@ class IncludeNode(Node):
 
         context = {}
         for (var, expr) in self._assigns:
-            context[var] = expr.eval()
+            context[var] = expr.eval(scope)
 
-        template.render(renderer, context, self._retvar)
+        retval = template._render(renderer, context, scope)
+        if self._retvar:
+            scope.set(self._retvar, retval)
 
 
 class ReturnNode(Node):
@@ -235,14 +237,14 @@ class ReturnNode(Node):
         Node.__init__(self, template, line)
         self._assigns = assigns
 
-    def render(self, renderer):
+    def render(self, renderer, scope):
         """ Set the return nodes. """
 
         result = {}
         for (var, expr) in self._assigns:
-            result[var] = expr.eval()
+            result[var] = expr.eval(scope)
 
-        self._env.set(":return:", result, Scope.SCOPE_TEMPLATE)
+        scope.set(":return:", result, Scope.SCOPE_TEMPLATE)
 
 
 class ExpandNode(Node):
@@ -253,12 +255,12 @@ class ExpandNode(Node):
         Node.__init__(self, template, line)
         self._expr = expr
 
-    def render(self, renderer):
+    def render(self, renderer, scope):
         """ Expand the variables. """
 
-        result = self._expr.eval()
+        result = self._expr.eval(scope)
         try:
-            self._env.update(result)
+            scope.update(result)
         except (KeyError, TypeError, ValueError) as e:
             raise TemplateError(
                 str(e),
@@ -276,12 +278,12 @@ class AssignNode(Node):
         self._assigns = assigns
         self._where = where
 
-    def render(self, renderer):
+    def render(self, renderer, scope):
         """ Set the value. """
         env = self._env
 
         for (var, expr) in self._assigns:
-            env.set(var, expr.eval(), self._where)
+            scope.set(var, expr.eval(scope), self._where)
 
 
 class SectionNode(Node):
@@ -293,12 +295,12 @@ class SectionNode(Node):
         self._expr = expr
         self._nodes = NodeList()
 
-    def render(self, renderer):
+    def render(self, renderer, scope):
         """ Redirect output to a section. """
 
-        section = str(self._expr.eval())
+        section = str(self._expr.eval(scope))
         renderer.push_section(section)
-        self._nodes.render(renderer)
+        self._nodes.render(renderer, scope)
         renderer.pop_section()
 
 
@@ -310,10 +312,10 @@ class UseSectionNode(Node):
         Node.__init__(self, template, line)
         self._expr = expr
 
-    def render(self, renderer):
+    def render(self, renderer, scope):
         """ Render the section to the output. """
 
-        section = str(self._expr.eval())
+        section = str(self._expr.eval(scope))
         renderer.render(renderer.get_section(section))
 
 
@@ -326,17 +328,15 @@ class ScopeNode(Node):
         self._assigns = assigns
         self._nodes = NodeList()
 
-    def render(self, renderer):
+    def render(self, renderer, scope):
         """ Render the scope. """
         env = self._env
-        env._push_scope()
-        try:
-            for (var, expr) in self._assigns:
-                env.set(var, expr.eval())
+        new_scope = scope.push()
 
-            self._nodes.render(renderer)
-        finally:
-            env._pop_scope()
+        for (var, expr) in self._assigns:
+            new_scope.set(var, expr.eval(new_scope))
+
+        self._nodes.render(renderer, new_scope)
 
 
 class CodeNode(Node):
@@ -350,7 +350,7 @@ class CodeNode(Node):
         self._nodes = NodeList()
         self._code = None
 
-    def render(self, renderer):
+    def render(self, renderer, scope):
         """ Actually do the work of including the template. """
 
         # Check if allowed
@@ -365,7 +365,7 @@ class CodeNode(Node):
         if not self._code:
             # Get the code
             new_renderer = StringRenderer()
-            self._nodes.render(new_renderer)
+            self._nodes.render(new_renderer, scope)
             code = new_renderer.get()
 
             # Compile it
@@ -381,7 +381,7 @@ class CodeNode(Node):
         # Execute the code
         locals = {}
         for (var, expr) in self._assigns:
-            locals[var] = expr.eval()
+            locals[var] = expr.eval(scope)
 
         try:
             exec(self._code, locals, locals)
@@ -394,7 +394,7 @@ class CodeNode(Node):
 
         # Handle return values
         if self._retvar:
-            self._env.set(self._retvar, locals)
+            scope.set(self._retvar, locals)
 
 
 class VarNode(Node):
@@ -406,12 +406,12 @@ class VarNode(Node):
         self._var = var
         self._nodes = NodeList()
 
-    def render(self, renderer):
+    def render(self, renderer, scope):
         """ Render the results and capture into a variable. """
 
         new_renderer = StringRenderer()
-        self._nodes.render(new_renderer)
-        self._env.set(self._var, new_renderer.get())
+        self._nodes.render(new_renderer, scope)
+        scope.set(self._var, new_renderer.get())
 
 class ErrorNode(Node):
     """ Raise an error from the template. """
@@ -421,10 +421,10 @@ class ErrorNode(Node):
         Node.__init__(self, template, line)
         self._expr = expr
 
-    def render(self, renderer):
+    def render(self, renderer, scope):
         """ Raise the error. """
         raise RaisedError(
-            str(self._expr.eval()),
+            str(self._expr.eval(scope)),
             self._template._filename,
             self._line
         )
@@ -435,15 +435,15 @@ class ImportNode(Node):
         Node.__init__(self, template, line)
         self._assigns = assigns
 
-    def render(self, renderer):
+    def render(self, renderer, scope):
         """ Do the import. """
         env = self._env
 
         for (var, expr) in self._assigns:
-            name = expr.eval()
+            name = expr.eval(scope)
             try:
                 imp = env.load_import(name)
-                env.set(var, imp)
+                scope.set(var, imp)
             except KeyError:
                 raise UnknownImportError(
                     "No such import: {0}".format(name),
@@ -459,10 +459,10 @@ class DoNode(Node):
         Node.__init__(self, template, line)
         self._nodes = nodes
 
-    def render(self, renderer):
+    def render(self, renderer, scope):
         """ Set the value. """
         for node in self._nodes:
-            node.eval()
+            node.eval(scope)
 
 class UnsetNode(Node):
     """ Unset variable at the current scope rsults. """
@@ -472,9 +472,9 @@ class UnsetNode(Node):
         Node.__init__(self, template, line)
         self._varlist = varlist
 
-    def render(self, renderer):
+    def render(self, renderer, scope):
         """ Set the value. """
         env = self._env
         for item in self._varlist:
-            env.unset(item)
+            scope.unset(item)
 

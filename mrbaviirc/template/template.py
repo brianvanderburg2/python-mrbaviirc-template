@@ -9,6 +9,7 @@ import os
 
 from .errors import *
 from .parser import TemplateParser
+from .scope import Scope
 
 
 class Template(object):
@@ -57,29 +58,35 @@ class Template(object):
         self._text = text
         self._filename = filename
 
-        self._defines = {}
-        self._private = {}
+        self._private = {} # Need lock for _privatedata
 
         # Parse the template
         parser = TemplateParser(self, text)
         self._nodes = parser.parse()
 
-    def render(self, renderer, context=None, retvar=None):
+    def render(self, renderer, context=None):
         """ Render the template. """
-        env = self._env
-        scope = env._push_scope(True)
-        try:
-            if not context is None:
-                scope._local.update(context)
 
-            # set certain variables
-            scope._template["__filename__"] = self._filename
+        # Create the top (global) scope for this render
+        scope = Scope()
+        if context is not None:
+            scope.update(context)
 
-            self._nodes.render(renderer)
-        finally:
-            env._pop_scope()
+        return self._render(renderer, None, scope)
 
-        # Set up any return values:
-        if retvar:
-            env.set(retvar, scope._template.get(":return:", {}))
+    def _render(self, renderer, context, scope):
+        """ Render the template. """
+        new_scope = scope.push(True)
+
+        if context is not None:
+            new_scope.update(context)
+
+        # set certain variables
+        new_scope._template["__filename__"] = self._filename
+
+        self._nodes.render(renderer, new_scope)
+
+        # Return any template return values:
+        retval = new_scope._template.get(":return:", {})
+        return retval
 

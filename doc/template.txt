@@ -76,9 +76,6 @@ ACTION:
     SECTION: "section" + EXPRESSION
     SECTION: "endsection"
     USE: "use" + EXPRESSION
-    DEF: "def" +  STRING
-    ENDDEF: "enddef"
-    CALL: "call" + STRING
     VAR: "var" + VARPART
     ENDVAR: "endvar"
     ERROR: "error" + EXPRESSION

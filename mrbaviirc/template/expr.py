@@ -18,10 +18,9 @@ class Expr(object):
     def __init__(self, template, line):
         """ Initialize the expression object. """
         self._template = template
-        self._env = template._env
         self._line = line
 
-    def eval(self):
+    def eval(self, scope):
         """ Evaluate the expression object. """
         raise NotImplementedError
 
@@ -34,7 +33,7 @@ class ValueExpr(Expr):
         Expr.__init__(self, template, line)
         self._value = value
 
-    def eval(self):
+    def eval(self, scope):
         """ Evaluate the expression. """
         return self._value
 
@@ -48,11 +47,11 @@ class FuncExpr(Expr):
         self._var = var
         self._nodes = nodes
 
-    def eval(self):
+    def eval(self, scope):
         """ Evaluate the expression. """
         try:
-            fn = self._env.get(self._var)
-            params = [node.eval() for node in self._nodes]
+            fn = scope.get(self._var)
+            params = [node.eval(scope) for node in self._nodes]
             return fn(*params)
         except KeyError:
             raise UnknownVariableError(
@@ -70,9 +69,9 @@ class ListExpr(Expr):
         Expr.__init__(self, template, line)
         self._nodes = nodes
 
-    def eval(self):
+    def eval(self, scope):
         """ Evaluate the expression. """
-        return [node.eval() for node in self._nodes]
+        return [node.eval(scope) for node in self._nodes]
 
 
 class VarExpr(Expr):
@@ -83,10 +82,10 @@ class VarExpr(Expr):
         Expr.__init__(self, template, line)
         self._var = var
 
-    def eval(self):
+    def eval(self, scope):
         """ Evaluate the expression. """
         try:
-            return self._env.get(self._var)
+            return scope.get(self._var)
         except KeyError:
             raise UnknownVariableError(
                 ".".join(self._var),
@@ -104,11 +103,11 @@ class IndexExpr(Expr):
         self._var = var
         self._nodes = nodes
 
-    def eval(self):
+    def eval(self, scope):
         """ Evaluate the expression. """
         try:
-            var = self._env.get(self._var)
-            params = [node.eval() for node in self._nodes]
+            var = scope.get(self._var)
+            params = [node.eval(scope) for node in self._nodes]
         except KeyError:
             raise UnknownVariableError(
                 ".".join(self._var),
