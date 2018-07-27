@@ -1,0 +1,16 @@
+{% autostrip %}
+{% import lib="mrbaviirc.template.stdlib" %}
+
+{% for i in [1, 2, 3, 4, 5] %}
+{{ i }}
+{% if lib.eq(i, 3) %}
+{% break %}
+{% endif %}
+{% endfor +%}
+
+{% for i in [1, 2, 3, 4, 5] %}
+{% if lib.eq(i, 3) %}
+{% continue %}
+{% endif %}
+{{ i }}
+{% endfor +%}

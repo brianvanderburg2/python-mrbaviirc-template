@@ -8,7 +8,8 @@ __all__ = [
     "Node", "NodeList",  "TextNode", "IfNode", "ForNode", "SwitchNode",
     "EmitNode", "IncludeNode", "ReturnNode", "AssignNode", "SectionNode",
     "UseSectionNode", "ScopeNode", "VarNode", "ErrorNode","ImportNode",
-    "DoNode", "UnsetNode", "CodeNode", "ExpandNode"
+    "DoNode", "UnsetNode", "CodeNode", "ExpandNode", "BreakNode",
+    "ContinueNode"
 ]
 
 
@@ -20,6 +21,9 @@ from .scope import *
 class Node(object):
     """ A node is a part of the expression that is rendered. """
 
+    RENDER_BREAK = 1
+    RENDER_CONTINUE = 2
+
     def __init__(self, template, line):
         """ Initialize the node. """
         self._template = template
@@ -27,7 +31,12 @@ class Node(object):
         self._env = template._env
 
     def render(self, renderer, scope):
-        """ Render the node to a renderer. """
+        """ Render the node to a renderer.
+            If a value is returned other than None, then for most other
+            nodes it should return that value instantly.  Certain nodes
+            may use the value in a special manor, such as break and
+            continue nodes.
+        """
         raise NotImplementedError
 
 
@@ -49,7 +58,9 @@ class NodeList(object):
     def render(self, renderer, scope):
         """ Render all nodes. """
         for node in self._nodes:
-            node.render(renderer, scope)
+            result = node.render(renderer, scope)
+            if result in (Node.RENDER_BREAK, Node.RENDER_CONTINUE):
+                return result
 
     def __getitem__(self, n):
         return self._nodes[n]
@@ -94,11 +105,10 @@ class IfNode(Node):
         for (expr, nodes) in self._ifs:
             result = expr.eval(scope)
             if result:
-                nodes.render(renderer, scope)
-                return
+                return nodes.render(renderer, scope)
 
         if self._else:
-            self._else.render(renderer, scope)
+            return self._else.render(renderer, scope)
 
 
 class ForNode(Node):
@@ -137,10 +147,14 @@ class ForNode(Node):
                 index += 1
                                     
                 # Execute each sub-node
-                self._for.render(renderer, scope)
+                result = self._for.render(renderer, scope)
+                if result == Node.RENDER_BREAK:
+                    break
+                elif result == Node.RENDER_CONTINUE:
+                    continue
 
         if do_else and self._else:
-            self._else.render(renderer, scope)
+            return self._else.render(renderer, scope)
 
 
 class SwitchNode(Node):
@@ -177,10 +191,9 @@ class SwitchNode(Node):
         for cb, nodes, exprs in self._cases:
             params = [expr.eval(scope) for expr in exprs]
             if cb(value, *params):
-                nodes.render(renderer, scope)
-                return
+                return nodes.render(renderer, scope)
 
-        self._default.render(renderer, scope)
+        return self._default.render(renderer, scope)
 
 
 class EmitNode(Node):
@@ -413,6 +426,7 @@ class VarNode(Node):
         self._nodes.render(new_renderer, scope)
         scope.set(self._var, new_renderer.get())
 
+
 class ErrorNode(Node):
     """ Raise an error from the template. """
 
@@ -477,4 +491,18 @@ class UnsetNode(Node):
         env = self._env
         for item in self._varlist:
             scope.unset(item)
+
+
+class BreakNode(Node):
+    """ Return RENDER_BREAK. """
+
+    def render(self, renderer, scope):
+        return Node.RENDER_BREAK
+
+
+class ContinueNode(Node):
+    """ Return RENDER_CONTINUE. """
+
+    def render(self, renderer, scope):
+        return Node.RENDER_CONTINUE
 

@@ -50,6 +50,8 @@ ACTION:
     ELIF: "elif" + EXPRESSION
     ELSE: "else"
     ENDIF: "endif"
+    BREAK: "break"
+    CONTINUE: "continue"
     FOR: "for" + VARPART + ["," + VARPART]? + "in" + EXPRESSION
     ENDFOR: "endfor"
     SWITCH: "switch" + EXPRESSION
@@ -227,6 +229,28 @@ autostrip or autotrim is enabled.
 the start of the next block (startflag).  This will have an effect even if
 autostrip or autotrim is enabled.
 
+Loops and breaking
+==================
+
+A break or continue node will result in the current node stack stopping and
+returning a value of RENDER_BREAK or RENDER_CONTINUE up the node render stack.
+Most of the nodes will, then in turn stop and return the value up the render
+stack until it is handled.  Certain nodes once the receive that value behave
+differently.
+
+var, section, code, and scope nodes do not return the value up the render stack
+thus a break or continue under these nodes that is not otherwise handled within
+will simply result in the break of the rendering of the child nodes.
+
+the for node behaves specially.  If it receives a RENDER_BREAK return from the
+child nodes, it will stop rendering of any futher iterations.  If it receives
+a RENDER_CONTINUE, it will continue at that point to the next iteration. It will
+not return the value up the node render stack. The else clause of a for node
+will return the value up the node render stack
+
+Switch nodes are just glorified if nodes.  Break/continue nodes do not affect
+switch nodes as would in C or C++, but instead simply return the break or
+continue up the node stack.
 
 Functions Libraries
 ===================

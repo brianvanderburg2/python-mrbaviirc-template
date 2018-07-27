@@ -493,7 +493,11 @@ class TemplateParser(object):
         elif action == "elif":
             pos = self._parse_action_elif(pos)
         elif action == "else":
-            pos =  self._parse_action_else(pos)
+            pos = self._parse_action_else(pos)
+        elif action == "break":
+            pos = self._parse_action_break(pos)
+        elif action == "continue":
+            pos = self._parse_action_continue(pos)
         elif action == "for":
             pos = self._parse_action_for(pos)
         elif action == "switch":
@@ -613,6 +617,22 @@ class TemplateParser(object):
         node = self._stack[-1][-1]
         node.add_else()
         self._stack.append(node._nodes)
+
+        return start
+
+    def _parse_action_break(self, start):
+        """ Parse break. """
+        line = self._token._line
+        node = BreakNode(self._template, line)
+        self._stack[-1].append(node)
+
+        return start
+
+    def _parse_action_continue(self, start):
+        """ Parse continue. """
+        line = self._token._line
+        node = ContinueNode(self._template, line)
+        self._stack[-1].append(node)
 
         return start
 
