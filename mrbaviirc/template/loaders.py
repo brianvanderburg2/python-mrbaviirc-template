@@ -6,10 +6,11 @@ __license__     = "Apache License 2.0"
 
 __all__ = ["Loader", "UnrestrictedLoader", "SearchPathLoader", "MemoryLoader",
            "PrefixLoader", "PrefixSubLoader", "PrefixPathLoader", "PrefixMemoryLoader",
-           "SearchPathLoader2" ]
+           "DeprecatedSearchPathLoader" ]
 
 import os
 import posixpath
+import threading
 
 from .template import Template
 from .errors import *
@@ -39,6 +40,7 @@ class UnrestrictedLoader(Loader):
         Loader.__init__(self)
 
         self._cache = {}
+        self._lock = threading.Lock()
 
     def load_template(self, env, filename, parent=None):
         """ Load a template. """
@@ -53,18 +55,19 @@ class UnrestrictedLoader(Loader):
         filename = os.path.realpath(filename)
 
         # Available from cache?
-        if filename in self._cache:
+        with self._lock:
+            if filename in self._cache:
+                return self._cache[filename]
+
+            # Load and return
+            with open(filename, "rU") as handle:
+                text = handle.read()
+
+            self._cache[filename] = Template(env, text, filename)
             return self._cache[filename]
 
-        # Load and return
-        with open(filename, "rU") as handle:
-            text = handle.read()
 
-        self._cache[filename] = Template(env, text, filename)
-        return self._cache[filename]
-
-
-class SearchPathLoader(Loader):
+class DeprecatedSearchPathLoader(Loader):
     """ A loader that loads the template from the file system. """
 
     def __init__(self, path):
@@ -149,6 +152,7 @@ class MemoryLoader(Loader):
         Loader.__init__(self);
         self._cache = {}
         self._memory = {}
+        self._lock = threading.Lock()
 
     def add_template(self, name, contents):
         """ Add an entry to the memory. """
@@ -165,17 +169,18 @@ class MemoryLoader(Loader):
         ))
 
         # Available in cache
-        if filename in self._cache:
+        with self._lock:
+            if filename in self._cache:
+                return self._cache[filename]
+
+            if not filename in self._memory:
+                raise RestrictedError(
+                    "Attempt to load non-existing template from memory: {0}".format(filename)
+                )
+
+            # Load the file
+            self._cache[filename] = Template(env, self._memory[filename], filename)
             return self._cache[filename]
-
-        if not filename in self._memory:
-            raise RestrictedError(
-                "Attempt to load non-existing template from memory: {0}".format(filename)
-            )
-
-        # Load the file
-        self._cache[filename] = Template(env, self._memory[filename], filename)
-        return self._cache[filename]
 
 
 class PrefixLoader(Loader):
@@ -188,6 +193,7 @@ class PrefixLoader(Loader):
 
         self._prefixes = []
         self._cache = {}
+        self._lock = threading.Lock()
 
     def add_prefix(self, prefix, loader):
         """ Add a prefix to the loader. """
@@ -203,84 +209,94 @@ class PrefixLoader(Loader):
         # normalized = (path, index, cachename) of a filename if already
         #   loaded from the same template
 
-        if parent and filename in parent._private["normalized"]:
-            # We've already included the same filename from the same parent
-            # and cached the normalized result, no need to normalize again
-            (path, index_start, cache_name) = parent._private["normalized"][filename]
-        elif filename == ":next:":
-            # Load the same path as the parent starting at the next prefix entry
-            if parent is None:
-                raise RestrictedError(":next: can only be ncluded from an existing template.")
-
-            path = parent._private["path"]
-            index_start = parent._private["index"] + 1
-            cache_name = ":@@{0}@@:{1}".format(index_start, "/".join(path))
-        else:
-            # Loading a template directly by path
-            path = self._normalize(filename, parent)
-            index_start = 0
-            cache_name = "/".join(path)
-
-        # Cache the normalization results if loading from an include
+        # First normalize the name based on the parent and store the normalized
+        # value in the parent's cache
         if parent:
-            normalized = parent._private["normalized"]
-            normalized[filename] = (path, index_start, cache_name)
+            parent._lock.acquire()
 
-        # Check if already loaded
-        if cache_name in self._cache:
-            return self._cache[cache_name]
+        try:
+            if parent and filename in parent._private["normalized"]:
+                # We've already included the same filename from the same parent
+                # and cached the normalized result, no need to normalize again
+                (path, index_start, cache_name) = parent._private["normalized"][filename]
+            elif filename == ":next:":
+                # Load the same path as the parent starting at the next prefix entry
+                if parent is None:
+                    raise RestrictedError(":next: can only be ncluded from an existing template.")
 
-        # Find all matching prefixes and attempt to load the template
-        template = None
-        index = -1
-        for index, (prefix, loader) in enumerate(
-            self._prefixes[index_start:],
-            index_start
-        ):
-            # Make sure first parts are common
-            if len(path) < len(prefix):
-                # This will allow a situation where the subpath may be empty
-                # is if path to load matches the prefix exactly. This is
-                # intentional in case t here is an actualy use for it.
-                # Subloader should check for an empty load path
-                continue
+                path = parent._private["path"]
+                index_start = parent._private["index"] + 1
+                cache_name = ":@@{0}@@:{1}".format(index_start, "/".join(path))
+            else:
+                # Loading a template directly by path
+                path = self._normalize(filename, parent._private["path"] if parent else None)
+                index_start = 0
+                cache_name = "/".join(path)
 
-            if path[:len(prefix)] != prefix:
-                continue
+            # Cache the normalization results if loading from an include
+            if parent:
+                normalized = parent._private["normalized"]
+                normalized[filename] = (path, index_start, cache_name)
+        finally:
+            if parent:
+                parent._lock.release()
 
-            subpath = path[len(prefix):]
-            template = loader.load_template(env, subpath, path)
+        with self._lock:
+            # Check if already loaded
+            if cache_name in self._cache:
+                return self._cache[cache_name]
+
+            # Find all matching prefixes and attempt to load the template
+            template = None
+            index = -1
+            for index, (prefix, loader) in enumerate(
+                self._prefixes[index_start:],
+                index_start
+            ):
+                # Make sure first parts are common
+                if len(path) < len(prefix):
+                    # This will allow a situation where the subpath may be empty
+                    # is if path to load matches the prefix exactly. This is
+                    # intentional in case t here is an actualy use for it.
+                    # Subloader should check for an empty load path
+                    continue
+
+                if path[:len(prefix)] != prefix:
+                    continue
+
+                subpath = path[len(prefix):]
+                template = loader.load_template(env, subpath, path)
+                if template:
+                    break
+
             if template:
-                break
-
-        if template:
-            template._private["path"] = path
-            template._private["index"] = index
-            template._private["normalized"] = {}
-            self._cache[cache_name] = template
-            return template
-        elif parent:
-            raise RestrictedError(
-                "Template not found along prefix paths: {0}, Included from: {1}".format(
-                    filename, # We use filename so user can tell which include cause the problem
-                    "/".join(parent._private["path"])
+                template._private["path"] = path
+                template._private["index"] = index
+                template._private["normalized"] = {}
+                self._cache[cache_name] = template
+                return template
+            elif parent:
+                raise RestrictedError(
+                    "Template not found along prefix paths: {0}, Included from: {1}".format(
+                        filename, # We use filename so user can tell which include cause the problem
+                        "/".join(parent._private["path"])
+                    )
                 )
-            )
-        else:
-            raise RestrictedError(
-                "Template not found along prefix paths: {0}".format(filename)
-            )
+            else:
+                raise RestrictedError(
+                    "Template not found along prefix paths: {0}".format(filename)
+                )
 
-    def _normalize(self, filename, parent):
+    def _normalize(self, filename, path):
         """ Normalize the path and return the path tuple """
 
         # Convert filename to tuple first
         filepath = [i for i in filename.split("/") if len(i.strip())]
         absolute = filename[0:1] == "/"
 
-        if parent and not absolute:
+        if path and not absolute:
              # Remove last component so path is the parent directory
-            newpath = list(parent._private["path"])[:-1]
+            newpath = list(path[:-1])
         else:
             newpath = []
 
@@ -290,10 +306,10 @@ class PrefixLoader(Loader):
                 continue
             elif part == "..":
                 if len(newpath) == 0:
-                    if parent:
+                    if path:
                         raise RestrictedError("Relative include error: {0}, From: {1}".format(
                             filename,
-                            "/".join(parent._private["path"])
+                            "/".join(path)
                         ))
                     else:
                         raise RestrictedError("Relative load error: {0}".format(
@@ -373,14 +389,15 @@ class PrefixMemoryLoader(PrefixSubLoader):
         return None
 
 
-class SearchPathLoader2(PrefixLoader):
-    """ This path implements SearchPathLoader as a prefix loader.
-        It is only temporary until the prefix loaders are more tested.
-        Then SearchPathLoader will be made to use PrefixLoader). """
+class SearchPathLoader(PrefixLoader):
+    """ This loader implements the originaly SearchPathLoader """
 
     def __init__(self, path):
         """ Initialize the loader. """
         PrefixLoader.__init__(self)
+
+        if not isinstance(path, (tuple, list)):
+            path = [path]
 
         for part in path:
             self.add_prefix("", PrefixPathLoader(part))

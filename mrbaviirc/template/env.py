@@ -5,6 +5,9 @@ __copyright__   = "Copyright 2016"
 __license__     = "Apache License 2.0"
 
 
+import threading
+
+
 from .template import Template
 from .scope import Scope
 from .loaders import UnrestrictedLoader
@@ -21,6 +24,7 @@ class Environment(object):
         self._importers = { "mrbaviirc.template.stdlib": StdLib }
         self._imported = {}
         self._code_enabled = False
+        self._lock = threading.Lock()
 
         if loader:
             self._loader = loader
@@ -45,12 +49,13 @@ class Environment(object):
     def load_import(self, name):
         """ Load a lib from an importer. """
 
-        if not name in self._imported:
-            if not name in self._importers:
-                raise KeyError(name)
+        with self._lock:
+            if not name in self._imported:
+                if not name in self._importers:
+                    raise KeyError(name)
 
-            self._imported[name] = self._importers[name]()
+                self._imported[name] = self._importers[name]()
 
-        return self._imported[name]
+            return self._imported[name]
 
 

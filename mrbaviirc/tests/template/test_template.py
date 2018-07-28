@@ -9,8 +9,8 @@ import os
 import json
 import glob
 
-from ...template import UnrestrictedLoader, SearchPathLoader, Environment, StdLib, StringRenderer
-from ...template import PrefixLoader, PrefixPathLoader, SearchPathLoader2
+from ...template import UnrestrictedLoader, DeprecatedSearchPathLoader, Environment, StdLib, StringRenderer
+from ...template import PrefixLoader, PrefixPathLoader, SearchPathLoader
 
 DATADIR = os.path.join(os.path.dirname(__file__), "template_data")
 
@@ -105,7 +105,7 @@ def test_search_path2():
         os.path.join(DATADIR, "searchpath/2"),
         os.path.join(DATADIR, "searchpath/3")
     ]
-    loader = SearchPathLoader2(paths)
+    loader = DeprecatedSearchPathLoader(paths)
 
     return do_test_search_path(loader)
 

@@ -6,6 +6,7 @@ __license__     = "Apache License 2.0"
 
 
 import os
+import threading
 
 from .errors import *
 from .parser import TemplateParser
@@ -58,7 +59,8 @@ class Template(object):
         self._text = text
         self._filename = filename
 
-        self._private = {} # Need lock for _privatedata
+        self._private = {}
+        self._lock = threading.Lock()
 
         # Parse the template
         parser = TemplateParser(self, text)
