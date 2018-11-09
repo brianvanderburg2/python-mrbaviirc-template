@@ -328,7 +328,7 @@ class Tokenizer(object):
                 self._line += 1
 
         if not end:
-            raise SyntaxError("Unclosed string", self._line)
+            raise SyntaxError("Unclosed string", self._filename, self._line)
 
         token = Token(Token.TYPE_STRING, self._line, "".join(result))
         self._tokens.append(token)
