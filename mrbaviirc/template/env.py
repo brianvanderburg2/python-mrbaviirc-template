@@ -18,12 +18,12 @@ from .lib import StdLib
 class Environment(object):
     """ represent a template environment. """
 
-    def __init__(self, loader=None, importers=None):
+    def __init__(self, loader=None, importers=None, allow_code=False):
         """ Initialize the template environment. """
 
         self._importers = { "mrbaviirc.template.stdlib": StdLib }
         self._imported = {}
-        self._code_enabled = False
+        self._allow_code = allow_code
         self._lock = threading.Lock()
 
         if loader:
@@ -38,9 +38,9 @@ class Environment(object):
         """ Register an importer """
         self._importers[name] = importer
 
-    def enable_code(self, enabled=True):
+    def allow_code(self, enabled=True):
         """ Enable use of the code tag in templates. """
-        self._code_enabled = enabled
+        self._allow_code = enabled
 
     def load_file(self, filename, parent=None):
         """ Load a template from a file. """

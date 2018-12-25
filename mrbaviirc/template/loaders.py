@@ -63,7 +63,7 @@ class UnrestrictedLoader(Loader):
             with open(filename, "rU") as handle:
                 text = handle.read()
 
-            self._cache[filename] = Template(env, text, filename)
+            self._cache[filename] = Template(env, text, filename, allow_code=True)
             return self._cache[filename]
 
 
@@ -338,10 +338,11 @@ class PrefixSubLoader(object):
 class PrefixPathLoader(PrefixSubLoader):
     """ Load from a path. """
 
-    def __init__(self, path):
+    def __init__(self, path, allow_code=False):
         """ Initialize the loader with a given path. """
         PrefixSubLoader.__init__(self)
         self._path = os.path.realpath(path)
+        self._allow_code = allow_code
 
     def load_template(self, env, subpath, fullpath):
         """ Load a given template. """
@@ -358,7 +359,7 @@ class PrefixPathLoader(PrefixSubLoader):
             with open(filename, "rU") as handle:
                 text = handle.read()
 
-            return Template(env, text, filename)
+            return Template(env, text, filename, self._allow_code)
 
         return None
 
@@ -368,8 +369,9 @@ class PrefixMemoryLoader(PrefixSubLoader):
 
     def __init__(self):
         """ Initialize the loader. """
-        PrefixSubLoader.__init__(self)
+        PrefixSubLoader.__init__(self, allow_code=False)
         self._memory = {}
+        self._allow_code = allow_code
 
     def add_template(self, path, contents):
         """ Add a memory template. """
@@ -383,7 +385,8 @@ class PrefixMemoryLoader(PrefixSubLoader):
             return Template(
                 env,
                 self._memory[subpath],
-                ":memory:{0}".format("/".join(fullpath))
+                ":memory:{0}".format("/".join(fullpath)),
+                self._allow_code
             )
 
         return None
@@ -400,5 +403,5 @@ class SearchPathLoader(PrefixLoader):
             path = [path]
 
         for part in path:
-            self.add_prefix("", PrefixPathLoader(part))
+            self.add_prefix("", PrefixPathLoader(part, allow_code=True))
 

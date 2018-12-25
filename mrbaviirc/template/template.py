@@ -51,13 +51,14 @@ class Template(object):
         {%- ... %}
     """
 
-    def __init__(self, env, text, filename):
+    def __init__(self, env, text, filename, allow_code=False):
         """ Initialize a template with context variables. """
         
         # Initialize
         self._env = env
         self._text = text
         self._filename = filename
+        self._allow_code = allow_code
 
         self._private = {}
         self._lock = threading.Lock()

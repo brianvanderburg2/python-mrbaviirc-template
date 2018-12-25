@@ -366,8 +366,8 @@ class CodeNode(Node):
     def render(self, renderer, scope):
         """ Actually do the work of including the template. """
 
-        # Check if allowed
-        if not self._env._code_enabled:
+        # Must be allowed globally in env and also locally in template
+        if not self._env._allow_code or not self._template._allow_code:
             raise TemplateError(
                 "Use of direct python code not allowed",
                 self._template._filename,

@@ -16,26 +16,24 @@ DATADIR = os.path.join(os.path.dirname(__file__), "template_data")
 
 def test_compare_unrestricted_loader():
     loader = UnrestrictedLoader()
-    env = Environment(loader=loader)
-    env.enable_code()
+    env = Environment(loader=loader, allow_code=True)
 
     do_test_compare(env, False)
 
 
 def test_compare_search_path_loader():
     loader = SearchPathLoader(DATADIR)
-    env = Environment(loader=loader)
-    env.enable_code()
+    env = Environment(loader=loader, allow_code=True)
 
     do_test_compare(env, True)
 
 
 def test_compare_prefix_loader():
     loader = PrefixLoader()
-    loader.add_prefix("", PrefixPathLoader(DATADIR))
+    loader.add_prefix("", PrefixPathLoader(DATADIR, allow_code=True))
 
     env = Environment(loader=loader)
-    env.enable_code()
+    env.allow_code()
 
     do_test_compare(env, True)
 
