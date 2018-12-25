@@ -5,8 +5,7 @@ __copyright__   = "Copyright 2016"
 __license__     = "Apache License 2.0"
 
 __all__ = ["Loader", "UnrestrictedLoader", "SearchPathLoader", "MemoryLoader",
-           "PrefixLoader", "PrefixSubLoader", "PrefixPathLoader", "PrefixMemoryLoader",
-           "DeprecatedSearchPathLoader" ]
+           "PrefixLoader", "PrefixSubLoader", "PrefixPathLoader", "PrefixMemoryLoader"]
 
 import os
 import posixpath
@@ -67,125 +66,9 @@ class UnrestrictedLoader(Loader):
             return self._cache[filename]
 
 
-class DeprecatedSearchPathLoader(Loader):
-    """ A loader that loads the template from the file system. """
-
-    def __init__(self, path):
-        """ Initialze the loader. """
-
-        Loader.__init__(self)
-
-        if not isinstance(path, (tuple, list)):
-            path = [path]
-
-        self._path = tuple(os.path.realpath(i) for i in path)
-        self._cache = {}
-        self._find_cache = {}
-
-    def load_template(self, env, filename, parent=None):
-        """ Load a template. """
-
-        if filename == ":next:":
-            if parent is None:
-                # :next: must be used from a found file, not directly by load_template
-                raise RestrictedError(":next: can only be included from an existing template.")
-
-            filename = parent._filename
-            search_index = parent._private["search_index"] + 1
-            cachename = ":@@{0}@@:{1}".format(search_index, filename)
-        else:
-            # Determine filename from parent
-            filename = posixpath.normpath(posixpath.join(
-                "/", # to make sure it's always absolute
-                posixpath.dirname(parent._filename) if parent else "/",
-                filename
-            ))
-            search_index = 0
-            cachename = filename
-
-        # Available from cache?
-        if cachename in self._cache:
-            return self._cache[cachename]
-
-        # Find the real file and load it
-        (index, realname) = self._find_template(filename, search_index)
-        with open(realname, "rU") as handle:
-            text = handle.read()
-
-        # Create the template item
-        result = Template(env, text, filename)
-        result._private["search_index"] = index
-
-        self._cache[cachename] = result
-        return result
-
-    def _find_template(self, filename, start=0):
-        """ Find a template along search path. """
-
-        filename = filename.lstrip("/").replace("/", os.sep)
-        cachename = ":@@{0}@@:{1}".format(start, filename)
-
-        if not self._path:
-            raise RestrictedError(
-                "Attempt to load template from empty search path: {0}".format(filename)
-            )
-
-        if cachename not in self._find_cache:
-            for (index, path) in enumerate(self._path[start:], start):
-                new_filename = os.path.realpath(os.path.join(path, filename))
-                if os.path.isfile(new_filename):
-                    self._find_cache[cachename] = (index, new_filename)
-                    break
-            else:
-                raise RestrictedError(
-                    "Template not found along search path: {0}".format(filename)
-                )
-
-        return self._find_cache[cachename]
-
-
-class MemoryLoader(Loader):
-    """ Load from memory. """
-
-    def __init__(self):
-        """ Initialize the loader. """
-        Loader.__init__(self);
-        self._cache = {}
-        self._memory = {}
-        self._lock = threading.Lock()
-
-    def add_template(self, name, contents):
-        """ Add an entry to the memory. """
-        self._memory[name] = contents
-
-    def load_template(self, env, filename, parent=None):
-        """ Load a template. """
-
-        # Determine filename from parent, if any
-        filename = posixpath.normpath(posixpath.join(
-            "/", # To make sure it's always absolute
-            posixpath.dirname(parent._filename) if parent else "/",
-            filename
-        ))
-
-        # Available in cache
-        with self._lock:
-            if filename in self._cache:
-                return self._cache[filename]
-
-            if not filename in self._memory:
-                raise RestrictedError(
-                    "Attempt to load non-existing template from memory: {0}".format(filename)
-                )
-
-            # Load the file
-            self._cache[filename] = Template(env, self._memory[filename], filename)
-            return self._cache[filename]
-
-
 class PrefixLoader(Loader):
     """ A loader that allows registering specific prefixes to map to certain
-        loaders.  Eventually this will replace SearchPathLoader. """
+        loaders. """
 
     def __init__(self):
         """ Initialize the loader. """
@@ -404,4 +287,18 @@ class SearchPathLoader(PrefixLoader):
 
         for part in path:
             self.add_prefix("", PrefixPathLoader(part, allow_code=True))
+
+
+class MemoryLoader(PrefixLoader):
+    """ Load from memory. """
+
+    def __init__(self):
+        """ Initialize the loader. """
+        Loader.__init__(self);
+        self._memory = PrefixMemoryLoader(allow_code=True)
+        self.add_prefix("", self._memory)
+
+    def add_template(self, name, contents):
+        """ Add an entry to the memory. """
+        self._memory.add_template(name, contents)
 
