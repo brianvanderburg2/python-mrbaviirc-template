@@ -14,11 +14,6 @@ import threading
 from .template import Template
 from .errors import *
 
-try:
-    from codecs import open
-except ImportError:
-    pass
-
 
 class Loader(object):
     """ A loader loads and caches templates. """
@@ -59,7 +54,7 @@ class UnrestrictedLoader(Loader):
                 return self._cache[filename]
 
             # Load and return
-            with open(filename, "rU") as handle:
+            with open(filename, "r", encoding="utf8", newline=None) as handle:
                 text = handle.read()
 
             self._cache[filename] = Template(env, text, filename, allow_code=True)
@@ -239,7 +234,7 @@ class PrefixPathLoader(PrefixSubLoader):
         )
 
         if os.path.isfile(filename):
-            with open(filename, "rU") as handle:
+            with open(filename, "r", encoding="utf8", newline=None) as handle:
                 text = handle.read()
 
             return Template(env, text, filename, self._allow_code)

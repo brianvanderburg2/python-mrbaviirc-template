@@ -9,8 +9,8 @@ import os
 import json
 import glob
 
-from ...template import UnrestrictedLoader, Environment, StdLib, StringRenderer
-from ...template import PrefixLoader, PrefixPathLoader, SearchPathLoader
+from mrbaviirc.template import UnrestrictedLoader, Environment, StdLib, StringRenderer
+from mrbaviirc.template import PrefixLoader, PrefixPathLoader, SearchPathLoader
 
 DATADIR = os.path.join(os.path.dirname(__file__), "template_data")
 
@@ -41,7 +41,7 @@ def test_compare_prefix_loader():
 def do_test_compare(env, search_path_loader):
     """ Run tests by applying template to input and comparing output. """
 
-    with open(os.path.join(DATADIR, "data.json"), "rU") as handle:
+    with open(os.path.join(DATADIR, "data.json"), "r", newline=None) as handle:
         data = json.load(handle)
 
     data["lib"] = StdLib()
@@ -56,7 +56,7 @@ def do_test_compare(env, search_path_loader):
         target = path[:-5] + ".txt"
         contents = rndr.get()
 
-        with open(target, "rU") as handle:
+        with open(target, "r", newline=None) as handle:
             target_contents = handle.read()
 
         assert contents == target_contents
@@ -71,7 +71,7 @@ def do_test_compare(env, search_path_loader):
             target = path[:-5] + "_" + section + ".txt"
             contents = rndr.get_section(section)
 
-            with open(target, "rU") as handle:
+            with open(target, "r", newline=None) as handle:
                 target_contents = handle.read()
 
             assert contents == target_contents
@@ -117,7 +117,7 @@ def do_test_search_path(loader):
     env = Environment(loader=loader)
 
 
-    with open(os.path.join(DATADIR, "data.json"), "rU") as handle:
+    with open(os.path.join(DATADIR, "data.json"), "r", newline=None) as handle:
         data = json.load(handle)
 
     data["lib"] = StdLib()
@@ -128,7 +128,7 @@ def do_test_search_path(loader):
 
     contents = rndr.get()
 
-    with open(target, "rU") as handle:
+    with open(target, "r", newline=None) as handle:
         target_contents = handle.read()
 
     assert contents == target_contents

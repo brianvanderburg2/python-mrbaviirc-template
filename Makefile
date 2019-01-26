@@ -4,37 +4,23 @@ export SHELLOPTS
 override DATE:=$(shell date -u "+%Y%m%d-%H%M")
 
 
-.PHONY: check
-check:
-
-.PHONY: test
-test: check
+OUTDIR=output
 
 .PHONY: clean
-clean: check
+clean:
 	rm -rf output
 	rm -rf mrbaviirc.egg-info
 	find -type f -name "*.py[co]" -delete
 	find -depth \( -path "*/__pycache__/*" -o -name __pycache__ \) -delete
 
-output: check
-	mkdir -p output
+.PHONY: outdir
+outdir: 
+	mkdir -p $(OUTDIR)
 
 .PHONY: tarball
 tarball: NAME:=mrbaviirc-$(shell git symbolic-ref --short HEAD)-$(shell date +%Y%m%d)-$(shell git describe --always)
 tarball: output
-	git archive --format=tar --prefix=$(NAME)/ HEAD | xz > output/$(NAME).tar.xz
+	git archive --format=tar --prefix=$(NAME)/ HEAD | xz > $(OUTDIR)$(NAME).tar.xz
 
-.PHONY: test
-test: output
-	python -B -m pytest
-	python3 -B -m pytest
-
-.PHONY: wheel
-wheel: output
-	python setup.py bdist_wheel
-
-.PHONY: dist
-dist: wheel
 
 

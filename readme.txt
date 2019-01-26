@@ -1,11 +1,11 @@
-mrbaviirc
-=========
+mrbaviirc.template
+==================
 
-A collection of reusable python code.
+A small template system for python
 
 Copyright
 =========
-Copyright 2012-2017 Brian Allen Vanderburg II
+Copyright 2012-2019 Brian Allen Vanderburg II
 
 License
 =======
