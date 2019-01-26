@@ -6,7 +6,7 @@ override DATE:=$(shell date -u "+%Y%m%d-%H%M")
 .PHONY: clean
 clean:
 	rm -rf output
-	rm -rf mrbaviirc.egg-info
+	rm -rf mrbaviirc*.egg-info
 	find -type f -name "*.py[co]" -delete
 	find -depth \( -path "*/__pycache__/*" -o -name __pycache__ \) -delete
 
