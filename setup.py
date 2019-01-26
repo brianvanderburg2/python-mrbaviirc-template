@@ -1,15 +1,15 @@
 #!/usr/bin/env python
 
-from setuptools import setup, find_packages
+from setuptools import setup, find_namespace_packages
 
 metadata = {}
-with open("mrbaviirc/_version.py") as handle:
+with open("mrbaviirc/template/_version.py") as handle:
     exec(handle.read(), metadata)
 
 setup(
-    name="mrbaviirc",
+    name="mrbaviirc.template",
     version=metadata["__version__"],
     description=metadata["__doc__"].strip(),
     author=metadata["__author__"],
-    packages=find_packages()
+    packages=find_namespace_packages()
 )
