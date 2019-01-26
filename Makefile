@@ -11,7 +11,7 @@ clean:
 	find -depth \( -path "*/__pycache__/*" -o -name __pycache__ \) -delete
 
 .PHONY: tarball
-tarball: NAME:=mrbaviirc-$(shell git symbolic-ref --short HEAD)-$(shell date +%Y%m%d)-$(shell git describe --always)
+tarball: NAME:=mrbaviirc-template-$(shell git symbolic-ref --short HEAD)-$(shell date +%Y%m%d)-$(shell git describe --always)
 tarball: OUTDIR:=./output
 tarball:
 	mkdir -p $(OUTDIR)
