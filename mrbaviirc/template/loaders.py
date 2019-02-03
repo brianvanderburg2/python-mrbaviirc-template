@@ -25,6 +25,9 @@ class Loader(object):
     def load_template(self, env, filename, parent=None):
         raise NotImplementedError
 
+    def fix_load_text(self, template):
+        return
+
 
 class UnrestrictedLoader(Loader):
     """ A loader that loads any template specified. """
@@ -165,6 +168,12 @@ class PrefixLoader(Loader):
                     "Template not found along prefix paths: {0}".format(filename)
                 )
 
+    def fix_load_text(self, template):
+        """ Perform fixup on directly loaded text templates. """
+        template._private["path"] = ("",) # Tuple representing empty filename in root
+        template._private["index"] = 0
+        template._private["normalized"] = {}
+
     def _normalize(self, filename, path):
         """ Normalize the path and return the path tuple """
 
@@ -204,9 +213,9 @@ class PrefixLoader(Loader):
 class PrefixSubLoader(object):
     """ A subloader added to a PrefixLoader. """
 
-    def __init__(self):
+    def __init__(self, allow_code=False):
         """ Initialize the loader. """
-        pass
+        self._allow_code = allow_code
 
     def load_template(self, env, subpath, fullpath):
         """ Load the template specified by the subpath. """
@@ -218,9 +227,8 @@ class PrefixPathLoader(PrefixSubLoader):
 
     def __init__(self, path, allow_code=False):
         """ Initialize the loader with a given path. """
-        PrefixSubLoader.__init__(self)
+        PrefixSubLoader.__init__(self, allow_code)
         self._path = os.path.realpath(path)
-        self._allow_code = allow_code
 
     def load_template(self, env, subpath, fullpath):
         """ Load a given template. """
@@ -245,11 +253,10 @@ class PrefixPathLoader(PrefixSubLoader):
 class PrefixMemoryLoader(PrefixSubLoader):
     """ Load from an in-memory template. """
 
-    def __init__(self):
+    def __init__(self, allow_code=False):
         """ Initialize the loader. """
-        PrefixSubLoader.__init__(self, allow_code=False)
+        PrefixSubLoader.__init__(self, allow_code)
         self._memory = {}
-        self._allow_code = allow_code
 
     def add_template(self, path, contents):
         """ Add a memory template. """

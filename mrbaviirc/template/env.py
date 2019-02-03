@@ -46,6 +46,14 @@ class Environment(object):
         """ Load a template from a file. """
         return self._loader.load_template(self, filename, parent)
 
+    def load_text(self, text, filename="", allow_code=False):
+        """ Load a template direct from text. """
+        template = Template(self, text, filename, allow_code)
+        self._loader.fix_load_text(template)
+        return template
+
+
+
     def load_import(self, name):
         """ Load a lib from an importer. """
 

@@ -134,3 +134,34 @@ def do_test_search_path(loader):
     assert contents == target_contents
 
 
+def test_load_text():
+    """ Test the search path loader. """
+    paths = [
+        os.path.join(DATADIR, "searchpath/1"),
+        os.path.join(DATADIR, "searchpath/2"),
+        os.path.join(DATADIR, "searchpath/3")
+    ]
+    loader = SearchPathLoader(paths)
+
+    target = os.path.join(DATADIR, "loadtext/output.txt")
+    env = Environment(loader=loader)
+
+    with open(os.path.join(DATADIR, "data.json"), "r", newline=None) as handle:
+        data = json.load(handle)
+
+    with open(os.path.join(DATADIR, "loadtext/main.tmpl"), "r", newline=None) as handle:
+        text = handle.read()
+
+    data["lib"] = StdLib()
+
+    tmpl = env.load_text(text, "loadtext/main.tmpl")
+    rndr = StringRenderer()
+    tmpl.render(rndr, data)
+
+    contents = rndr.get()
+
+    with open(target, "r", newline=None) as handle:
+        target_contents = handle.read()
+
+    assert contents == target_contents
+
