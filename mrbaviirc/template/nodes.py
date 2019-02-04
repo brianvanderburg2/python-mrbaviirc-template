@@ -257,7 +257,8 @@ class ReturnNode(Node):
         for (var, expr) in self._assigns:
             result[var] = expr.eval(scope)
 
-        scope.set(":return:", result, Scope.SCOPE_TEMPLATE)
+        current = scope._template.setdefault(":return:", {})
+        current.update(result)
 
 
 class ExpandNode(Node):
