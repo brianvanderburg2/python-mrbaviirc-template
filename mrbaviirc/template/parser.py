@@ -504,7 +504,6 @@ class TemplateParser(object):
         self._template = template
         self._text = text
         self._tokens = None
-        self._token = None
         
         # Stack and line number
         self._ops_stack = []
@@ -517,36 +516,79 @@ class TemplateParser(object):
         self._autostrip = self.AUTOSTRIP_NONE
         self._autostrip_stack = []
 
-    def _get_token(self, pos, errmsg="Expected token", start=None, end=None):
-        """ Get a token at a position, optionally checking bounds """
-        if start is None:
-            start = 0
-        if end is None:
-            end = len(self._tokens) - 1
+    def _get_token(self, pos, end, errmsg="Expected token"):
+        """ Get a token at a position, raise error if not found/out of bound """
 
-        if pos < start or pos > end:
+        if pos <= end:
+            return self._tokens[pos]
+        else:
             raise SyntaxError(
                 errmsg,
                 self._template._filename,
-                self._token._line if self._token else 0
+                self._tokens[pos - 1]._line if pos > 0 else 0
             )
 
-        self._token = self._tokens[pos]
-        return self._token
 
-    def _expect_token(self, token, type, errmsg="Unexpected token"):
-        if token._type != type:
-            raise SyntaxError(
-                errmsg,
-                self._template._filename,
-                token._line if token else 0
-            )
-
-    def _get_expected_token(self, pos, type, errmsg="Unexpected token"):
+    def _get_expected_token(self, pos, end, types, errmsg="Unexpected token", values=[]):
         """ Expect a specific type of token. """
-        token = self._get_token(pos)
-        self._expect_token(token, type, errmsg)
+
+        token = self._get_token(pos, end, errmsg)
+        if not isinstance(types, (list, tuple)):
+            types = [types]
+
+        if token._type not in types:
+            raise SyntaxError(
+                errmsg,
+                self._template._filename,
+                token._line
+            )
+
+        if token._type == token.TYPE_WORD:
+            if not isinstance(values, (list, tuple)):
+                values = [values]
+
+            if token._value not in values:
+                raise SyntaxError(
+                    errmsg,
+                    self._template._filename,
+                    token._line
+                )
+
         return token
+
+    def _get_no_more_tokens(self, pos, end, errmsg="Unexpected token"):
+        """ Expect the end of the range. """
+
+        if pos <= end:
+            raise SyntaxError(
+                errmsg,
+                self._template._filename,
+                self._tokens[pos]._line
+            )
+
+    def _get_token_var(self, pos, end, errmsg="Expected variable."):
+        """ Parse a variable and return var """
+
+        errpos = pos - 1
+        if pos <= end:
+            errpos = pos
+            token = self._tokens[pos]
+            if token._type == Token.TYPE_WORD:
+                if re.match("[a-zA-Z_][a-zA-Z0-9_]*", token._value):
+                    return token._value
+                else:
+                    raise SyntaxError(
+                        "Invalid variable name: {0}".format(token._value),
+                        self._template._filename,
+                        self._template._line
+                    )
+         
+        # If we got here, it wasn't a variable
+        raise SyntaxError(
+            errmsg,
+            self._template._filename,
+            self._tokens[errpos] if errpos > 0 else 0
+        )
 
     def _find_level0_token(self, start, end, token=None):
         """ Find a token at level 0 nesting. """
@@ -672,7 +714,7 @@ class TemplateParser(object):
         pre_ws_control = None
         pos = 0
         while pos < len(self._tokens):
-            token = self._token = self._tokens[pos]
+            token = self._tokens[pos]
 
             if token._type == Token.TYPE_TEXT:
                 self._buffer.append(token._value)
@@ -729,34 +771,11 @@ class TemplateParser(object):
 
         return self._nodes
 
-    def _parse_tag_ending(self, start, type):
-        """ Parse an expected tag ending. """
-
-        token = self._get_token(start, "Unclosed tag")
-        if not token._type == type:
-            raise SyntaxError(
-                "Unexpected close tag",
-                self._template._filename,
-                token._line
-            )
-
-        self._pre_ws_control = token._value
-
-        return start + 1
-
-
     def _parse_tag_action(self, start, end):
         """ Parse some action tag. """
         
-        if end < start:
-            raise SyntaxError(
-                "Empty action tag",
-                self._template._filename,
-                self._token._line
-            )
-
         # Determine the action
-        token = self._get_token(start, "Expected action")
+        token = self._get_token(start, end, "Expected action")
         action = token._value
         start += 1
         
@@ -827,8 +846,8 @@ class TemplateParser(object):
 
     def _parse_action_if(self, start, end):
         """ Parse an if action. """
-        line = self._token._line
         expr = self._parse_expr(start, end)
+        line = self._tokens[start]._line
         
         node = IfNode(self._template, line, expr)
         
@@ -838,8 +857,8 @@ class TemplateParser(object):
 
     def _parse_action_elif(self, start, end):
         """ Parse an elif action. """
-        line = self._token._line
         expr = self._parse_expr(start, end)
+        line = self._tokens[start]._line
 
         if not self._ops_stack:
             raise SyntaxError(
@@ -864,14 +883,9 @@ class TemplateParser(object):
     def _parse_action_else(self, start, end):
         """ Parse an else. """
 
-        if start <= end:
-            raise SyntaxError(
-                "Unexpected token",
-                self._template._filename,
-                self._tokens[start]._line
-            )
+        self._get_no_more_tokens(start, end)
+        line = self._tokens[start - 1]._line if start > 0 else 0
 
-        line = self._token._line
         if not self._ops_stack:
             raise SyntaxError(
                 "Mismatched else",
@@ -895,77 +909,59 @@ class TemplateParser(object):
 
     def _parse_action_break(self, start, end):
         """ Parse break. """
-        if start <= end:
-            raise SyntaxError(
-                "Unexpected token",
-                self._template._filename,
-                self._tokens[start]._line
-            )
-
-        line = self._token._line
+        
+        self._get_no_more_tokens(start, end)
+        line = self._tokens[start - 1]._line if start > 0 else 0
+        
         node = BreakNode(self._template, line)
         self._stack[-1].append(node)
 
     def _parse_action_continue(self, start, end):
-        if start <= end:
-            raise SyntaxError(
-                "Unexpected token",
-                self._template._filename,
-                self._tokens[start]._line
-            )
-
         """ Parse continue. """
-        line = self._token._line
+
+        self._get_no_more_tokens(start, end)
+        line = self._tokens[start - 1]._line if start > 0 else 0
+        
         node = ContinueNode(self._template, line)
         self._stack[-1].append(node)
 
         return start
 
     def _parse_action_for(self, start, end):
+        """ Parse a for statement. """
         # TODO: with new segments, support for <a>[,<b>] in expr and also
         # for init ; test ; step (init and step are multi-assign, test is expr)
         # Or, simplification, change for to foreach, both can still have else
         # foreach if there are no results, for if first test is false/no iterations
         # and break to break out of loop
 
-        """ Parse a for statement. """
-        line = self._token._line
-
-        var = self._parse_var(start, end)
+        var = self._get_token_var(start, end)
+        line = self._tokens[start]._line
         start += 1
 
-        if start <= end:
-            token = self._get_token(start, "Expected 'in'")
-            start += 1
-        else:
-            raise SyntaxError(
-                "Expected 'in' or ','",
-                self._template._filename,
-                self._token._line
-            )
+        token = self._get_expected_token(
+            start,
+            end,
+            [Token.TYPE_COMMA, Token.TYPE_WORD],
+            "Expected 'in' or ','",
+            "in"
+        )
+        start += 1
 
         cvar = None
         if token._type == Token.TYPE_COMMA:
 
-            cvar = self._parse_var(start, end)
+            cvar = self._get_token_var(start, end)
             start += 1
 
-            if start <= end:
-                token = self._get_token(start, "Expected 'in'")
-                start += 1
-            else:
-                raise SyntaxError(
-                    "Expected 'in' or ','",
-                    self._template._filename,
-                    self._token._line
-                )
-
-        if token._type != Token.TYPE_WORD or token._value != "in":
-            raise SyntaxError(
+            token = self._get_expected_token(
+                start,
+                end,
+                Token.TYPE_WORD,
                 "Expected 'in'",
-                self._template._filename,
-                token._line
+                "in"
             )
+            start += 1
 
         expr = self._parse_expr(start, end)
 
@@ -976,8 +972,8 @@ class TemplateParser(object):
 
     def _parse_action_switch(self, start, end):
         """ Parse a switch statement. """
-        line = self._token._line
         expr = self._parse_expr(start, end)
+        line = self._tokens[start]._line
 
         node = SwitchNode(self._template, line, expr)
         self._ops_stack.append(("switch", line))
@@ -986,7 +982,7 @@ class TemplateParser(object):
 
     def _parse_action_switch_item(self, start, end, item):
         """ Parse the switch item. """
-        line = self._token._line
+        line = self._tokens[start - 1]._line if start > 0 else 0
 
         if not self._ops_stack:
             raise SyntaxError(
@@ -1022,27 +1018,27 @@ class TemplateParser(object):
 
     def _parse_action_set(self, start, end, where):
         """ Parse a set statement. """
-        line = self._token._line
-
         assigns = self._parse_multi_assign(start, end)
+        line = self._tokens[start]._line
 
         node = AssignNode(self._template, line, assigns, where)
         self._stack[-1].append(node)
 
     def _parse_action_unset(self, start, end):
         """ Parse an unset statement. """
-        line = self._token._line
-
         varlist = self._parse_multi_var(start, end)
+        line = self._tokens[start]._line
 
         node = UnsetNode(self._template, line, varlist);
         self._stack[-1].append(node)
 
     def _parse_action_scope(self, start, end):
         """ Parse a scope statement. """
-        line = self._token._line
-
-        assigns = self._parse_multi_assign(start, Token.TYPE_END_ACTION)
+        line = self._tokens[start - 1]._line if start > 0 else 0
+        if start <= end:
+            assigns = self._parse_multi_assign(start, end)
+        else:
+            assigns = []
 
         node = ScopeNode(self._template, line, assigns)
         self._ops_stack.append(("scope", line))
@@ -1051,7 +1047,7 @@ class TemplateParser(object):
 
     def _parse_action_code(self, start, end):
         """ Parse a code node. """
-        line = self._token._line
+        line = self._tokens[start - 1]._line if start > 0 else 0
 
         # disable autostrip for this block
         self._autostrip_stack.append(self._autostrip)
@@ -1063,36 +1059,21 @@ class TemplateParser(object):
         for segment in segments:
             (start, end) = segment
 
-            token = self._get_token(start)
+            token = self._get_token(start, end)
             start += 1
 
             # expecting either return or with
             if token._type == Token.TYPE_WORD and token._value == "return":
-                retvar = self._parse_var(start, end)
+                retvar = self._get_token_var(start, end)
                 start += 1
 
-                if start <= end:
-                    raise SyntaxError(
-                        "Unexpected token",
-                        self._template._filename,
-                        self._tokens[start]._line
-                    )
-
+                self._get_no_more_tokens(start, end)
                 continue
 
             if token._type == Token.TYPE_WORD and token._value == "with":
-                if start <= end:
-                    assigns = self._parse_multi_assign(start, end)
-                    continue
-                else:
-                    raise SyntaxError(
-                        "Expecting assignment list",
-                        self._template._filename,
-                        self._token._line
-                    )
-
+                assigns = self._parse_multi_assign(start, end)
                 continue
-
+            
             raise SyntaxError(
                 "Unexpected token",
                 self._template._filename,
@@ -1107,7 +1088,7 @@ class TemplateParser(object):
 
     def _parse_action_include(self, start, end):
         """ Parse an include node. """
-        line = self._token._line
+        line = self._tokens[start - 1]._line if start > 0 else start
 
         retvar = None
         assigns = []
@@ -1115,33 +1096,19 @@ class TemplateParser(object):
         for segment in segments:
             (start, end) = segment
 
-            token = self._get_token(start)
+            token = self._get_token(start, end)
             start += 1
 
             # expecting either return or with
             if token._type == Token.TYPE_WORD and token._value == "return":
-                retvar = self._parse_var(start, end)
+                retvar = self._get_token_var(start, end)
                 start += 1
-                if start <= end:
-                    raise SyntaxError(
-                        "Unexpected token",
-                        self._template._filename,
-                        self._tokens[start]._line
-                    )
 
+                self._get_no_more_tokens(start, end)
                 continue
 
             if token._type == Token.TYPE_WORD and token._value == "with":
-                if start <= end:
-                    assigns = self._parse_multi_assign(start, end)
-                    continue
-                else:
-                    raise SyntaxError(
-                        "Expecting assignment list",
-                        self._template._filename,
-                        self._token._line
-                    )
-
+                assigns = self._parse_multi_assign(start, end)
                 continue
 
             # neither return or with, so expression
@@ -1154,27 +1121,24 @@ class TemplateParser(object):
 
     def _parse_action_return(self, start, end):
         """ Parse a return variable node. """
-        line = self._token._line
-
         assigns = self._parse_multi_assign(start, end)
+        line = self._tokens[start]._line
 
         node = ReturnNode(self._template, line, assigns)
         self._stack[-1].append(node)
 
     def _parse_action_expand(self, start, end):
         """ Parse an expand node. """
-        line = self._token._line
-
         expr = self._parse_expr(start, end)
+        line = self._tokens[start]._line
 
         node = ExpandNode(self._template, line, expr)
         self._stack[-1].append(node)
 
     def _parse_action_section(self, start, end):
         """ Parse a section node. """
-        line = self._token._line
-
         expr = self._parse_expr(start, end)
+        line = self._tokens[start]._line
 
         self._ops_stack.append(("section", line))
         node = SectionNode(self._template, line, expr)
@@ -1183,19 +1147,19 @@ class TemplateParser(object):
 
     def _parse_action_use(self, start, end):
         """ Parse a use section node. """
-        line = self._token._line
-
         expr = self._parse_expr(start, end)
+        line = self._tokens[start]._line
 
         node = UseSectionNode(self._template, line, expr)
         self._stack[-1].append(node)
 
     def _parse_action_var(self, start, end):
         """ Parse a block to store rendered output in a variable. """
-        line = self._token._line
+        var = self._get_token_var(start, end)
+        line = self._tokens[start]._line
+        start += 1
 
-        var = self._parse_var(start, end)
-        # TODO: check end = start - 1
+        self._get_no_more_tokens(start, end)
 
         node = VarNode(self._template, line, var)
         self._ops_stack.append(("var", line))
@@ -1204,30 +1168,32 @@ class TemplateParser(object):
 
     def _parse_action_error(self, start, end):
         """ Raise an error from the template. """
-        line = self._token._line
-
         expr = self._parse_expr(start, end)
+        line = self._tokens[start]._line
+
         node = ErrorNode(self._template, line, expr)
         self._stack[-1].append(node)
 
     def _parse_action_import(self, start, end):
         """ Parse an import action. """
-
         assigns = self._parse_multi_assign(start, end)
+        line = self._tokens[start]._line
 
-        node = ImportNode(self._template, self._token._line, assigns)
+        node = ImportNode(self._template, line, assigns)
         self._stack[-1].append(node)
 
     def _parse_action_do(self, start, end):
         """ Parse a do tag. """
-
         nodes = self._parse_multi_expr(start, end)
-        node = DoNode(self._template, self._token._line, nodes)
+        line = self._tokens[start]._line
+
+        node = DoNode(self._template, line, nodes)
         self._stack[-1].append(node)
 
     def _parse_action_end(self, start, end, action):
         """ Parse an end tag """
-        line = self._token._line
+        self._get_no_more_tokens(start, end)
+        line = self._tokens[start - 1]._line if start > 0 else 0
 
         if not self._ops_stack:
             raise SyntaxError(
@@ -1263,31 +1229,24 @@ class TemplateParser(object):
             self._autostrip = self._autostrip_stack.pop()
 
     def _parse_action_strip(self, start, end):
-        """ Push autostrip and change the state. """
-        line = self._token._line
+        """ Change the autostrip state. """
+        line = self._tokens[start - 1]._line if start > 0 else 0
 
         self._autostrip_stack.append(self._autostrip)
         self._ops_stack.append(("strip", line))
 
         if start <= end:
-            token = self._get_token(start, "Expected on, off, or trim")
+            token = self._get_expected_token(
+                start, 
+                end, 
+                Token.TYPE_WORD,
+                "Expected on, off, or trim",
+                ["on", "off", "trim"]
+            )
             start += 1
         else:
             # No change
-            return start
-
-        if token._type != Token.TYPE_WORD or not token._value in ("on", "off", "trim"):
-            raise SyntaxError(
-                "Expected on, off, or trim",
-                self._template._filename,
-                token._line
-            )
-        elif start <= end:
-            raise SyntaxError(
-                "Unexpected token",
-                self._template._filename,
-                slef._tokens[start]._line
-            )
+            return
 
         if token._value == "on":
             self._autostrip = self.AUTOSTRIP_STRIP
@@ -1298,17 +1257,14 @@ class TemplateParser(object):
 
     def _parse_tag_emitter(self, start, end):
         """ Parse an emitter tag. """
-        line = self._token._line
-
         expr = self._parse_expr(start, end)
+        line = self._tokens[start]._line
+
         if isinstance(expr, ValueExpr):
             node = TextNode(self._template, line, str(expr.eval(None)))
         else:
             node = EmitNode(self._template, line, expr)
         self._stack[-1].append(node)
-
-
-### RESUME FROM HERE ###
 
     def _parse_expr(self, start, end):
         """ Parse the expression. """
@@ -1460,7 +1416,7 @@ class TemplateParser(object):
 
         if token._type == Token.TYPE_WORD:
             # Variable
-            var = self._parse_var(start, end)
+            var = self._get_token_var(start, end)
             expr = VarExpr(self._template, token._line, var)
 
             if start < end:
@@ -1491,7 +1447,7 @@ class TemplateParser(object):
             if token._type == Token.TYPE_DOT:
                 start += 1
                 if start <= end:
-                    var = self._parse_var(start, end)
+                    var = self._get_token_var(start, end)
                     expr = LookupAttrExpr(self._template, token._line, expr, var)
                     start += 1
                     continue
@@ -1524,68 +1480,49 @@ class TemplateParser(object):
 
         return expr
 
-
-
-    def _parse_expr_old(self, start, end):
-        """ Parse an expression and return (node, pos) """
-
-        token = self._get_token(start)
-        if token._type in (Token.TYPE_STRING, Token.TYPE_FLOAT, Token.TYPE_INTEGER):
-            node = ValueExpr(self._template, token._line, token._value)
-            return (node, start + 1)
-
-        if token._type == Token.TYPE_OPEN_BRACKET:
-            return self._parse_expr_list(start + 1)
-
-        (var, pos) = self._parse_var(start)
-        next = self._get_token(pos)
-        if next._type == Token.TYPE_OPEN_PAREN:
-            (nodes, pos) = self._parse_multi_expr(pos + 1, Token.TYPE_CLOSE_PAREN)
-            pos += 1 # skip past ")"
-            node = FuncExpr(self._template, next._line, var, nodes)
-        elif next._type == Token.TYPE_OPEN_BRACKET:
-            (nodes, pos) = self._parse_multi_expr(pos + 1, Token.TYPE_CLOSE_BRACKET)
-            pos += 1 # skip past "]"
-            node = IndexExpr(self._template, next._line, var, nodes)
-        else:
-            node = VarExpr(self._template, token._line, var)
-          
-        return (node, pos)
-
     def _parse_expr_list(self, start, end):
         """ Pare an expression that's a list. """
-        nodes = self._parse_multi_expr(start, end)
+        line = self._tokens[start - 1]._line if start > 0 else 0
+        if start <= end:
+            nodes = self._parse_multi_expr(start, end)
+        else:
+            nodes = []
 
         if nodes and all(isinstance(node, ValueExpr) for node in nodes):
             node = ValueExpr(self._template, nodes[0]._line, [node.eval(None) for node in nodes])
         else:
-            node = ListExpr(self._template, self._token._line, nodes)
+            node = ListExpr(self._template, line, nodes)
         return node
 
     def _parse_multi_expr(self, start, end):
         """ Parse a list of expressions separated by comma. """
         items = []
 
-        pos = start
-        while pos <= end:
-            commapos = self._find_level0_token(pos, end, Token.TYPE_COMMA)
-            if commapos is not None:
-                items.append(self._parse_expr(pos, commapos - 1))
-                pos = commapos + 1
-            else:
-                items.append(self._parse_expr(pos, end))
-                pos = end + 1
+        if start <= end:
+            pos = start
+            while pos <= end:
+                commapos = self._find_level0_token(pos, end, Token.TYPE_COMMA)
+                if commapos is not None:
+                    items.append(self._parse_expr(pos, commapos - 1))
+                    pos = commapos + 1
+                else:
+                    items.append(self._parse_expr(pos, end))
+                    pos = end + 1
 
-        return items
+            return items
+        else:
+            raise SyntaxError(
+                "Expected expression list",
+                self._template._filename,
+                self._tokens[start - 1] if start > 0 else 0
+            )
 
     def _parse_assign(self, start, end):
         """ Parse a var = expr assignment, return (var, expr, pos) """
-        line = self._token._line
-
-        var = self._parse_var(start, end)
+        var = self._get_token_var(start, end)
         start += 1
 
-        token = self._get_expected_token(start, Token.TYPE_ASSIGN, "Expected '='")
+        token = self._get_expected_token(start, end, Token.TYPE_ASSIGN, "Expected '='")
         start += 1
 
         expr = self._parse_expr(start, end)
@@ -1596,102 +1533,48 @@ class TemplateParser(object):
         """ Parse multiple var = expr statemetns, return [(var, expr)] """
         assigns = []
 
-        pos = start
-        while pos <= end:
-            commapos = self._find_level0_token(pos, end, Token.TYPE_COMMA)
-            if commapos is not None:
-                assigns.append(self._parse_assign(pos, commapos - 1))
-                pos = commapos + 1
-            else:
-                assigns.append(self._parse_assign(pos, end))
-                pos = end + 1
-
-        return assigns
-
-
-    def _check_var(self, var):
-        """ Check that a variable is valid. """
-        if not re.match("[a-zA-Z_][a-zA-Z0-9_]*", part):
-            raise SyntaxError(
-                "Invalid variable name: {0}".format(token._value),
-                self._template._filename,
-                token._line
-            )
-
-    def _parse_var(self, pos, end):
-        """ Parse a variable and return var """
-
-        if pos <= end:
-            token = self._tokens[pos]
-            if token._type == Token.TYPE_WORD:
-                if re.match("[a-zA-Z_][a-zA-Z0-9_]*", token._value):
-                    return token._value
+        if start <= end:
+            pos = start
+            while pos <= end:
+                commapos = self._find_level0_token(pos, end, Token.TYPE_COMMA)
+                if commapos is not None:
+                    assigns.append(self._parse_assign(pos, commapos - 1))
+                    pos = commapos + 1
                 else:
-                    raise SyntaxError(
-                        "Invalid variable name: {0}".format(token._value),
-                        self._template._filename,
-                        self._template._line
-                    )
-         
-        # If we got here, it wasn't a variable
-        raise SyntaxError(
-            "Expected token",
-            self._template._filename,
-            self._template._line
-        )
-                
-        # Delete below
-        token = self._get_token(start, "Expected variable")
-        if not token._type == Token.TYPE_WORD:
+                    assigns.append(self._parse_assign(pos, end))
+                    pos = end + 1
+
+            return assigns
+        else:
             raise SyntaxError(
-                "Expected variable",
+                "Expected assignment list.",
                 self._template._filename,
-                token._line
+                self._tokens[start - 1]._line if start > 0 else 0
             )
-
-        # parts = token._value.split(".")
-        # if len(parts) > 1 and not allow_dots:
-        #    raise SyntaxError(
-        #        "Dotted variable not allowed",
-        #        self._template._filename,
-        #        token._line
-        #    )
-
-        #for part in parts:
-        #    if part[0:1] in ("@", "#"):
-        #        part = part[1:]
-        part = token._value
-
-        if not re.match("[a-zA-Z_][a-zA-Z0-9_]*", part):
-            raise SyntaxError(
-                "Invalid variable name: {0}".format(token._value),
-                self._template._filename,
-                token._line
-            )
-
-        #if allow_dots:
-        #    result = parts
-        #else:
-        #    result = parts[0]
-
-        #return (result, start + 1)
-        return part
 
     def _parse_multi_var(self, start, end):
         """ Parse multiple variables and return (varlist, pos)
             Note: Return pos points at ending token.
         """
-        varlist = []
-        while start <= end:
-            varlist.append(self._parse_var(start, end))
-            start += 1
 
-            if start <= end:
-                # More left, should have a comma
-                self._get_expect_token(start, Token.TYPE_COMMA)
+        if start <= end:
+            varlist = []
+            while start <= end:
+                varlist.append(self._get_token_var(start, end))
                 start += 1
 
-        return varlist
+                if start <= end:
+                    # More left, should have a comma
+                    self._get_expect_token(start, end, Token.TYPE_COMMA)
+                    start += 1
+
+            return varlist
+        else:
+            raise SyntaxError(
+                "Expected variable list",
+                self._template._filename,
+                self._tokens[start - 1] if start > 0 else 0
+            )
 
     def _flush_buffer(self, pre_ws_control, post_ws_control):
         """ Flush the buffer to output. """
@@ -1748,7 +1631,10 @@ class TemplateParser(object):
             text = text + " "
 
         if text:
-            node = TextNode(self._template, self._token._line, text)
+            # Use line 0 b/c we don't report errors on TextNodes
+            # Other solution would be to append the text tokens instead of
+            # values, then have access to the line
+            node = TextNode(self._template, 0, text)
             self._stack[-1].append(node)
 
         self._buffer = []
