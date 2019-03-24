@@ -5,7 +5,8 @@ __copyright__   = "Copyright 2016"
 __license__     = "Apache License 2.0"
 
 __all__ = [
-    "Expr", "ValueExpr", "FuncExpr", "ListExpr", "VarExpr", "IndexExpr"
+    "Expr", "ValueExpr", "FuncExpr", "ListExpr", "VarExpr", "IndexExpr",
+    "LookupAttrExpr", "LookupItemExpr"
 ]
 
 
@@ -41,24 +42,17 @@ class ValueExpr(Expr):
 class FuncExpr(Expr):
     """ A function expression node. """
 
-    def __init__(self, template, line, var, nodes):
+    def __init__(self, template, line, expr, nodes):
         """ Initialize the node. """
         Expr.__init__(self, template, line)
-        self._var = var
+        self._expr = expr
         self._nodes = nodes
 
     def eval(self, scope):
         """ Evaluate the expression. """
-        try:
-            fn = scope.get(self._var)
-            params = [node.eval(scope) for node in self._nodes]
-            return fn(*params)
-        except KeyError:
-            raise UnknownVariableError(
-                ".".join(self._var),
-                self._template._filename,
-                self._line
-            )
+        fn = self._expr.eval(scope)
+        params = [node.eval(scope) for node in self._nodes]
+        return fn(*params)
 
 
 class ListExpr(Expr):
@@ -88,7 +82,7 @@ class VarExpr(Expr):
             return scope.get(self._var)
         except KeyError:
             raise UnknownVariableError(
-                ".".join(self._var),
+                self._var,
                 self._template._filename,
                 self._line
             )
@@ -110,7 +104,7 @@ class IndexExpr(Expr):
             params = [node.eval(scope) for node in self._nodes]
         except KeyError:
             raise UnknownVariableError(
-                ".".join(self._var),
+                self._var,
                 self._template._filename,
                 self._line
             )
@@ -118,10 +112,10 @@ class IndexExpr(Expr):
         try:
             for param in params:
                 var = var[param]
-        except (TypeError, KeyError, IndexError):
+        except (TypeError, KeyError, IndexError, AttributeError):
             raise UnknownIndexError(
                 "{0}[{1}]".format(
-                    ".".join(self._var),
+                    self._var,
                     ",".join(map(str, params))
                 ),
                 self._template._filename,
@@ -129,4 +123,47 @@ class IndexExpr(Expr):
             )
 
         return var
+
+class LookupAttrExpr(Expr):
+    """ An array index expression node. """
+
+    def __init__(self, template, line, expr, attr):
+        """ Initialize the node. """
+        Expr.__init__(self, template, line)
+        self._expr = expr
+        self._attr = attr
+
+    def eval(self, scope):
+        """ Evaluate the expression. """
+        result = self._expr.eval(scope)
+        try:
+            return getattr(result, self._attr)
+        except (TypeError, KeyError, IndexError, AttributeError):
+            raise UnknownVariableError(
+                self._attr,
+                self._template._filename,
+                self._line
+            )
+
+class LookupItemExpr(Expr):
+    """ An array index expression node. """
+
+    def __init__(self, template, line, expr, item):
+        """ Initialize the node. """
+        Expr.__init__(self, template, line)
+        self._expr = expr
+        self._item = item
+
+    def eval(self, scope):
+        """ Evaluate the expression. """
+        result = self._expr.eval(scope)
+        item = self._item.eval(scope)
+        try:
+            return result[item]
+        except (KeyError, IndexError, TypeError):
+            raise UnknownIndexError(
+                item,
+                self._template._filename,
+                self._line
+            )
 

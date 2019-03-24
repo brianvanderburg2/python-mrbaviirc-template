@@ -1,5 +1,5 @@
-{% set i1 = nested.item1, i2 = people %}
+{% set i1 = nested["item1"], i2 = people %}
 {{ i1 }}
 {% for i in i2 %}
-{{ i.name }}
+{{ i["name"] }}
 {% endfor %}
