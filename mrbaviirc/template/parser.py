@@ -529,7 +529,7 @@ class TemplateParser(object):
             )
 
 
-    def _get_expected_token(self, pos, end, types, errmsg="Unexpected token", values=[]):
+    def _get_expected_token(self, pos, end, types, errmsg="Unexpected token", values=None):
         """ Expect a specific type of token. """
 
         token = self._get_token(pos, end, errmsg)
@@ -543,7 +543,7 @@ class TemplateParser(object):
                 token._line
             )
 
-        if token._type == token.TYPE_WORD:
+        if token._type == token.TYPE_WORD and values is not None:
             if not isinstance(values, (list, tuple)):
                 values = [values]
 
@@ -569,25 +569,21 @@ class TemplateParser(object):
     def _get_token_var(self, pos, end, errmsg="Expected variable."):
         """ Parse a variable and return var """
 
-        errpos = pos - 1
-        if pos <= end:
-            errpos = pos
-            token = self._tokens[pos]
-            if token._type == Token.TYPE_WORD:
-                if re.match("[a-zA-Z_][a-zA-Z0-9_]*", token._value):
-                    return token._value
-                else:
-                    raise SyntaxError(
-                        "Invalid variable name: {0}".format(token._value),
-                        self._template._filename,
-                        self._template._line
-                    )
+        token = self._get_expected_token(pos, end, Token.TYPE_WORD, errmsg)
+        if re.match("[a-zA-Z_][a-zA-Z0-9_]*", token._value):
+            return token._value
+        else:
+            raise SyntaxError(
+                "Invalid variable name: {0}".format(token._value),
+                self._template._filename,
+                token._line
+            )
          
         # If we got here, it wasn't a variable
         raise SyntaxError(
             errmsg,
             self._template._filename,
-            self._tokens[errpos] if errpos > 0 else 0
+            token._line
         )
 
     def _find_level0_token(self, start, end, token=None):
