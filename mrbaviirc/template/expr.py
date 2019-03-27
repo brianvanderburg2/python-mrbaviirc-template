@@ -6,7 +6,8 @@ __license__     = "Apache License 2.0"
 
 __all__ = [
     "Expr", "ValueExpr", "FuncExpr", "ListExpr", "VarExpr", "IndexExpr",
-    "LookupAttrExpr", "LookupItemExpr"
+    "LookupAttrExpr", "LookupItemExpr", "BooleanBinaryExpr", "BinaryExpr",
+    "BooleanUnaryExpr", "UnaryExpr"
 ]
 
 
@@ -90,6 +91,7 @@ class VarExpr(Expr):
 
 class IndexExpr(Expr):
     """ An array index expression node. """
+    # TODO: To be removed, replaced with LookupItemExpr
 
     def __init__(self, template, line, var, nodes):
         """ Initialize the node. """
@@ -124,6 +126,7 @@ class IndexExpr(Expr):
 
         return var
 
+
 class LookupAttrExpr(Expr):
     """ An array index expression node. """
 
@@ -144,6 +147,7 @@ class LookupAttrExpr(Expr):
                 self._template._filename,
                 self._line
             )
+
 
 class LookupItemExpr(Expr):
     """ An array index expression node. """
@@ -166,4 +170,68 @@ class LookupItemExpr(Expr):
                 self._template._filename,
                 self._line
             )
+
+
+class BooleanBinaryExpr(Expr):
+    """ Return boolean binary operation of two expressions. """
+    def __init__(self, template, line, oper, expr1, expr2):
+        """ Initialize the node. """
+        Expr.__init__(self, template, line)
+        self._oper = oper
+        self._expr1 = expr1
+        self._expr2 = expr2
+
+    def eval(self, scope):
+        """ Evaluate the expression. """
+
+        return bool(self._oper(
+            self._expr1.eval(scope),
+            self._expr2.eval(scope)
+        ))
+
+
+class BinaryExpr(Expr):
+    """ Return binary operation of two expressions. """
+    def __init__(self, template, line, oper, expr1, expr2):
+        """ Initialize the node. """
+        Expr.__init__(self, template, line)
+        self._oper = oper
+        self._expr1 = expr1
+        self._expr2 = expr2
+
+    def eval(self, scope):
+        """ Evaluate the expression. """
+
+        return self._oper(
+            self._expr1.eval(scope),
+            self._expr2.eval(scope)
+        )
+
+
+class BooleanUnaryExpr(Expr):
+    """ Return boolean binary operation of two expressions. """
+    def __init__(self, template, line, oper, expr1):
+        """ Initialize the node. """
+        Expr.__init__(self, template, line)
+        self._oper = oper
+        self._expr1 = expr1
+
+    def eval(self, scope):
+        """ Evaluate the expression. """
+
+        return bool(self._oper(self._expr1.eval(scope)))
+
+
+class UnaryExpr(Expr):
+    """ Return binary operation of two expressions. """
+    def __init__(self, template, line, oper, expr1):
+        """ Initialize the node. """
+        Expr.__init__(self, template, line)
+        self._oper = oper
+        self._expr1 = expr1
+
+    def eval(self, scope):
+        """ Evaluate the expression. """
+
+        return self._oper(self._expr1.eval(scope))
 

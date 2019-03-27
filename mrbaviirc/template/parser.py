@@ -6,6 +6,7 @@ __license__     = "Apache License 2.0"
 
 
 import re
+import operator
 
 
 from .errors import *
@@ -49,6 +50,7 @@ class Token(object):
     TYPE_SEMICOLON      = 32
     TYPE_AND            = 33
     TYPE_OR             = 34
+    TYPE_FLOORDIV       = 35
 
     WS_NONE = 0
     WS_TRIMTONL = 1
@@ -278,15 +280,20 @@ class Tokenizer(object):
             # *
             if ch == "*":
                 if self._text[pos + 1:pos + 3] not in ("#}", "%}", "}}"):
-                    self._tokens.append(Token(Token.TYPE_MINUS, self._line))
+                    self._tokens.append(Token(Token.TYPE_MULTIPLY, self._line))
                     pos += 1
                     continue
 
-            # /
+            # / and //
             if ch == "/":
-                self._tokens.append(Token(Token.TYPE_DIVIDE, self._line))
-                pos += 1
-                continue
+                if self._text[pos + 1:pos + 2] == "/":
+                    self._tokens.append(Token(Token.TYPE_FLOORDIV, self._line))
+                    pos += 2
+                    continue
+                else:
+                    self._tokens.append(Token(Token.TYPE_DIVIDE, self._line))
+                    pos += 1
+                    continue
 
             # %
             if ch == "%":
@@ -297,7 +304,7 @@ class Tokenizer(object):
 
             # > and >=
             if ch == ">":
-                if self._text[pos + 1, pos + 2] == "=":
+                if self._text[pos + 1:pos + 2] == "=":
                     self._tokens.append(Token(Token.TYPE_GREATER_EQUAL, self._line))
                     pos += 2
                     continue
@@ -306,14 +313,10 @@ class Tokenizer(object):
                     pos += 1
                     continue
 
-            # < and <= and <>
+            # < and <=
             if ch == "<":
                 if self._text[pos + 1:pos + 2] == "=":
                     self._tokens.append(Token(Token.TYPE_LESS_EQUAL, self._line))
-                    pos += 2
-                    continue
-                elif self._text[pos + 1:pos + 2] == ">":
-                    self._tokens.append(Token(Token.TYPE_NOT_EQUAL, self._line))
                     pos += 2
                     continue
                 else:
@@ -337,10 +340,27 @@ class Tokenizer(object):
                     pos += 1
                     continue
 
-            # !
-            if self._text[pos:pos + 3] == "!":
-                self._tokens.append(Token(Token.TYPE_NOT, self._line))
-                pos += 1
+            # ! and !=
+            if ch == "!":
+                if self._text[pos + 1:pos + 2] == "=":
+                    self._tokens.append(Token(Token.TYPE_NOT_EQUAL, self._line))
+                    pos += 2
+                    continue
+                else:
+                    self._tokens.append(Token(Token.TYPE_NOT, self._line))
+                    pos += 1
+                    continue
+
+            # &&
+            if self._text[pos:pos + 2] == "&&":
+                self._tokens.append(Token(Token.TYPE_AND, self._line))
+                pos += 2
+                continue
+
+            # ||
+            if self._text[pos:pos + 2] == "||":
+                self._tokens.append(Token(Token.TYPE_OR, self._line))
+                pos += 2
                 continue
 
             # <number>
@@ -1293,9 +1313,11 @@ class TemplateParser(object):
                     token._line
                 )
 
-            if token._type in (Token.TYPE_MULTIPLY, Token.TYPE_DIVIDE, Token.TYPE_MODULUS):
-                if muldivmod is None:
-                    muldivmod = pos
+            if token._type in (
+                    Token.TYPE_MULTIPLY, Token.TYPE_DIVIDE,
+                    Token.TYPE_FLOORDIV, Token.TYPE_MODULUS
+            ):
+                muldivmod = pos
                 pos += 1
                 continue
 
@@ -1308,7 +1330,8 @@ class TemplateParser(object):
                     lasttoken = self._tokens[pos - 1]
                     if lasttoken._type in (
                         Token.TYPE_ASSIGN, Token.TYPE_PLUS, Token.TYPE_MINUS,
-                        Token.TYPE_MULTIPLE, Token.TYPE_DIVIDE, Token.TYPE_MODULUS,
+                        Token.TYPE_MULTIPLY, Token.TYPE_DIVIDE,
+                        Token.TYPE_FLOORDIV, Token.TYPE_MODULUS,
                         Token.TYPE_EQUAL, Token.TYPE_NOT_EQUAL,
                         Token.TYPE_GREATER, Token.TYPE_GREATER_EQUAL,
                         Token.TYPE_LESS, Token.TYPE_LESS_EQUAL,
@@ -1329,14 +1352,12 @@ class TemplateParser(object):
                 Token.TYPE_GREATER, Token.TYPE_GREATER_EQUAL,
                 Token.TYPE_LESS, Token.TYPE_LESS_EQUAL
             ):
-                if compare is None:
-                    compare = pos
+                compare = pos
                 pos +=1
                 continue
 
             if token._type in (Token.TYPE_AND, Token.TYPE_OR):
-                if andor is None:
-                    andor = pos
+                andor = pos
                 pos += 1
                 continue
 
@@ -1353,47 +1374,141 @@ class TemplateParser(object):
         # Now we handle things based on what we found
 
         # Split on and/or first
-        #if andor is not None:
-        #    expr1 = self._parse_expr(start, andor - 1)
-        #    expr2 = self._parse_expr(andor + 1, end)
-        #    # TODO: create andor node
+        if andor is not None:
+            token = self._tokens[andor]
+            expr1 = self._parse_expr(start, andor - 1)
+            expr2 = self._parse_expr(andor + 1, end)
+
+            if token._type == Token.TYPE_AND:
+                oper = lambda a, b: a and b
+            else:
+                oper = lambda a, b: a or b
+
+            return BooleanBinaryExpr(
+                self._template._filename,
+                token._line,
+                oper,
+                expr1,
+                expr2
+            )
 
         # Split on comparison next
-        #if compare is not None
-        #    expr1 = self._parse_expr(start, compare - 1)
-        #   expr2 = self._parse_expr(compare + 1, end)
+        if compare is not None:
+            token = self._tokens[compare]
+            expr1 = self._parse_expr(start, compare - 1)
+            expr2 = self._parse_expr(compare + 1, end)
+
+            if token._type == Token.TYPE_EQUAL:
+                oper = operator.eq
+            elif token._type == Token.TYPE_NOT_EQUAL:
+                oper = operator.ne
+            elif token._type == Token.TYPE_GREATER:
+                oper = operator.gt
+            elif token._type == Token.TYPE_GREATER_EQUAL:
+                oper = operator.ge
+            elif token._type == Token.TYPE_LESS:
+                oper = operator.lt
+            elif token._type == Token.TYPE_LESS_EQUAL:
+                oper = operator.le
+
+            return BooleanBinaryExpr(
+                self._template._filename,
+                token._line,
+                oper,
+                expr1,
+                expr2
+            )
 
         # Add/sub next
-        #if addsub is not None
-        #    expr1 = self._parse_expr(start, addsub - 1)
-        #    expr2 = self._parse_expr(addsub + 1, end)
+        if addsub is not None:
+            token = self._tokens[addsub]
+            expr1 = self._parse_expr(start, addsub - 1)
+            expr2 = self._parse_expr(addsub + 1, end)
+
+            if token._type == Token.TYPE_PLUS:
+                oper = operator.add
+            else:
+                oper = operator.sub
+
+            return BinaryExpr(
+                self._template._filename,
+                token._line,
+                oper,
+                expr1,
+                expr2
+            )
 
         # Mul/div/mod next
-        # ...
+        if muldivmod is not None:
+            token = self._tokens[muldivmod]
+            expr1 = self._parse_expr(start, muldivmod - 1)
+            expr2 = self._parse_expr(muldivmod + 1, end)
+
+            if token._type == Token.TYPE_MULTIPLY:
+                oper = operator.mul
+            elif token._type == Token.TYPE_DIVIDE:
+                oper = operator.truediv
+            elif token._type == Token.TYPE_FLOORDIV:
+                oper = operator.floordiv
+            else:
+                oper = operator.mod
+
+            return BinaryExpr(
+                self._template._filename,
+                token._line,
+                oper,
+                expr1,
+                expr2
+            )
 
         # At this point, no more binary operators
 
         # Not
-        # if nott is not None
-        #   if nott == start
-        #       ...
-        #   else
-        #       raise expection
+        if nott is not None:
+            token = self._tokens[nott]
+            if nott == start:
+                return BooleanUnaryExpr(
+                    self._template._filename,
+                    token._line,
+                    lambda a: not a,
+                    self._parse_expr(nott + 1, end)
+                )
+            else:
+                raise SyntaxError(
+                    "Unexpected token: !",
+                    self._template._filename,
+                    token._line
+                )
 
-        # Pos/neg
-        # if posneg is not None:
-        #   if posnext == start
-        #       ...
-        #   else
-        #       raise expection
-
+        # Posneg
+        if posneg is not None:
+            token = self._tokens[posneg]
+            if posneg == start:
+                if token._type == Token.TYPE_PLUS:
+                    return self._parse_expr(posneg + 1, end)
+                else:
+                    return UnaryExpr(
+                        self._template._filename,
+                        token._line,
+                        lambda a: -a,
+                        self._parse_expr(posneg + 1, end)
+                    )
+            else:
+                raise SyntaxError(
+                    "Unexpected token: {0}".format(
+                        "+" if token._type == Token.TYPE_PLUS else "-"
+                    ),
+                    self._template._filename,
+                    token._line
+                )
+                
         # Check what we have at the start
         token = self._tokens[start]
 
         if token._type == Token.TYPE_OPEN_PAREN:
             # Find closing paren, treat all as expression
             closing = self._find_level0_closing(start, end)
-            expr = self._parse_expression(start + 1, closing - 1)
+            expr = self._parse_expr(start + 1, closing - 1)
 
             if closing < end:
                 expr = self._parse_continuation(expr, closing + 1, end)
@@ -1456,7 +1571,10 @@ class TemplateParser(object):
 
             if token._type == Token.TYPE_OPEN_PAREN:
                 closing = self._find_level0_closing(start, end)
-                exprs = self._parse_multi_expr(start + 1, closing - 1)
+                if start < closing - 1:
+                    exprs = self._parse_multi_expr(start + 1, closing - 1)
+                else:
+                    exprs = []
                 expr = FuncExpr(self._template, token._line, expr, exprs)
                 start = closing + 1
                 continue
