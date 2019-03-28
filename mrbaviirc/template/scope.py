@@ -67,7 +67,7 @@ class Scope(object):
         self._private.clear()
 
     def get(self, var):
-        """ Get a dotted variable. """
+        """ Get a variable. """
 
         # Find the scope dict it is in
         cur = self
@@ -75,11 +75,11 @@ class Scope(object):
 
         while cur is not None:
             # Try private scope first
-            if cur is self and var[0] in cur._private:
+            if cur is self and var in cur._private:
                 found = cur._private
                 break
 
-            if var[0] in cur._local:
+            if var in cur._local:
                 found = cur._local
                 break
 
@@ -87,9 +87,12 @@ class Scope(object):
             cur = cur._parent
 
         if found is None:
-            raise KeyError(var[0])
+            raise KeyError(var)
+
+        return found[var]
 
         # Solve dotted variables
+        # TODO: delete below
         value = found[var[0]]
         for dot in var[1:]:
 

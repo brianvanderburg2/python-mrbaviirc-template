@@ -2,5 +2,5 @@
 {{ v1 }}
 {{ v2 }}
 About to include.
-{% include "include_1.inc" with v2 = "Value 3" %}
+{% include "include_1.inc" ; with v2 = "Value 3" %}
 {% for var in ["include_1.inc"] %}{% include var %}{% endfor %}
