@@ -1,8 +1,8 @@
 """ A parser for the template engine. """
 
-__author__      = "Brian Allen Vanderburg II"
-__copyright__   = "Copyright 2016"
-__license__     = "Apache License 2.0"
+__author__ = "Brian Allen Vanderburg II"
+__copyright__ = "Copyright 2016"
+__license__ = "Apache License 2.0"
 
 
 import re
@@ -17,46 +17,50 @@ from .scope import *
 
 class Token(object):
     """ Represent a token. """
-    TYPE_TEXT           = 1
-    TYPE_START_COMMENT  = 2
-    TYPE_END_COMMENT    = 3
-    TYPE_START_ACTION   = 4
-    TYPE_END_ACTION     = 5
-    TYPE_START_EMITTER  = 6
-    TYPE_END_EMITTER    = 7
-    TYPE_STRING         = 8
-    TYPE_INTEGER        = 9
-    TYPE_FLOAT          = 10
-    TYPE_OPEN_BRACKET   = 11
-    TYPE_CLOSE_BRACKET  = 12
-    TYPE_OPEN_PAREN     = 13
-    TYPE_CLOSE_PAREN    = 14
-    TYPE_COMMA          = 15
-    TYPE_ASSIGN         = 16
-    TYPE_PLUS           = 17
-    TYPE_MINUS          = 18
-    TYPE_MULTIPLY       = 19
-    TYPE_DIVIDE         = 20
-    TYPE_MODULUS        = 21
-    TYPE_EQUAL          = 22
-    TYPE_GREATER        = 23
-    TYPE_GREATER_EQUAL  = 24
-    TYPE_LESS           = 25
-    TYPE_LESS_EQUAL     = 26
-    TYPE_NOT_EQUAL      = 27
-    TYPE_DOT            = 29
-    TYPE_NOT            = 30
-    TYPE_WORD           = 31
-    TYPE_SEMICOLON      = 32
-    TYPE_AND            = 33
-    TYPE_OR             = 34
-    TYPE_FLOORDIV       = 35
+    (
+        TYPE_TEXT,
+        TYPE_START_COMMENT,
+        TYPE_END_COMMENT,
+        TYPE_START_ACTION,
+        TYPE_END_ACTION,
+        TYPE_START_EMITTER,
+        TYPE_END_EMITTER,
+        TYPE_STRING,
+        TYPE_INTEGER,
+        TYPE_FLOAT,
+        TYPE_OPEN_BRACKET,
+        TYPE_CLOSE_BRACKET,
+        TYPE_OPEN_PAREN,
+        TYPE_CLOSE_PAREN,
+        TYPE_COMMA,
+        TYPE_ASSIGN,
+        TYPE_PLUS,
+        TYPE_MINUS,
+        TYPE_MULTIPLY,
+        TYPE_DIVIDE,
+        TYPE_MODULUS,
+        TYPE_EQUAL,
+        TYPE_GREATER,
+        TYPE_GREATER_EQUAL,
+        TYPE_LESS,
+        TYPE_LESS_EQUAL,
+        TYPE_NOT_EQUAL,
+        TYPE_DOT,
+        TYPE_NOT,
+        TYPE_WORD,
+        TYPE_SEMICOLON,
+        TYPE_AND,
+        TYPE_OR,
+        TYPE_FLOORDIV
+    ) = range(34)
 
-    WS_NONE = 0
-    WS_TRIMTONL = 1
-    WS_TRIMTONL_PRESERVENL = 2
-    WS_ADDNL = 3
-    WS_ADDSP = 4
+    (
+        WS_NONE,
+        WS_TRIMTONL,
+        WS_TRIMTONL_PRESERVENL,
+        WS_ADDNL,
+        WS_ADDSP
+    ) = range(5)
 
     def __init__(self, type, line, value=None):
         """ Initialize a token. """
@@ -67,9 +71,9 @@ class Token(object):
 
 class Tokenizer(object):
     """ Parse text into some tokens. """
-    MODE_TEXT       = 1
-    MODE_COMMENT    = 2
-    MODE_OTHER      = 3
+    MODE_TEXT = 1
+    MODE_COMMENT = 2
+    MODE_OTHER = 3
 
     _alpha = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
     _digit = "0123456789"
@@ -142,7 +146,6 @@ class Tokenizer(object):
                 break
 
             # Skip non-tags to allow literal text to contain {
-                
             pos += 2
             continue
 
@@ -259,7 +262,7 @@ class Tokenizer(object):
 
             # + and +<number>
             if ch == "+":
-                if self._text[pos + 1:pos + 2] in (self._digit + "."):
+                if self._text[pos + 1:pos + 2] in self._digit + ".":
                     pos = self._parse_number(pos)
                     continue
                 elif self._text[pos + 1:pos + 3] not in ("#}", "%}", "}}"):
@@ -269,7 +272,7 @@ class Tokenizer(object):
             
             # - and -<number>
             if ch == "-":
-                if self._text[pos + 1:pos + 2] in (self._digit + "."):
+                if self._text[pos + 1:pos + 2] in self._digit + ".":
                     pos = self._parse_number(pos)
                     continue
                 elif self._text[pos + 1:pos + 3] not in ("#}", "%}", "}}"):
@@ -417,6 +420,7 @@ class Tokenizer(object):
         elif self._text[start] == "+":
             start += 1
 
+        pos = start
         for pos in range(start, len(self._text)):
             ch = self._text[pos]
 
@@ -449,6 +453,7 @@ class Tokenizer(object):
         escaped = False
         result = []
         end = False
+        pos = start + 1
         for pos in range(start + 1, len(self._text)): # Skip opening quote
             ch = self._text[pos]
 
@@ -486,6 +491,7 @@ class Tokenizer(object):
     def _parse_word(self, start):
         """ Parse a word. """
         result = []
+        pos = start
         for pos in range(start, len(self._text)):
             ch = self._text[pos]
 
@@ -1045,7 +1051,7 @@ class TemplateParser(object):
         varlist = self._parse_multi_var(start, end)
         line = self._tokens[start]._line
 
-        node = UnsetNode(self._template, line, varlist);
+        node = UnsetNode(self._template, line, varlist)
         self._stack[-1].append(node)
 
     def _parse_action_scope(self, start, end):
@@ -1285,7 +1291,6 @@ class TemplateParser(object):
     def _parse_expr(self, start, end):
         """ Parse the expression. """
         
-        #fgopen = fgclose = None
         addsub = None
         muldivmod = None
         posneg = None
@@ -1329,13 +1334,13 @@ class TemplateParser(object):
                 else:
                     lasttoken = self._tokens[pos - 1]
                     if lasttoken._type in (
-                        Token.TYPE_ASSIGN, Token.TYPE_PLUS, Token.TYPE_MINUS,
-                        Token.TYPE_MULTIPLY, Token.TYPE_DIVIDE,
-                        Token.TYPE_FLOORDIV, Token.TYPE_MODULUS,
-                        Token.TYPE_EQUAL, Token.TYPE_NOT_EQUAL,
-                        Token.TYPE_GREATER, Token.TYPE_GREATER_EQUAL,
-                        Token.TYPE_LESS, Token.TYPE_LESS_EQUAL,
-                        Token.TYPE_NOT
+                            Token.TYPE_ASSIGN, Token.TYPE_PLUS, Token.TYPE_MINUS,
+                            Token.TYPE_MULTIPLY, Token.TYPE_DIVIDE,
+                            Token.TYPE_FLOORDIV, Token.TYPE_MODULUS,
+                            Token.TYPE_EQUAL, Token.TYPE_NOT_EQUAL,
+                            Token.TYPE_GREATER, Token.TYPE_GREATER_EQUAL,
+                            Token.TYPE_LESS, Token.TYPE_LESS_EQUAL,
+                            Token.TYPE_NOT
                     ):
                         # After any of those, it is positive or negative
                         if posneg is None:
@@ -1344,16 +1349,16 @@ class TemplateParser(object):
                         # Else, it is addition and subtraction
                         # Keep track of last one for correct order
                         addsub = pos
-                pos +=1
+                pos += 1
                 continue
 
             if token._type in (
-                Token.TYPE_EQUAL, Token.TYPE_NOT_EQUAL,
-                Token.TYPE_GREATER, Token.TYPE_GREATER_EQUAL,
-                Token.TYPE_LESS, Token.TYPE_LESS_EQUAL
+                    Token.TYPE_EQUAL, Token.TYPE_NOT_EQUAL,
+                    Token.TYPE_GREATER, Token.TYPE_GREATER_EQUAL,
+                    Token.TYPE_LESS, Token.TYPE_LESS_EQUAL
             ):
                 compare = pos
-                pos +=1
+                pos += 1
                 continue
 
             if token._type in (Token.TYPE_AND, Token.TYPE_OR):
