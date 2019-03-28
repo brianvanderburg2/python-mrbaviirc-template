@@ -75,18 +75,10 @@ class Tokenizer(object):
     MODE_COMMENT = 2
     MODE_OTHER = 3
 
-    _alpha = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    _digit = "0123456789"
+    ALPHA = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    DIGIT = "0123456789"
 
-    _symbol_map = {
-        "[": Token.TYPE_OPEN_BRACKET,
-        "]": Token.TYPE_CLOSE_BRACKET,
-        "(": Token.TYPE_OPEN_PAREN,
-        ")": Token.TYPE_CLOSE_PAREN,
-        ",": Token.TYPE_COMMA,
-    }
-
-    _tag_map = {
+    TAG_MAP = {
         "{#": Token.TYPE_START_COMMENT,
         "{%": Token.TYPE_START_ACTION,
         "{{": Token.TYPE_START_EMITTER,
@@ -95,7 +87,7 @@ class Tokenizer(object):
         "}}": Token.TYPE_END_EMITTER
     }
 
-    _ws_map = {
+    WS_MAP = {
         "-": Token.WS_TRIMTONL,
         "^": Token.WS_TRIMTONL_PRESERVENL,
         "+": Token.WS_ADDNL,
@@ -142,7 +134,7 @@ class Tokenizer(object):
 
             tag = self._text[pos:pos + 2]
 
-            if tag in self._tag_map:
+            if tag in self.TAG_MAP:
                 break
 
             # Skip non-tags to allow literal text to contain {
@@ -165,10 +157,10 @@ class Tokenizer(object):
             return len(self._text)
 
         # Get whitespace control
-        wscontrol = self._ws_map.get(self._text[pos + 2:pos + 3], Token.WS_NONE)
+        wscontrol = self.WS_MAP.get(self._text[pos + 2:pos + 3], Token.WS_NONE)
 
         # Create token
-        type = self._tag_map[tag]
+        type = self.TAG_MAP[tag]
         token = Token(type, self._line, wscontrol)
         self._tokens.append(token)
         if type == Token.TYPE_START_COMMENT:
@@ -195,7 +187,7 @@ class Tokenizer(object):
             return len(self._text)
 
         else:
-            wscontrol = self._ws_map.get(self._text[pos - 1], Token.WS_NONE)
+            wscontrol = self.WS_MAP.get(self._text[pos - 1], Token.WS_NONE)
 
             self._line += self._text[start:pos].count("\n")
             token = Token(Token.TYPE_END_COMMENT, self._line, wscontrol)
@@ -262,7 +254,7 @@ class Tokenizer(object):
 
             # + and +<number>
             if ch == "+":
-                if self._text[pos + 1:pos + 2] in self._digit + ".":
+                if self._text[pos + 1:pos + 2] in self.DIGIT + ".":
                     pos = self._parse_number(pos)
                     continue
                 elif self._text[pos + 1:pos + 3] not in ("#}", "%}", "}}"):
@@ -272,7 +264,7 @@ class Tokenizer(object):
             
             # - and -<number>
             if ch == "-":
-                if self._text[pos + 1:pos + 2] in self._digit + ".":
+                if self._text[pos + 1:pos + 2] in self.DIGIT + ".":
                     pos = self._parse_number(pos)
                     continue
                 elif self._text[pos + 1:pos + 3] not in ("#}", "%}", "}}"):
@@ -335,7 +327,7 @@ class Tokenizer(object):
 
             # . and .<number>
             if ch == ".":
-                if self._text[pos + 1:pos + 2] in self._digit:
+                if self._text[pos + 1:pos + 2] in self.DIGIT:
                     pos = self._parse_number(pos)
                     continue
                 else:
@@ -367,7 +359,7 @@ class Tokenizer(object):
                 continue
 
             # <number>
-            if ch in self._digit:
+            if ch in self.DIGIT:
                 pos = self._parse_number(pos)
                 continue
 
@@ -377,23 +369,23 @@ class Tokenizer(object):
                 continue
 
             # word
-            if ch in self._alpha or ch == "_":
+            if ch in self.ALPHA or ch == "_":
                 pos = self._parse_word(pos)
                 continue
 
             # Ending tag, no whitespace control
             if self._text[pos:pos + 2] in ("#}", "%}", "}}"):
-                type = self._tag_map[self._text[pos:pos + 2]]
+                type = self.TAG_MAP[self._text[pos:pos + 2]]
                 self._tokens.append(Token(type, self._line, Token.WS_NONE))
                 self._mode = self.MODE_TEXT
                 pos += 2
                 break
 
             # Ending tag, with whitespace control
-            if ch in self._ws_map:
+            if ch in self.WS_MAP:
                 if self._text[pos + 1:pos + 3] in ("#}", "%}", "}}"):
-                    type = self._tag_map[self._text[pos + 1:pos + 3]]
-                    wscontrol = self._ws_map[ch]
+                    type = self.TAG_MAP[self._text[pos + 1:pos + 3]]
+                    wscontrol = self.WS_MAP[ch]
                     self._tokens.append(Token(type, self._line, wscontrol))
                     self._mode = self.MODE_TEXT
                     pos += 3
@@ -424,7 +416,7 @@ class Tokenizer(object):
         for pos in range(start, len(self._text)):
             ch = self._text[pos]
 
-            if ch in self._digit:
+            if ch in self.DIGIT:
                 result.append(ch)
                 continue
 
@@ -495,7 +487,7 @@ class Tokenizer(object):
         for pos in range(start, len(self._text)):
             ch = self._text[pos]
 
-            if ch in self._alpha or ch in self._digit or ch in ("_", "@", "#"):
+            if ch in self.ALPHA or ch in self.DIGIT or ch in ("_", "@", "#"):
                 result.append(ch)
                 continue
             else:
@@ -514,12 +506,12 @@ class TemplateParser(object):
     AUTOSTRIP_STRIP = 1
     AUTOSTRIP_TRIM = 2
 
-    _open_close_map = {
+    OPEN_CLOSE_MAP = {
         Token.TYPE_OPEN_PAREN: Token.TYPE_CLOSE_PAREN,
         Token.TYPE_OPEN_BRACKET: Token.TYPE_CLOSE_BRACKET
     }
 
-    _close_tokens = [
+    CLOSE_TOKENS = [
         Token.TYPE_CLOSE_PAREN,
         Token.TYPE_CLOSE_BRACKET
     ]   
@@ -621,20 +613,20 @@ class TemplateParser(object):
         for pos in range(start, end + 1):
             newtoken = self._tokens[pos]
 
-            if newtoken._type in self._open_close_map:
+            if newtoken._type in self.OPEN_CLOSE_MAP:
                 # Found an open token
                 token_stack.append(newtoken._type)
                 if len(token_stack) == 1:
                     first = pos
 
-            elif newtoken._type in self._close_tokens:
+            elif newtoken._type in self.CLOSE_TOKENS:
                 # Make sure it matches the
                 if len(token_stack):
                     last = token_stack.pop()
                 else:
                     last = None
 
-                if last is None or newtoken._type != self._open_close_map[last]:
+                if last is None or newtoken._type != self.OPEN_CLOSE_MAP[last]:
                     raise SyntaxError(
                         "Mismatched or unclosed token",
                         self._template._filename,
@@ -658,7 +650,7 @@ class TemplateParser(object):
         """ Find the matching closing token. """
 
         token = self._tokens[start]
-        if not token._type in self._open_close_map:
+        if not token._type in self.OPEN_CLOSE_MAP:
             raise SyntaxError(
                 "Unexpected token",
                 self._template._filename,
@@ -670,16 +662,16 @@ class TemplateParser(object):
         for pos in range(start + 1, end + 1):
             token = self._tokens[pos]
             
-            if token._type in self._open_close_map:
+            if token._type in self.OPEN_CLOSE_MAP:
                 token_stack.append(token._type)
 
-            elif token._type in self._close_tokens:
+            elif token._type in self.CLOSE_TOKENS:
                 if len(token_stack):
                     last = token_stack.pop()
                 else:
                     last = None
 
-                if last is None or token._type != self._open_close_map[last]:
+                if last is None or token._type != self.OPEN_CLOSE_MAP[last]:
                     raise SyntaxError(
                         "Mismatched or unclosed token",
                         self._template._filename,
