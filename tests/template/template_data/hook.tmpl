@@ -1,0 +1,8 @@
+{% autostrip %}
+
+{# Doesn't exist #}
+{% hook "testhook" %}
+{% rhook "testhook" ; with info = 1 + 2 %}
+
+{% hook "hook1" ; with count = 9 + 6 // 3%}
+{% rhook "hook1" ; with count = 3 + 4 %}

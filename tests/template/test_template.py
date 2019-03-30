@@ -12,11 +12,24 @@ import glob
 from mrbaviirc.template import UnrestrictedLoader, Environment, StdLib, StringRenderer
 from mrbaviirc.template import PrefixLoader, PrefixPathLoader, SearchPathLoader
 
+def hook1a(env, template, renderer, scope, params):
+    renderer.render("Hook1 A\n")
+
+def hook1b(env, template, renderer, scope, params):
+    renderer.render("Hook1 B\n")
+    if "count" in params:
+        renderer.render("Count: {0}\n".format(params["count"]))
+
+def register_hooks(env):
+    env.register_hook("hook1", hook1a)
+    env.register_hook("hook1", hook1b)
+
 DATADIR = os.path.join(os.path.dirname(__file__), "template_data")
 
 def test_compare_unrestricted_loader():
     loader = UnrestrictedLoader()
     env = Environment(loader=loader, allow_code=True)
+    register_hooks(env)
 
     do_test_compare(env, False)
 
@@ -24,6 +37,7 @@ def test_compare_unrestricted_loader():
 def test_compare_search_path_loader():
     loader = SearchPathLoader(DATADIR)
     env = Environment(loader=loader, allow_code=True)
+    register_hooks(env)
 
     do_test_compare(env, True)
 
@@ -33,6 +47,7 @@ def test_compare_prefix_loader():
     loader.add_prefix("", PrefixPathLoader(DATADIR, allow_code=True))
 
     env = Environment(loader=loader)
+    register_hooks(env)
     env.allow_code()
 
     do_test_compare(env, True)

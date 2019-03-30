@@ -1,0 +1,45 @@
+Unreleased
+==========
+
+Changed
+-------
+
+* Parser changes will require some template changes. In particular expression
+  sections may now require a semicolon separator to define more information
+  such as on include between the path expression, with and return segments
+  or on code segments
+
+* Currently dot notation only performs attribute lookup and bracket notation
+  performs item lookup.  Eventually a change may be added to allow
+
+  . notation (item, then attr)
+  [ ] notation (always item)
+  @ notation (always attr)
+
+  data = user.name (first try user["name"] then user.name
+  data = user["name"]  - always user["name"]
+  data = user@name - always user.name
+
+* Code formatting changes
+
+Added
+-----
+
+* New parser supports more natural operators such as +, -, ==, /, <, >
+
+* Parser allows tail continuations
+
+    users[0].name.toupper()[0] - Access user[0], attribute/item name, call
+    toupper on name, the access the first item/character of the result
+
+* Hook tag allows calling registered hooks.
+
+    Hooks can be registered that take env, template, renderer, scope, and params
+    Tags of {% hook ... ; with ... %} and {% rhook ... ; with ... %} can then
+    be used to call the hooks.  The call just returns if the hook doesn't exist.
+    Hooks may be used to generate output directly with renderer, include other
+    templates via env, template.render_nested, set variables in the scope, etc.
+
+
+
+

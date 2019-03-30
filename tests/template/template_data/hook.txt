@@ -1,0 +1,6 @@
+Hook1 A
+Hook1 B
+Count: 11
+Hook1 B
+Count: 7
+Hook1 A

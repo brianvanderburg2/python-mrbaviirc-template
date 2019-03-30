@@ -9,7 +9,7 @@ __all__ = [
     "Node", "NodeList", "TextNode", "IfNode", "ForNode", "SwitchNode",
     "EmitNode", "IncludeNode", "ReturnNode", "AssignNode", "SectionNode",
     "UseSectionNode", "ScopeNode", "VarNode", "ErrorNode", "ImportNode",
-    "DoNode", "UnsetNode", "CodeNode", "ExpandNode", "BreakNode",
+    "DoNode", "UnsetNode", "CodeNode", "ExpandNode", "HookNode", "BreakNode",
     "ContinueNode"
 ]
 
@@ -487,6 +487,27 @@ class UnsetNode(Node):
         """ Set the value. """
         for item in self.varlist:
             scope.unset(item)
+
+
+class HookNode(Node):
+    """ A node to call a registered hook. """
+
+    def __init__(self, template, line, hook, assigns, reverse):
+        """ Initialize """
+        Node.__init__(self, template, line)
+        self.hook = hook
+        self.assigns = assigns
+        self.reverse = reverse
+
+    def render(self, renderer, scope):
+        """ Expand the variables. """
+
+        hook = self.hook.eval(scope)
+        params = {}
+        for (name, expr) in self.assigns:
+            params[name] = expr.eval(scope)
+
+        self.env.call_hook(hook, self.template, renderer, scope, params, self.reverse)
 
 
 class BreakNode(Node):

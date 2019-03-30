@@ -361,6 +361,10 @@ class TemplateParser(object):
             self._parse_action_import(start, end)
         elif action == "do":
             self._parse_action_do(start, end)
+        elif action == "hook":
+            self._parse_action_hook(start, end, False)
+        elif action == "rhook":
+            self._parse_action_hook(start, end, True)
         elif action.startswith("end"):
             self._parse_action_end(start, end, action)
         elif action == "strip":
@@ -624,6 +628,7 @@ class TemplateParser(object):
         """ Parse an include node. """
         line = self.tokens[start - 1].line if start > 0 else start
 
+        expr = None
         retvar = None
         assigns = []
         segments = self._find_tag_segments(start, end)
@@ -649,6 +654,12 @@ class TemplateParser(object):
             start -= 1
             expr = self._parse_expr(start, end)
 
+        if expr is None:
+            raise SyntaxError(
+                "Include expecting path expression",
+                self.template.filename,
+                line
+            )
 
         node = IncludeNode(self.template, line, expr, assigns, retvar)
         self.stack[-1].append(node)
@@ -722,6 +733,37 @@ class TemplateParser(object):
         line = self.tokens[start].line
 
         node = DoNode(self.template, line, nodes)
+        self.stack[-1].append(node)
+
+    def _parse_action_hook(self, start, end, reverse):
+        """ Parse a hook tag. """
+        line = self.tokens[start - 1].line if start > 0 else 0
+
+        hook = None
+        assigns = []
+        segments = self._find_tag_segments(start, end)
+        for segment in segments:
+            (start, end) = segment
+
+            token = self._get_token(start, end)
+            start += 1
+
+            # expecting either with or expression
+            if token.type == Token.TYPE_WORD and token.value == "with":
+                assigns = self._parse_multi_assign(start, end)
+                continue
+
+            # not with, then should be expression
+            start -= 1
+            hook = self._parse_expr(start, end)
+
+        if hook is None:
+            raise SyntaxError(
+                "Hook expecting name expression",
+                self.template.filename,
+                line)
+
+        node = HookNode(self.template, line, hook, assigns, reverse)
         self.stack[-1].append(node)
 
     def _parse_action_end(self, start, end, action):

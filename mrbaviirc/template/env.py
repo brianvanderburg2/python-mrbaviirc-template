@@ -1,4 +1,5 @@
 """ Provide an environment for templates. """
+# pylint: disable=too-many-arguments
 
 __author__ = "Brian Allen Vanderburg II"
 __copyright__ = "Copyright 2016"
@@ -23,6 +24,7 @@ class Environment(object):
 
         self.importers = {"mrbaviirc.template.stdlib": StdLib}
         self.imported = {}
+        self.hooks = {}
         self.code_enabled = allow_code
         self.lock = threading.Lock()
 
@@ -37,6 +39,10 @@ class Environment(object):
     def register_importer(self, name, importer):
         """ Register an importer """
         self.importers[name] = importer
+
+    def register_hook(self, name, callback):
+        """ Register a hook. """
+        self.hooks.setdefault(name, []).append(callback)
 
     def allow_code(self, enabled=True):
         """ Enable use of the code tag in templates. """
@@ -63,3 +69,17 @@ class Environment(object):
                 self.imported[name] = self.importers[name]()
 
             return self.imported[name]
+
+    def call_hook(self, hook, template, renderer, scope, params, reverse):
+        """ Call a hook if it exist, otherwise just return. """
+
+        callbacks = self.hooks.get(hook, None)
+        if callbacks is None:
+            return
+
+        if reverse:
+            for callback in reversed(callbacks):
+                callback(self, template, renderer, scope, params)
+        else:
+            for callback in callbacks:
+                callback(self, template, renderer, scope, params)
