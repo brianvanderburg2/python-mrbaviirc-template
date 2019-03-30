@@ -40,6 +40,9 @@ Added
     Hooks may be used to generate output directly with renderer, include other
     templates via env, template.render_nested, set variables in the scope, etc.
 
+* Userdata can be passed to a template during render.
 
+    Userdata passed can then be passed on to hooks and in the future special
+    functions. These hooks and functions can then access the userdata.
 
 
