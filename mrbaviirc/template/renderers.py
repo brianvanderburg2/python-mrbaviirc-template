@@ -1,8 +1,8 @@
 """ Renderers for the template engine. """
 
-__author__      = "Brian Allen Vanderburg II"
-__copyright__   = "Copyright 2016"
-__license__     = "Apache License 2.0"
+__author__ = "Brian Allen Vanderburg II"
+__copyright__ = "Copyright 2016"
+__license__ = "Apache License 2.0"
 
 
 class Renderer(object):
@@ -10,36 +10,35 @@ class Renderer(object):
 
     def __init__(self):
         """ Initialize the renderer. """
-        self._sections = {}
-        self._cursection = []
-        pass
+        self.sections = {}
+        self.cursection = []
 
     def render(self, content):
         """ Render the content. """
-        if self._cursection:
-            section = self._cursection[-1]
-            self._sections[section].append(content)
+        if self.cursection:
+            section = self.cursection[-1]
+            self.sections[section].append(content)
             return True
         else:
             return False
 
     def push_section(self, name):
         """ Set a named section to render to. """
-        self._sections.setdefault(name, [])
-        self._cursection.append(name)
+        self.sections.setdefault(name, [])
+        self.cursection.append(name)
 
     def pop_section(self):
         """ Return rendering to the previous section or default. """
-        self._cursection.pop()
+        self.cursection.pop()
 
     def get_sections(self):
         """ Return all known sections. """
-        return list(self._sections.keys())
+        return list(self.sections.keys())
 
     def get_section(self, name):
         """ Return the contents of a particular section. """
-        if name in self._sections:
-            return "".join(self._sections[name])
+        if name in self.sections:
+            return "".join(self.sections[name])
 
         return ""
 
@@ -50,12 +49,12 @@ class StreamRenderer(Renderer):
     def __init__(self, stream):
         """ Initialize the stream. """
         Renderer.__init__(self)
-        self._stream = stream
+        self.stream = stream
 
     def render(self, content):
         """ Render to the stream. """
         if not Renderer.render(self, content):
-            self._stream.write(content)
+            self.stream.write(content)
 
 
 class StringRenderer(Renderer):
@@ -64,16 +63,13 @@ class StringRenderer(Renderer):
     def __init__(self):
         """ Initialize the renderer. """
         Renderer.__init__(self)
-        self._buffer = []
+        self.buffer = []
 
     def render(self, content):
         """ Render the content to the buffer. """
         if not Renderer.render(self, content):
-            self._buffer.append(content)
+            self.buffer.append(content)
 
     def get(self):
         """ Get the buffer. """
-        return "".join(self._buffer)
-
-
-
+        return "".join(self.buffer)

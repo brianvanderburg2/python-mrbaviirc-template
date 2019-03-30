@@ -1,17 +1,19 @@
 """ Provide expressions for the templates. """
 
-__author__      = "Brian Allen Vanderburg II"
-__copyright__   = "Copyright 2016"
-__license__     = "Apache License 2.0"
+# pylint: disable=too-few-public-methods,too-many-arguments
+
+__author__ = "Brian Allen Vanderburg II"
+__copyright__ = "Copyright 2016"
+__license__ = "Apache License 2.0"
 
 __all__ = [
-    "Expr", "ValueExpr", "FuncExpr", "ListExpr", "VarExpr", "IndexExpr",
+    "Expr", "ValueExpr", "FuncExpr", "ListExpr", "VarExpr",
     "LookupAttrExpr", "LookupItemExpr", "BooleanBinaryExpr", "BinaryExpr",
     "BooleanUnaryExpr", "UnaryExpr"
 ]
 
 
-from .errors import *
+from .errors import UnknownVariableError, UnknownIndexError
 
 
 class Expr(object):
@@ -19,8 +21,8 @@ class Expr(object):
 
     def __init__(self, template, line):
         """ Initialize the expression object. """
-        self._template = template
-        self._line = line
+        self.template = template
+        self.line = line
 
     def eval(self, scope):
         """ Evaluate the expression object. """
@@ -33,11 +35,11 @@ class ValueExpr(Expr):
     def __init__(self, template, line, value):
         """ Initialize the value expression. """
         Expr.__init__(self, template, line)
-        self._value = value
+        self.value = value
 
     def eval(self, scope):
         """ Evaluate the expression. """
-        return self._value
+        return self.value
 
 
 class FuncExpr(Expr):
@@ -46,27 +48,27 @@ class FuncExpr(Expr):
     def __init__(self, template, line, expr, nodes):
         """ Initialize the node. """
         Expr.__init__(self, template, line)
-        self._expr = expr
-        self._nodes = nodes
+        self.expr = expr
+        self.nodes = nodes
 
     def eval(self, scope):
         """ Evaluate the expression. """
-        fn = self._expr.eval(scope)
-        params = [node.eval(scope) for node in self._nodes]
-        return fn(*params)
+        func = self.expr.eval(scope)
+        params = [node.eval(scope) for node in self.nodes]
+        return func(*params)
 
 
 class ListExpr(Expr):
     """ A list expression node. """
-    
+
     def __init__(self, template, line, nodes):
         """ Initialize the node. """
         Expr.__init__(self, template, line)
-        self._nodes = nodes
+        self.nodes = nodes
 
     def eval(self, scope):
         """ Evaluate the expression. """
-        return [node.eval(scope) for node in self._nodes]
+        return [node.eval(scope) for node in self.nodes]
 
 
 class VarExpr(Expr):
@@ -75,56 +77,18 @@ class VarExpr(Expr):
     def __init__(self, template, line, var):
         """ Initialize the variable expression. """
         Expr.__init__(self, template, line)
-        self._var = var
+        self.var = var
 
     def eval(self, scope):
         """ Evaluate the expression. """
         try:
-            return scope.get(self._var)
+            return scope.get(self.var)
         except KeyError:
             raise UnknownVariableError(
-                self._var,
-                self._template._filename,
-                self._line
+                self.var,
+                self.template.filename,
+                self.line
             )
-
-
-class IndexExpr(Expr):
-    """ An array index expression node. """
-    # TODO: To be removed, replaced with LookupItemExpr
-
-    def __init__(self, template, line, var, nodes):
-        """ Initialize the node. """
-        Expr.__init__(self, template, line)
-        self._var = var
-        self._nodes = nodes
-
-    def eval(self, scope):
-        """ Evaluate the expression. """
-        try:
-            var = scope.get(self._var)
-            params = [node.eval(scope) for node in self._nodes]
-        except KeyError:
-            raise UnknownVariableError(
-                self._var,
-                self._template._filename,
-                self._line
-            )
-
-        try:
-            for param in params:
-                var = var[param]
-        except (TypeError, KeyError, IndexError, AttributeError):
-            raise UnknownIndexError(
-                "{0}[{1}]".format(
-                    self._var,
-                    ",".join(map(str, params))
-                ),
-                self._template._filename,
-                self._line
-            )
-
-        return var
 
 
 class LookupAttrExpr(Expr):
@@ -133,19 +97,19 @@ class LookupAttrExpr(Expr):
     def __init__(self, template, line, expr, attr):
         """ Initialize the node. """
         Expr.__init__(self, template, line)
-        self._expr = expr
-        self._attr = attr
+        self.expr = expr
+        self.attr = attr
 
     def eval(self, scope):
         """ Evaluate the expression. """
-        result = self._expr.eval(scope)
+        result = self.expr.eval(scope)
         try:
-            return getattr(result, self._attr)
+            return getattr(result, self.attr)
         except (TypeError, KeyError, IndexError, AttributeError):
             raise UnknownVariableError(
-                self._attr,
-                self._template._filename,
-                self._line
+                self.attr,
+                self.template.filename,
+                self.line
             )
 
 
@@ -155,20 +119,20 @@ class LookupItemExpr(Expr):
     def __init__(self, template, line, expr, item):
         """ Initialize the node. """
         Expr.__init__(self, template, line)
-        self._expr = expr
-        self._item = item
+        self.expr = expr
+        self.item = item
 
     def eval(self, scope):
         """ Evaluate the expression. """
-        result = self._expr.eval(scope)
-        item = self._item.eval(scope)
+        result = self.expr.eval(scope)
+        item = self.item.eval(scope)
         try:
             return result[item]
         except (KeyError, IndexError, TypeError):
             raise UnknownIndexError(
                 item,
-                self._template._filename,
-                self._line
+                self.template.filename,
+                self.line
             )
 
 
@@ -177,16 +141,16 @@ class BooleanBinaryExpr(Expr):
     def __init__(self, template, line, oper, expr1, expr2):
         """ Initialize the node. """
         Expr.__init__(self, template, line)
-        self._oper = oper
-        self._expr1 = expr1
-        self._expr2 = expr2
+        self.oper = oper
+        self.expr1 = expr1
+        self.expr2 = expr2
 
     def eval(self, scope):
         """ Evaluate the expression. """
 
-        return bool(self._oper(
-            self._expr1.eval(scope),
-            self._expr2.eval(scope)
+        return bool(self.oper(
+            self.expr1.eval(scope),
+            self.expr2.eval(scope)
         ))
 
 
@@ -195,16 +159,16 @@ class BinaryExpr(Expr):
     def __init__(self, template, line, oper, expr1, expr2):
         """ Initialize the node. """
         Expr.__init__(self, template, line)
-        self._oper = oper
-        self._expr1 = expr1
-        self._expr2 = expr2
+        self.oper = oper
+        self.expr1 = expr1
+        self.expr2 = expr2
 
     def eval(self, scope):
         """ Evaluate the expression. """
 
-        return self._oper(
-            self._expr1.eval(scope),
-            self._expr2.eval(scope)
+        return self.oper(
+            self.expr1.eval(scope),
+            self.expr2.eval(scope)
         )
 
 
@@ -213,13 +177,13 @@ class BooleanUnaryExpr(Expr):
     def __init__(self, template, line, oper, expr1):
         """ Initialize the node. """
         Expr.__init__(self, template, line)
-        self._oper = oper
-        self._expr1 = expr1
+        self.oper = oper
+        self.expr1 = expr1
 
     def eval(self, scope):
         """ Evaluate the expression. """
 
-        return bool(self._oper(self._expr1.eval(scope)))
+        return bool(self.oper(self.expr1.eval(scope)))
 
 
 class UnaryExpr(Expr):
@@ -227,11 +191,10 @@ class UnaryExpr(Expr):
     def __init__(self, template, line, oper, expr1):
         """ Initialize the node. """
         Expr.__init__(self, template, line)
-        self._oper = oper
-        self._expr1 = expr1
+        self.oper = oper
+        self.expr1 = expr1
 
     def eval(self, scope):
         """ Evaluate the expression. """
 
-        return self._oper(self._expr1.eval(scope))
-
+        return self.oper(self.expr1.eval(scope))

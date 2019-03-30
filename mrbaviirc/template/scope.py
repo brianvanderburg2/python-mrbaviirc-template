@@ -1,8 +1,8 @@
 """ Provide a scope to hold variables. """
 
-__author__      = "Brian Allen Vanderburg II"
-__copyright__   = "Copyright 2016"
-__license__     = "Apache License 2.0"
+__author__ = "Brian Allen Vanderburg II"
+__copyright__ = "Copyright 2016"
+__license__ = "Apache License 2.0"
 
 
 class Scope(object):
@@ -15,24 +15,24 @@ class Scope(object):
     def __init__(self, parent=None, template=False):
         """ Initialize the current scope. """
 
-        self._parent = parent
-        self._local = {}
+        self.parent = parent
+        self.local_scope = {}
 
         # Private variables can only be accessed from the scope that set them
-        self._private = {}
+        self.private_scope = {}
 
         # Set global and template
         if parent:
-            self._global = parent._global
+            self.global_scope = parent.global_scope
 
             if template:
                 # We are starting a template scope
-                self._template = self._local
+                self.template_scope = self.local_scope
             else:
-                self._template = parent._template
+                self.template_scope = parent.template_scope
         else:
-            self._global = self._local
-            self._template = None
+            self.global_scope = self.local_scope
+            self.template_scope = None
 
     def push(self, template=False):
         """ Create new scope and return it. """
@@ -41,30 +41,30 @@ class Scope(object):
     def set(self, name, value, where=SCOPE_LOCAL):
         """ Set a value in the a scope. """
         if where == Scope.SCOPE_LOCAL:
-            self._local[name] = value
+            self.local_scope[name] = value
         elif where == Scope.SCOPE_GLOBAL:
-            self._global[name] = value
+            self.global_scope[name] = value
         elif where == Scope.SCOPE_TEMPLATE:
-            self._template[name] = value
+            self.template_scope[name] = value
         elif where == Scope.SCOPE_PRIVATE:
-            self._private[name] = value
+            self.private_scope[name] = value
         else:
             # Shold never happen, but default to local
-            self._scope._local[name] = value
+            self.local_scope[name] = value
 
     def update(self, values):
         """ Update values in the context. """
-        self._local.update(values)
+        self.local_scope.update(values)
 
     def unset(self, name):
         """ Unset a variable from the current scope. """
-        self._local.pop(name, None)
-        self._private.pop(name, None)
+        self.local_scope.pop(name, None)
+        self.private_scope.pop(name, None)
 
     def clear(self):
         """ Clear the current context. """
-        self._local.clear()
-        self._private.clear()
+        self.local_scope.clear()
+        self.private_scope.clear()
 
     def get(self, var):
         """ Get a variable. """
@@ -75,51 +75,18 @@ class Scope(object):
 
         while cur is not None:
             # Try private scope first
-            if cur is self and var in cur._private:
-                found = cur._private
+            if cur is self and var in cur.private_scope:
+                found = cur.private_scope
                 break
 
-            if var in cur._local:
-                found = cur._local
+            if var in cur.local_scope:
+                found = cur.local_scope
                 break
 
             # Walk up the scopes
-            cur = cur._parent
+            cur = cur.parent
 
         if found is None:
             raise KeyError(var)
 
         return found[var]
-
-        # Solve dotted variables
-        # TODO: delete below
-        value = found[var[0]]
-        for dot in var[1:]:
-
-            if dot[0:1] == "#":
-                # Requested direct dict item access
-                try:
-                    value = value[dot[1:]]
-                except:
-                    raise KeyError(dot)
-
-            elif dot[0:1] == "@":
-                # Requested direct attribute access
-                try:
-                    value = getattr(value, dot[1:])
-                except:
-                    raise KeyError(dot)
-
-            else:
-                # Try to acess the item both ways
-                try:
-                    value = value[dot]
-                except:
-                    try:
-                        value = getattr(value, dot)
-                    except:
-                        raise KeyError(dot)
-
-        return value
-
-

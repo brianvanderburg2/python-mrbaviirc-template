@@ -1,502 +1,21 @@
 """ A parser for the template engine. """
+# pylint: disable=unused-wildcard-import,too-many-branches,too-many-statements
+# pylint: disable=too-many-lines,too-few-public-methods,too-many-arguments
+# pylint: disable=too-many-return-statements,too-many-instance-attributes
 
 __author__ = "Brian Allen Vanderburg II"
-__copyright__ = "Copyright 2016"
+__copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
 
 import re
 import operator
 
-
 from .errors import *
 from .nodes import *
 from .expr import *
 from .scope import *
-
-
-class Token(object):
-    """ Represent a token. """
-    (
-        TYPE_TEXT,
-        TYPE_START_COMMENT,
-        TYPE_END_COMMENT,
-        TYPE_START_ACTION,
-        TYPE_END_ACTION,
-        TYPE_START_EMITTER,
-        TYPE_END_EMITTER,
-        TYPE_STRING,
-        TYPE_INTEGER,
-        TYPE_FLOAT,
-        TYPE_OPEN_BRACKET,
-        TYPE_CLOSE_BRACKET,
-        TYPE_OPEN_PAREN,
-        TYPE_CLOSE_PAREN,
-        TYPE_COMMA,
-        TYPE_ASSIGN,
-        TYPE_PLUS,
-        TYPE_MINUS,
-        TYPE_MULTIPLY,
-        TYPE_DIVIDE,
-        TYPE_MODULUS,
-        TYPE_EQUAL,
-        TYPE_GREATER,
-        TYPE_GREATER_EQUAL,
-        TYPE_LESS,
-        TYPE_LESS_EQUAL,
-        TYPE_NOT_EQUAL,
-        TYPE_DOT,
-        TYPE_NOT,
-        TYPE_WORD,
-        TYPE_SEMICOLON,
-        TYPE_AND,
-        TYPE_OR,
-        TYPE_FLOORDIV
-    ) = range(34)
-
-    (
-        WS_NONE,
-        WS_TRIMTONL,
-        WS_TRIMTONL_PRESERVENL,
-        WS_ADDNL,
-        WS_ADDSP
-    ) = range(5)
-
-    def __init__(self, type, line, value=None):
-        """ Initialize a token. """
-        self._type = type
-        self._line = line
-        self._value = value
-
-
-class Tokenizer(object):
-    """ Parse text into some tokens. """
-    MODE_TEXT = 1
-    MODE_COMMENT = 2
-    MODE_OTHER = 3
-
-    ALPHA = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    DIGIT = "0123456789"
-
-    TAG_MAP = {
-        "{#": Token.TYPE_START_COMMENT,
-        "{%": Token.TYPE_START_ACTION,
-        "{{": Token.TYPE_START_EMITTER,
-        "#}": Token.TYPE_END_COMMENT,
-        "%}": Token.TYPE_END_ACTION,
-        "}}": Token.TYPE_END_EMITTER
-    }
-
-    WS_MAP = {
-        "-": Token.WS_TRIMTONL,
-        "^": Token.WS_TRIMTONL_PRESERVENL,
-        "+": Token.WS_ADDNL,
-        "*": Token.WS_ADDSP
-    }
-
-    def __init__(self, text, filename):
-        """ Initialze the tokenizer. """
-        self._text = text
-        self._filename = filename
-        self._line = 1
-        self._mode = self.MODE_TEXT
-        self._tokens = []
-
-    def parse(self):
-        """ Parse the tokens and return the sequence. """
-
-        self._mode = self.MODE_TEXT
-        pos = 0
-
-        while pos < len(self._text):
-            if self._mode == self.MODE_TEXT:
-                pos = self._parse_mode_text(pos)
-
-            elif self._mode == self.MODE_COMMENT:
-                pos = self._parse_mode_comment(pos)
-
-            else:
-                pos = self._parse_mode_other(pos)
-
-        return self._tokens
-
-
-    def _parse_mode_text(self, start):
-        """ Parse while in text mode. """
-        # Search for open block. If not a tag, pass through as a normal block.
-        # Makes text containing { and } easier. To pass litteral {{, {#, or {%,
-        # use {{ "{{" }} in the template
-        pos = start
-        while True:
-            pos = self._text.find("{", pos)
-            if pos == -1:
-                break
-
-            tag = self._text[pos:pos + 2]
-
-            if tag in self.TAG_MAP:
-                break
-
-            # Skip non-tags to allow literal text to contain {
-            pos += 2
-            continue
-
-        # Add any preceeding text
-        if pos == -1:
-            block = self._text[start:]
-        else:
-            block = self._text[start:pos]
-
-        if block:
-            token = Token(Token.TYPE_TEXT, self._line, block)
-            self._tokens.append(token)
-            self._line += block.count("\n")
-
-        if pos == -1:
-            # No more tags
-            return len(self._text)
-
-        # Get whitespace control
-        wscontrol = self.WS_MAP.get(self._text[pos + 2:pos + 3], Token.WS_NONE)
-
-        # Create token
-        type = self.TAG_MAP[tag]
-        token = Token(type, self._line, wscontrol)
-        self._tokens.append(token)
-        if type == Token.TYPE_START_COMMENT:
-            self._mode = self.MODE_COMMENT
-        else:
-            self._mode = self.MODE_OTHER
-
-        # Return next position
-        if wscontrol != Token.WS_NONE:
-            return pos + 3
-        else:
-            return pos + 2
-
-    def _parse_mode_comment(self, start):
-        """ Parse a comment tag. """
-
-        # Just look for the ending
-        pos = self._text.find("#}", start)
-
-        if pos == -1:
-            # No more tokens
-            self._line += self._text[start:].count("\n")
-            self._mode = self.MODE_TEXT
-            return len(self._text)
-
-        else:
-            wscontrol = self.WS_MAP.get(self._text[pos - 1], Token.WS_NONE)
-
-            self._line += self._text[start:pos].count("\n")
-            token = Token(Token.TYPE_END_COMMENT, self._line, wscontrol)
-
-            self._tokens.append(token)
-            self._mode = self.MODE_TEXT
-            return pos + 2
-
-    def _parse_mode_other(self, start):
-        """ Parse other stuff. """
-
-        pos = start
-        while pos < len(self._text):
-            ch = self._text[pos]
-
-            # Whitespace is ignored
-            if ch in (" ", "\t", "\n"):
-                if ch == "\n":
-                    self._line += 1
-
-                pos += 1
-                continue
-
-            # [
-            if ch == "[":
-                self._tokens.append(Token(Token.TYPE_OPEN_BRACKET, self._line))
-                pos += 1
-                continue
-
-            # ]
-            if ch == "]":
-                self._tokens.append(Token(Token.TYPE_CLOSE_BRACKET, self._line))
-                pos += 1
-                continue
- 
-            # (
-            if ch == "(":
-                self._tokens.append(Token(Token.TYPE_OPEN_PAREN, self._line))
-                pos += 1
-                continue
-
-            # )
-            if ch == ")":
-                self._tokens.append(Token(Token.TYPE_CLOSE_PAREN, self._line))
-                pos += 1
-                continue
-
-            # ,
-            if ch == ",":
-                self._tokens.append(Token(Token.TYPE_COMMA, self._line))
-                pos += 1
-                continue
-
-            # = and ==
-            if ch == "=":
-                if self._text[pos + 1:pos + 2] == "=":
-                    self._tokens.append(Token(Token.TYPE_EQUAL, self._line))
-                    pos += 2
-                    continue
-                else:
-                    self._tokens.append(Token(Token.TYPE_ASSIGN, self._line))
-                    pos += 1
-                    continue
-
-            # + and +<number>
-            if ch == "+":
-                if self._text[pos + 1:pos + 2] in self.DIGIT + ".":
-                    pos = self._parse_number(pos)
-                    continue
-                elif self._text[pos + 1:pos + 3] not in ("#}", "%}", "}}"):
-                    self._tokens.append(Token(Token.TYPE_PLUS, self._line))
-                    pos += 1
-                    continue
-            
-            # - and -<number>
-            if ch == "-":
-                if self._text[pos + 1:pos + 2] in self.DIGIT + ".":
-                    pos = self._parse_number(pos)
-                    continue
-                elif self._text[pos + 1:pos + 3] not in ("#}", "%}", "}}"):
-                    self._tokens.append(Token(Token.TYPE_MINUS, self._line))
-                    pos += 1
-                    continue
-
-            # *
-            if ch == "*":
-                if self._text[pos + 1:pos + 3] not in ("#}", "%}", "}}"):
-                    self._tokens.append(Token(Token.TYPE_MULTIPLY, self._line))
-                    pos += 1
-                    continue
-
-            # / and //
-            if ch == "/":
-                if self._text[pos + 1:pos + 2] == "/":
-                    self._tokens.append(Token(Token.TYPE_FLOORDIV, self._line))
-                    pos += 2
-                    continue
-                else:
-                    self._tokens.append(Token(Token.TYPE_DIVIDE, self._line))
-                    pos += 1
-                    continue
-
-            # %
-            if ch == "%":
-                if self._text[pos:pos + 2] != "%}":
-                    self._tokens.append(Token(Token.TYPE_MODULUS, self._line))
-                    pos += 1
-                    continue
-
-            # > and >=
-            if ch == ">":
-                if self._text[pos + 1:pos + 2] == "=":
-                    self._tokens.append(Token(Token.TYPE_GREATER_EQUAL, self._line))
-                    pos += 2
-                    continue
-                else:
-                    self._tokens.append(Token(Token.TYPE_GREATER, self._line))
-                    pos += 1
-                    continue
-
-            # < and <=
-            if ch == "<":
-                if self._text[pos + 1:pos + 2] == "=":
-                    self._tokens.append(Token(Token.TYPE_LESS_EQUAL, self._line))
-                    pos += 2
-                    continue
-                else:
-                    self._tokens.append(Token(Token.TYPE_LESS, self._line))
-                    pos += 1
-                    continue
-
-            # ;
-            if ch == ";":
-                self._tokens.append(Token(Token.TYPE_SEMICOLON, self._line))
-                pos += 1
-                continue
-
-            # . and .<number>
-            if ch == ".":
-                if self._text[pos + 1:pos + 2] in self.DIGIT:
-                    pos = self._parse_number(pos)
-                    continue
-                else:
-                    self._tokens.append(Token(Token.TYPE_DOT, self._line))
-                    pos += 1
-                    continue
-
-            # ! and !=
-            if ch == "!":
-                if self._text[pos + 1:pos + 2] == "=":
-                    self._tokens.append(Token(Token.TYPE_NOT_EQUAL, self._line))
-                    pos += 2
-                    continue
-                else:
-                    self._tokens.append(Token(Token.TYPE_NOT, self._line))
-                    pos += 1
-                    continue
-
-            # &&
-            if self._text[pos:pos + 2] == "&&":
-                self._tokens.append(Token(Token.TYPE_AND, self._line))
-                pos += 2
-                continue
-
-            # ||
-            if self._text[pos:pos + 2] == "||":
-                self._tokens.append(Token(Token.TYPE_OR, self._line))
-                pos += 2
-                continue
-
-            # <number>
-            if ch in self.DIGIT:
-                pos = self._parse_number(pos)
-                continue
-
-            # "<string>"
-            if ch == "\"":
-                pos = self._parse_string(pos)
-                continue
-
-            # word
-            if ch in self.ALPHA or ch == "_":
-                pos = self._parse_word(pos)
-                continue
-
-            # Ending tag, no whitespace control
-            if self._text[pos:pos + 2] in ("#}", "%}", "}}"):
-                type = self.TAG_MAP[self._text[pos:pos + 2]]
-                self._tokens.append(Token(type, self._line, Token.WS_NONE))
-                self._mode = self.MODE_TEXT
-                pos += 2
-                break
-
-            # Ending tag, with whitespace control
-            if ch in self.WS_MAP:
-                if self._text[pos + 1:pos + 3] in ("#}", "%}", "}}"):
-                    type = self.TAG_MAP[self._text[pos + 1:pos + 3]]
-                    wscontrol = self.WS_MAP[ch]
-                    self._tokens.append(Token(type, self._line, wscontrol))
-                    self._mode = self.MODE_TEXT
-                    pos += 3
-                    break
-
-            # Unknown character in input
-            raise SyntaxError(
-                "Unexpected character {0}".format(ch),
-                self._filename,
-                self._line
-            )
-
-        # end while loop
-        return pos
-
-    def _parse_number(self, start):
-        """ Parse a number. """
-        result = []
-        found_dot = False
-
-        if self._text[start] == "-":
-            start += 1
-            result.append("-")
-        elif self._text[start] == "+":
-            start += 1
-
-        pos = start
-        for pos in range(start, len(self._text)):
-            ch = self._text[pos]
-
-            if ch in self.DIGIT:
-                result.append(ch)
-                continue
-
-            if ch == ".":
-                if found_dot:
-                    break
-
-                result.append(ch)
-                found_dot = True
-                continue
-
-            break
-
-        result = "".join(result)
-        if found_dot:
-            token = Token(Token.TYPE_FLOAT, self._line, float(result))
-        else:
-            token = Token(Token.TYPE_INTEGER, self._line, int(result))
-
-        self._tokens.append(token)
-        return pos
-
-    def _parse_string(self, start):
-        """ Parse a string. """
-
-        escaped = False
-        result = []
-        end = False
-        pos = start + 1
-        for pos in range(start + 1, len(self._text)): # Skip opening quote
-            ch = self._text[pos]
-
-            if escaped:
-                escaped = False
-                if ch == "n":
-                    result.append("\n")
-                elif ch == "t":
-                    result.append("\t")
-                elif ch == "\\":
-                    result.append("\\")
-                elif ch == "\"":
-                    result.append("\"")
-                continue
-
-            if ch == "\"":
-                end = True
-                break
-
-            if ch == "\\":
-                escaped = True
-                continue
-
-            result.append(ch)
-            if ch == "\n":
-                self._line += 1
-
-        if not end:
-            raise SyntaxError("Unclosed string", self._filename, self._line)
-
-        token = Token(Token.TYPE_STRING, self._line, "".join(result))
-        self._tokens.append(token)
-        return pos + 1
-
-    def _parse_word(self, start):
-        """ Parse a word. """
-        result = []
-        pos = start
-        for pos in range(start, len(self._text)):
-            ch = self._text[pos]
-
-            if ch in self.ALPHA or ch in self.DIGIT or ch in ("_", "@", "#"):
-                result.append(ch)
-                continue
-            else:
-                break
-
-        token = Token(Token.TYPE_WORD, self._line, "".join(result))
-        self._tokens.append(token)
-
-        return pos
+from .tokenizer import *
 
 
 class TemplateParser(object):
@@ -514,36 +33,35 @@ class TemplateParser(object):
     CLOSE_TOKENS = [
         Token.TYPE_CLOSE_PAREN,
         Token.TYPE_CLOSE_BRACKET
-    ]   
+    ]
 
     def __init__(self, template, text):
         """ Initialize the parser. """
 
-        self._template = template
-        self._text = text
-        self._tokens = None
-        
+        self.template = template
+        self.text = text
+        self.tokens = None
+
         # Stack and line number
         self._ops_stack = []
-        self._nodes = NodeList()
-        self._stack = [self._nodes]
+        self.nodes = NodeList()
+        self.stack = [self.nodes]
 
         # Buffer for plain text segments
-        self._buffer = []
-        self._pre_ws_control = Token.WS_NONE
-        self._autostrip = self.AUTOSTRIP_NONE
-        self._autostrip_stack = []
+        self.buffer = []
+        self.autostrip = self.AUTOSTRIP_NONE
+        self.autostrip_stack = []
 
     def _get_token(self, pos, end, errmsg="Expected token"):
         """ Get a token at a position, raise error if not found/out of bound """
 
         if pos <= end:
-            return self._tokens[pos]
+            return self.tokens[pos]
         else:
             raise SyntaxError(
                 errmsg,
-                self._template._filename,
-                self._tokens[pos - 1]._line if pos > 0 else 0
+                self.template.filename,
+                self.tokens[pos - 1].line if pos > 0 else 0
             )
 
 
@@ -554,22 +72,22 @@ class TemplateParser(object):
         if not isinstance(types, (list, tuple)):
             types = [types]
 
-        if token._type not in types:
+        if token.type not in types:
             raise SyntaxError(
                 errmsg,
-                self._template._filename,
-                token._line
+                self.template.filename,
+                token.line
             )
 
-        if token._type == token.TYPE_WORD and values is not None:
+        if token.type == token.TYPE_WORD and values is not None:
             if not isinstance(values, (list, tuple)):
                 values = [values]
 
-            if token._value not in values:
+            if token.value not in values:
                 raise SyntaxError(
                     errmsg,
-                    self._template._filename,
-                    token._line
+                    self.template.filename,
+                    token.line
                 )
 
         return token
@@ -580,28 +98,28 @@ class TemplateParser(object):
         if pos <= end:
             raise SyntaxError(
                 errmsg,
-                self._template._filename,
-                self._tokens[pos]._line
+                self.template.filename,
+                self.tokens[pos].line
             )
 
     def _get_token_var(self, pos, end, errmsg="Expected variable."):
         """ Parse a variable and return var """
 
         token = self._get_expected_token(pos, end, Token.TYPE_WORD, errmsg)
-        if re.match("[a-zA-Z_][a-zA-Z0-9_]*", token._value):
-            return token._value
+        if re.match("[a-zA-Z_][a-zA-Z0-9_]*", token.value):
+            return token.value
         else:
             raise SyntaxError(
-                "Invalid variable name: {0}".format(token._value),
-                self._template._filename,
-                token._line
+                "Invalid variable name: {0}".format(token.value),
+                self.template.filename,
+                token.line
             )
-         
+
         # If we got here, it wasn't a variable
         raise SyntaxError(
             errmsg,
-            self._template._filename,
-            token._line
+            self.template.filename,
+            token.line
         )
 
     def _find_level0_token(self, start, end, token=None):
@@ -611,37 +129,37 @@ class TemplateParser(object):
         first = None
 
         for pos in range(start, end + 1):
-            newtoken = self._tokens[pos]
+            newtoken = self.tokens[pos]
 
-            if newtoken._type in self.OPEN_CLOSE_MAP:
+            if newtoken.type in self.OPEN_CLOSE_MAP:
                 # Found an open token
-                token_stack.append(newtoken._type)
+                token_stack.append(newtoken.type)
                 if len(token_stack) == 1:
                     first = pos
 
-            elif newtoken._type in self.CLOSE_TOKENS:
+            elif newtoken.type in self.CLOSE_TOKENS:
                 # Make sure it matches the
                 if len(token_stack):
                     last = token_stack.pop()
                 else:
                     last = None
 
-                if last is None or newtoken._type != self.OPEN_CLOSE_MAP[last]:
+                if last is None or newtoken.type != self.OPEN_CLOSE_MAP[last]:
                     raise SyntaxError(
                         "Mismatched or unclosed token",
-                        self._template._filename,
-                        newtoken._line
+                        self.template.filename,
+                        newtoken.line
                     )
 
             elif len(token_stack) == 0:
-                if token is None or token == newtoken._type:
+                if token is None or token == newtoken.type:
                     return pos
 
         if token_stack:
             raise SyntaxError(
                 "Unmatched braces/parenthesis",
-                self._template._filename,
-                self._tokens[first]._line
+                self.template.filename,
+                self.tokens[first].line
             )
 
         return None
@@ -649,33 +167,33 @@ class TemplateParser(object):
     def _find_level0_closing(self, start, end):
         """ Find the matching closing token. """
 
-        token = self._tokens[start]
-        if not token._type in self.OPEN_CLOSE_MAP:
+        token = self.tokens[start]
+        if not token.type in self.OPEN_CLOSE_MAP:
             raise SyntaxError(
                 "Unexpected token",
-                self._template._filename,
-                token._line
+                self.template.filename,
+                token.line
             )
 
-        token_stack = [token._type]
+        token_stack = [token.type]
 
         for pos in range(start + 1, end + 1):
-            token = self._tokens[pos]
-            
-            if token._type in self.OPEN_CLOSE_MAP:
-                token_stack.append(token._type)
+            token = self.tokens[pos]
 
-            elif token._type in self.CLOSE_TOKENS:
+            if token.type in self.OPEN_CLOSE_MAP:
+                token_stack.append(token.type)
+
+            elif token.type in self.CLOSE_TOKENS:
                 if len(token_stack):
                     last = token_stack.pop()
                 else:
                     last = None
 
-                if last is None or token._type != self.OPEN_CLOSE_MAP[last]:
+                if last is None or token.type != self.OPEN_CLOSE_MAP[last]:
                     raise SyntaxError(
                         "Mismatched or unclosed token",
-                        self._template._filename,
-                        token._line
+                        self.template.filename,
+                        token.line
                     )
 
                 if len(token_stack) == 0:
@@ -685,8 +203,8 @@ class TemplateParser(object):
         # If we get here, we never found the closing token
         raise SyntaxError(
             "Unmatched braces/parenthesis",
-            self._template._filename,
-            self._tokens[start]._line
+            self.template.filename,
+            self.tokens[start].line
         )
 
     def _find_tag_segments(self, start, end):
@@ -704,8 +222,8 @@ class TemplateParser(object):
             if pos == start or pos == end:
                 raise SyntaxError(
                     "Unexpected semicolon",
-                    self._template._filename,
-                    self._tokens[pos]._line # find_level0 doesn't use get_token
+                    self.template.filename,
+                    self.tokens[pos].line # find_level0 doesn't use get_token
                 )
 
             result.append((start, pos - 1))
@@ -721,78 +239,80 @@ class TemplateParser(object):
         """ Parse the template and return the node list. """
 
         # Build our tokens
-        tokenizer = Tokenizer(self._text, self._template._filename)
-        self._tokens = tokenizer.parse()
+        tokenizer = Tokenizer(self.text, self.template.filename)
+        self.tokens = tokenizer.parse()
 
         # Parse our body
         pre_ws_control = None
         pos = 0
-        while pos < len(self._tokens):
-            token = self._tokens[pos]
+        while pos < len(self.tokens):
+            token = self.tokens[pos]
 
-            if token._type == Token.TYPE_TEXT:
-                self._buffer.append(token._value)
+            if token.type == Token.TYPE_TEXT:
+                self.buffer.append(token.value)
                 pos += 1
                 continue
 
-            if token._type in (Token.TYPE_START_COMMENT,
-                               Token.TYPE_START_ACTION,
-                               Token.TYPE_START_EMITTER):
+            if token.type in (
+                    Token.TYPE_START_COMMENT,
+                    Token.TYPE_START_ACTION,
+                    Token.TYPE_START_EMITTER
+            ):
                 # Flush the buffer
-                self._flush_buffer(pre_ws_control, token._value)
+                self._flush_buffer(pre_ws_control, token.value)
 
                 # Find the ending
-                if token._type == Token.TYPE_START_COMMENT:
+                if token.type == Token.TYPE_START_COMMENT:
                     ending = Token.TYPE_END_COMMENT
-                elif token._type == Token.TYPE_START_ACTION:
+                elif token.type == Token.TYPE_START_ACTION:
                     ending = Token.TYPE_END_ACTION
-                elif token._type == Token.TYPE_START_EMITTER:
+                elif token.type == Token.TYPE_START_EMITTER:
                     ending = Token.TYPE_END_EMITTER
 
-                for endpos in range(pos + 1, len(self._tokens)):
-                    if self._tokens[endpos]._type == ending:
+                for endpos in range(pos + 1, len(self.tokens)):
+                    if self.tokens[endpos].type == ending:
                         break
                 else:
                     raise SyntaxError(
                         "Opening tag missing closing tag.",
-                        self._template._filename,
-                        token._line
+                        self.template.filename,
+                        token.line
                     )
 
-                end_token = self._tokens[endpos]
-                pre_ws_control = end_token._value
+                end_token = self.tokens[endpos]
+                pre_ws_control = end_token.value
 
                 # Parse the insides
-                if token._type == Token.TYPE_START_ACTION:
+                if token.type == Token.TYPE_START_ACTION:
                     self._parse_tag_action(pos + 1, endpos - 1)
 
-                elif token._type == Token.TYPE_START_EMITTER:
+                elif token.type == Token.TYPE_START_EMITTER:
                     self._parse_tag_emitter(pos + 1, endpos - 1)
 
                 # comment is skipped entirely
 
                 # Move past it
                 pos = endpos + 1
-        
+
         self._flush_buffer(pre_ws_control, None)
 
         if self._ops_stack:
             raise SyntaxError(
-                "Unmatched action tag", 
-                self._template._filename,
+                "Unmatched action tag",
+                self.template.filename,
                 self._ops_stack[-1][1]
             )
 
-        return self._nodes
+        return self.nodes
 
     def _parse_tag_action(self, start, end):
         """ Parse some action tag. """
-        
+
         # Determine the action
         token = self._get_token(start, end, "Expected action")
-        action = token._value
+        action = token.value
         start += 1
-        
+
         if action == "if":
             self._parse_action_if(start, end)
         elif action == "elif":
@@ -846,38 +366,38 @@ class TemplateParser(object):
         elif action == "strip":
             self._parse_action_strip(start, end)
         elif action == "autostrip":
-            self._autostrip = self.AUTOSTRIP_STRIP
+            self.autostrip = self.AUTOSTRIP_STRIP
         elif action == "autotrim":
-            self._autostrip = self.AUTOSTRIP_TRIM
+            self.autostrip = self.AUTOSTRIP_TRIM
         elif action == "no_autostrip":
-            self._autostrip = self.AUTOSTRIP_NONE
+            self.autostrip = self.AUTOSTRIP_NONE
         else:
             raise SyntaxError(
                 "Unknown action tag: {0}".format(action),
-                self._template._filename,
-                token._line
+                self.template.filename,
+                token.line
             )
 
     def _parse_action_if(self, start, end):
         """ Parse an if action. """
         expr = self._parse_expr(start, end)
-        line = self._tokens[start]._line
-        
-        node = IfNode(self._template, line, expr)
-        
+        line = self.tokens[start].line
+
+        node = IfNode(self.template, line, expr)
+
         self._ops_stack.append(("if", line))
-        self._stack[-1].append(node)
-        self._stack.append(node._nodes)
+        self.stack[-1].append(node)
+        self.stack.append(node.nodes)
 
     def _parse_action_elif(self, start, end):
         """ Parse an elif action. """
         expr = self._parse_expr(start, end)
-        line = self._tokens[start]._line
+        line = self.tokens[start].line
 
         if not self._ops_stack:
             raise SyntaxError(
                 "Mismatched elif",
-                self._template._filename,
+                self.template.filename,
                 line
             )
 
@@ -885,25 +405,25 @@ class TemplateParser(object):
         if what[0] != "if":
             raise SyntaxError(
                 "Mismatched elif",
-                self._template._filename,
+                self.template.filename,
                 line
             )
 
-        self._stack.pop()
-        node = self._stack[-1][-1]
+        self.stack.pop()
+        node = self.stack[-1][-1]
         node.add_elif(expr)
-        self._stack.append(node._nodes)
+        self.stack.append(node.nodes)
 
     def _parse_action_else(self, start, end):
         """ Parse an else. """
 
         self._get_no_more_tokens(start, end)
-        line = self._tokens[start - 1]._line if start > 0 else 0
+        line = self.tokens[start - 1].line if start > 0 else 0
 
         if not self._ops_stack:
             raise SyntaxError(
                 "Mismatched else",
-                self._template._filename,
+                self.template.filename,
                 line
             )
 
@@ -911,33 +431,33 @@ class TemplateParser(object):
         if not what[0] in ("if", "for"):
             raise SyntaxError(
                 "Mismatched else",
-                self._template._filename,
+                self.template.filename,
                 line
             )
 
         # Both if and for do this the same way
-        self._stack.pop()
-        node = self._stack[-1][-1]
+        self.stack.pop()
+        node = self.stack[-1][-1]
         node.add_else()
-        self._stack.append(node._nodes)
+        self.stack.append(node.nodes)
 
     def _parse_action_break(self, start, end):
         """ Parse break. """
-        
+
         self._get_no_more_tokens(start, end)
-        line = self._tokens[start - 1]._line if start > 0 else 0
-        
-        node = BreakNode(self._template, line)
-        self._stack[-1].append(node)
+        line = self.tokens[start - 1].line if start > 0 else 0
+
+        node = BreakNode(self.template, line)
+        self.stack[-1].append(node)
 
     def _parse_action_continue(self, start, end):
         """ Parse continue. """
 
         self._get_no_more_tokens(start, end)
-        line = self._tokens[start - 1]._line if start > 0 else 0
-        
-        node = ContinueNode(self._template, line)
-        self._stack[-1].append(node)
+        line = self.tokens[start - 1].line if start > 0 else 0
+
+        node = ContinueNode(self.template, line)
+        self.stack[-1].append(node)
 
         return start
 
@@ -950,7 +470,7 @@ class TemplateParser(object):
         # and break to break out of loop
 
         var = self._get_token_var(start, end)
-        line = self._tokens[start]._line
+        line = self.tokens[start].line
         start += 1
 
         token = self._get_expected_token(
@@ -963,7 +483,7 @@ class TemplateParser(object):
         start += 1
 
         cvar = None
-        if token._type == Token.TYPE_COMMA:
+        if token.type == Token.TYPE_COMMA:
 
             cvar = self._get_token_var(start, end)
             start += 1
@@ -979,29 +499,29 @@ class TemplateParser(object):
 
         expr = self._parse_expr(start, end)
 
-        node = ForNode(self._template, line, var, cvar, expr)
+        node = ForNode(self.template, line, var, cvar, expr)
         self._ops_stack.append(("for", line))
-        self._stack[-1].append(node)
-        self._stack.append(node._nodes)
+        self.stack[-1].append(node)
+        self.stack.append(node.nodes)
 
     def _parse_action_switch(self, start, end):
         """ Parse a switch statement. """
         expr = self._parse_expr(start, end)
-        line = self._tokens[start]._line
+        line = self.tokens[start].line
 
-        node = SwitchNode(self._template, line, expr)
+        node = SwitchNode(self.template, line, expr)
         self._ops_stack.append(("switch", line))
-        self._stack[-1].append(node)
-        self._stack.append(node._nodes)
+        self.stack[-1].append(node)
+        self.stack.append(node.nodes)
 
     def _parse_action_switch_item(self, start, end, item):
         """ Parse the switch item. """
-        line = self._tokens[start - 1]._line if start > 0 else 0
+        line = self.tokens[start - 1].line if start > 0 else 0
 
         if not self._ops_stack:
             raise SyntaxError(
                 "{0} can only occur in switch".format(item),
-                self._template._filename,
+                self.template.filename,
                 line
             )
 
@@ -1009,7 +529,7 @@ class TemplateParser(object):
         if what[0] != "switch":
             raise SyntaxError(
                 "{0} can only occur in switch".format(item),
-                self._template._filename,
+                self.template.filename,
                 line
             )
 
@@ -1021,51 +541,51 @@ class TemplateParser(object):
         if len(exprs) != argc:
             raise SyntaxError(
                 "Switch clause {0} takes {1} argument".format(item, argc),
-                self._template._filename,
+                self.template.filename,
                 line
             )
 
-        self._stack.pop()
-        node = self._stack[-1][-1]
+        self.stack.pop()
+        node = self.stack[-1][-1]
         node.add_case(SwitchNode.cbs[offset], exprs)
-        self._stack.append(node._nodes)
+        self.stack.append(node.nodes)
 
     def _parse_action_set(self, start, end, where):
         """ Parse a set statement. """
         assigns = self._parse_multi_assign(start, end)
-        line = self._tokens[start]._line
+        line = self.tokens[start].line
 
-        node = AssignNode(self._template, line, assigns, where)
-        self._stack[-1].append(node)
+        node = AssignNode(self.template, line, assigns, where)
+        self.stack[-1].append(node)
 
     def _parse_action_unset(self, start, end):
         """ Parse an unset statement. """
         varlist = self._parse_multi_var(start, end)
-        line = self._tokens[start]._line
+        line = self.tokens[start].line
 
-        node = UnsetNode(self._template, line, varlist)
-        self._stack[-1].append(node)
+        node = UnsetNode(self.template, line, varlist)
+        self.stack[-1].append(node)
 
     def _parse_action_scope(self, start, end):
         """ Parse a scope statement. """
-        line = self._tokens[start - 1]._line if start > 0 else 0
+        line = self.tokens[start - 1].line if start > 0 else 0
         if start <= end:
             assigns = self._parse_multi_assign(start, end)
         else:
             assigns = []
 
-        node = ScopeNode(self._template, line, assigns)
+        node = ScopeNode(self.template, line, assigns)
         self._ops_stack.append(("scope", line))
-        self._stack[-1].append(node)
-        self._stack.append(node._nodes)
+        self.stack[-1].append(node)
+        self.stack.append(node.nodes)
 
     def _parse_action_code(self, start, end):
         """ Parse a code node. """
-        line = self._tokens[start - 1]._line if start > 0 else 0
+        line = self.tokens[start - 1].line if start > 0 else 0
 
         # disable autostrip for this block
-        self._autostrip_stack.append(self._autostrip)
-        self._autostrip = self.AUTOSTRIP_NONE
+        self.autostrip_stack.append(self.autostrip)
+        self.autostrip = self.AUTOSTRIP_NONE
 
         retvar = None
         assigns = []
@@ -1077,32 +597,32 @@ class TemplateParser(object):
             start += 1
 
             # expecting either return or with
-            if token._type == Token.TYPE_WORD and token._value == "return":
+            if token.type == Token.TYPE_WORD and token.value == "return":
                 retvar = self._get_token_var(start, end)
                 start += 1
 
                 self._get_no_more_tokens(start, end)
                 continue
 
-            if token._type == Token.TYPE_WORD and token._value == "with":
+            if token.type == Token.TYPE_WORD and token.value == "with":
                 assigns = self._parse_multi_assign(start, end)
                 continue
-            
+
             raise SyntaxError(
                 "Unexpected token",
-                self._template._filename,
-                self._tokens[start]._line
+                self.template.filename,
+                self.tokens[start].line
             )
 
 
         self._ops_stack.append(("code", line))
-        node = CodeNode(self._template, line, assigns, retvar)
-        self._stack[-1].append(node)
-        self._stack.append(node._nodes)
+        node = CodeNode(self.template, line, assigns, retvar)
+        self.stack[-1].append(node)
+        self.stack.append(node.nodes)
 
     def _parse_action_include(self, start, end):
         """ Parse an include node. """
-        line = self._tokens[start - 1]._line if start > 0 else start
+        line = self.tokens[start - 1].line if start > 0 else start
 
         retvar = None
         assigns = []
@@ -1114,14 +634,14 @@ class TemplateParser(object):
             start += 1
 
             # expecting either return or with
-            if token._type == Token.TYPE_WORD and token._value == "return":
+            if token.type == Token.TYPE_WORD and token.value == "return":
                 retvar = self._get_token_var(start, end)
                 start += 1
 
                 self._get_no_more_tokens(start, end)
                 continue
 
-            if token._type == Token.TYPE_WORD and token._value == "with":
+            if token.type == Token.TYPE_WORD and token.value == "with":
                 assigns = self._parse_multi_assign(start, end)
                 continue
 
@@ -1130,103 +650,103 @@ class TemplateParser(object):
             expr = self._parse_expr(start, end)
 
 
-        node = IncludeNode(self._template, line, expr, assigns, retvar)
-        self._stack[-1].append(node)
+        node = IncludeNode(self.template, line, expr, assigns, retvar)
+        self.stack[-1].append(node)
 
     def _parse_action_return(self, start, end):
         """ Parse a return variable node. """
         assigns = self._parse_multi_assign(start, end)
-        line = self._tokens[start]._line
+        line = self.tokens[start].line
 
-        node = ReturnNode(self._template, line, assigns)
-        self._stack[-1].append(node)
+        node = ReturnNode(self.template, line, assigns)
+        self.stack[-1].append(node)
 
     def _parse_action_expand(self, start, end):
         """ Parse an expand node. """
         expr = self._parse_expr(start, end)
-        line = self._tokens[start]._line
+        line = self.tokens[start].line
 
-        node = ExpandNode(self._template, line, expr)
-        self._stack[-1].append(node)
+        node = ExpandNode(self.template, line, expr)
+        self.stack[-1].append(node)
 
     def _parse_action_section(self, start, end):
         """ Parse a section node. """
         expr = self._parse_expr(start, end)
-        line = self._tokens[start]._line
+        line = self.tokens[start].line
 
         self._ops_stack.append(("section", line))
-        node = SectionNode(self._template, line, expr)
-        self._stack[-1].append(node)
-        self._stack.append(node._nodes)
+        node = SectionNode(self.template, line, expr)
+        self.stack[-1].append(node)
+        self.stack.append(node.nodes)
 
     def _parse_action_use(self, start, end):
         """ Parse a use section node. """
         expr = self._parse_expr(start, end)
-        line = self._tokens[start]._line
+        line = self.tokens[start].line
 
-        node = UseSectionNode(self._template, line, expr)
-        self._stack[-1].append(node)
+        node = UseSectionNode(self.template, line, expr)
+        self.stack[-1].append(node)
 
     def _parse_action_var(self, start, end):
         """ Parse a block to store rendered output in a variable. """
         var = self._get_token_var(start, end)
-        line = self._tokens[start]._line
+        line = self.tokens[start].line
         start += 1
 
         self._get_no_more_tokens(start, end)
 
-        node = VarNode(self._template, line, var)
+        node = VarNode(self.template, line, var)
         self._ops_stack.append(("var", line))
-        self._stack[-1].append(node)
-        self._stack.append(node._nodes)
+        self.stack[-1].append(node)
+        self.stack.append(node.nodes)
 
     def _parse_action_error(self, start, end):
         """ Raise an error from the template. """
         expr = self._parse_expr(start, end)
-        line = self._tokens[start]._line
+        line = self.tokens[start].line
 
-        node = ErrorNode(self._template, line, expr)
-        self._stack[-1].append(node)
+        node = ErrorNode(self.template, line, expr)
+        self.stack[-1].append(node)
 
     def _parse_action_import(self, start, end):
         """ Parse an import action. """
         assigns = self._parse_multi_assign(start, end)
-        line = self._tokens[start]._line
+        line = self.tokens[start].line
 
-        node = ImportNode(self._template, line, assigns)
-        self._stack[-1].append(node)
+        node = ImportNode(self.template, line, assigns)
+        self.stack[-1].append(node)
 
     def _parse_action_do(self, start, end):
         """ Parse a do tag. """
         nodes = self._parse_multi_expr(start, end)
-        line = self._tokens[start]._line
+        line = self.tokens[start].line
 
-        node = DoNode(self._template, line, nodes)
-        self._stack[-1].append(node)
+        node = DoNode(self.template, line, nodes)
+        self.stack[-1].append(node)
 
     def _parse_action_end(self, start, end, action):
         """ Parse an end tag """
         self._get_no_more_tokens(start, end)
-        line = self._tokens[start - 1]._line if start > 0 else 0
+        line = self.tokens[start - 1].line if start > 0 else 0
 
         if not self._ops_stack:
             raise SyntaxError(
                 "To many ends: {0}".format(action),
-                self._template._filename,
+                self.template.filename,
                 line
             )
         elif start <= end:
             raise SyntaxError(
                 "Unexpected token",
-                self._template._filename,
-                self._tokens[start]._line
+                self.template.filename,
+                self.tokens[start].line
             )
 
         what = self._ops_stack[-1]
         if what[0] != action[3:]:
             raise SyntaxError(
                 "Mismatched end tag: {0}".format(action),
-                self._template._filename,
+                self.template.filename,
                 line
             )
 
@@ -1236,23 +756,23 @@ class TemplateParser(object):
 
         # Pop node stack for any op that created a new node stack
         if not what[0] == "strip":
-            self._stack.pop()
+            self.stack.pop()
 
         # Restore autostrip value for any op that pushed the value
         if what[0] in ("strip", "code"):
-            self._autostrip = self._autostrip_stack.pop()
+            self.autostrip = self.autostrip_stack.pop()
 
     def _parse_action_strip(self, start, end):
         """ Change the autostrip state. """
-        line = self._tokens[start - 1]._line if start > 0 else 0
+        line = self.tokens[start - 1].line if start > 0 else 0
 
-        self._autostrip_stack.append(self._autostrip)
+        self.autostrip_stack.append(self.autostrip)
         self._ops_stack.append(("strip", line))
 
         if start <= end:
             token = self._get_expected_token(
-                start, 
-                end, 
+                start,
+                end,
                 Token.TYPE_WORD,
                 "Expected on, off, or trim",
                 ["on", "off", "trim"]
@@ -1262,34 +782,33 @@ class TemplateParser(object):
             # No change
             return
 
-        if token._value == "on":
-            self._autostrip = self.AUTOSTRIP_STRIP
-        elif token._value == "trim":
-            self._autostrip = self.AUTOSTRIP_TRIM
+        if token.value == "on":
+            self.autostrip = self.AUTOSTRIP_STRIP
+        elif token.value == "trim":
+            self.autostrip = self.AUTOSTRIP_TRIM
         else:
-            self._autostrip = self.AUTOSTRIP_NONE
+            self.autostrip = self.AUTOSTRIP_NONE
 
     def _parse_tag_emitter(self, start, end):
         """ Parse an emitter tag. """
         expr = self._parse_expr(start, end)
-        line = self._tokens[start]._line
+        line = self.tokens[start].line
 
         if isinstance(expr, ValueExpr):
-            node = TextNode(self._template, line, str(expr.eval(None)))
+            node = TextNode(self.template, line, str(expr.eval(None)))
         else:
-            node = EmitNode(self._template, line, expr)
-        self._stack[-1].append(node)
+            node = EmitNode(self.template, line, expr)
+        self.stack[-1].append(node)
 
     def _parse_expr(self, start, end):
         """ Parse the expression. """
-        
+
         addsub = None
         muldivmod = None
         posneg = None
         andor = None
         nott = None
         compare = None
-        neg = None
 
         pos = start
         while pos <= end:
@@ -1298,19 +817,19 @@ class TemplateParser(object):
             if pos is None:
                 break
 
-            token = self._tokens[pos]
+            token = self.tokens[pos]
 
             # Keep track of certain types
             # We ignore many dependency how we split
 
-            if token._type == Token.TYPE_SEMICOLON:
+            if token.type == Token.TYPE_SEMICOLON:
                 raise SyntaxError(
                     "Unexpected semicolon",
-                    self._template._filename,
-                    token._line
+                    self.template.filename,
+                    token.line
                 )
 
-            if token._type in (
+            if token.type in (
                     Token.TYPE_MULTIPLY, Token.TYPE_DIVIDE,
                     Token.TYPE_FLOORDIV, Token.TYPE_MODULUS
             ):
@@ -1318,14 +837,14 @@ class TemplateParser(object):
                 pos += 1
                 continue
 
-            if token._type in (Token.TYPE_PLUS, Token.TYPE_MINUS):
+            if token.type in (Token.TYPE_PLUS, Token.TYPE_MINUS):
                 if pos == start:
                     # At start, it is a positive or negative
                     if posneg is None:
                         posneg = pos
                 else:
-                    lasttoken = self._tokens[pos - 1]
-                    if lasttoken._type in (
+                    lasttoken = self.tokens[pos - 1]
+                    if lasttoken.type in (
                             Token.TYPE_ASSIGN, Token.TYPE_PLUS, Token.TYPE_MINUS,
                             Token.TYPE_MULTIPLY, Token.TYPE_DIVIDE,
                             Token.TYPE_FLOORDIV, Token.TYPE_MODULUS,
@@ -1344,7 +863,7 @@ class TemplateParser(object):
                 pos += 1
                 continue
 
-            if token._type in (
+            if token.type in (
                     Token.TYPE_EQUAL, Token.TYPE_NOT_EQUAL,
                     Token.TYPE_GREATER, Token.TYPE_GREATER_EQUAL,
                     Token.TYPE_LESS, Token.TYPE_LESS_EQUAL
@@ -1353,12 +872,12 @@ class TemplateParser(object):
                 pos += 1
                 continue
 
-            if token._type in (Token.TYPE_AND, Token.TYPE_OR):
+            if token.type in (Token.TYPE_AND, Token.TYPE_OR):
                 andor = pos
                 pos += 1
                 continue
 
-            if token._type == Token.TYPE_NOT:
+            if token.type == Token.TYPE_NOT:
                 nott = pos
                 pos += 1
                 continue
@@ -1372,18 +891,18 @@ class TemplateParser(object):
 
         # Split on and/or first
         if andor is not None:
-            token = self._tokens[andor]
+            token = self.tokens[andor]
             expr1 = self._parse_expr(start, andor - 1)
             expr2 = self._parse_expr(andor + 1, end)
 
-            if token._type == Token.TYPE_AND:
+            if token.type == Token.TYPE_AND:
                 oper = lambda a, b: a and b
             else:
                 oper = lambda a, b: a or b
 
             return BooleanBinaryExpr(
-                self._template._filename,
-                token._line,
+                self.template.filename,
+                token.line,
                 oper,
                 expr1,
                 expr2
@@ -1391,26 +910,26 @@ class TemplateParser(object):
 
         # Split on comparison next
         if compare is not None:
-            token = self._tokens[compare]
+            token = self.tokens[compare]
             expr1 = self._parse_expr(start, compare - 1)
             expr2 = self._parse_expr(compare + 1, end)
 
-            if token._type == Token.TYPE_EQUAL:
+            if token.type == Token.TYPE_EQUAL:
                 oper = operator.eq
-            elif token._type == Token.TYPE_NOT_EQUAL:
+            elif token.type == Token.TYPE_NOT_EQUAL:
                 oper = operator.ne
-            elif token._type == Token.TYPE_GREATER:
+            elif token.type == Token.TYPE_GREATER:
                 oper = operator.gt
-            elif token._type == Token.TYPE_GREATER_EQUAL:
+            elif token.type == Token.TYPE_GREATER_EQUAL:
                 oper = operator.ge
-            elif token._type == Token.TYPE_LESS:
+            elif token.type == Token.TYPE_LESS:
                 oper = operator.lt
-            elif token._type == Token.TYPE_LESS_EQUAL:
+            elif token.type == Token.TYPE_LESS_EQUAL:
                 oper = operator.le
 
             return BooleanBinaryExpr(
-                self._template._filename,
-                token._line,
+                self.template.filename,
+                token.line,
                 oper,
                 expr1,
                 expr2
@@ -1418,18 +937,18 @@ class TemplateParser(object):
 
         # Add/sub next
         if addsub is not None:
-            token = self._tokens[addsub]
+            token = self.tokens[addsub]
             expr1 = self._parse_expr(start, addsub - 1)
             expr2 = self._parse_expr(addsub + 1, end)
 
-            if token._type == Token.TYPE_PLUS:
+            if token.type == Token.TYPE_PLUS:
                 oper = operator.add
             else:
                 oper = operator.sub
 
             return BinaryExpr(
-                self._template._filename,
-                token._line,
+                self.template.filename,
+                token.line,
                 oper,
                 expr1,
                 expr2
@@ -1437,22 +956,22 @@ class TemplateParser(object):
 
         # Mul/div/mod next
         if muldivmod is not None:
-            token = self._tokens[muldivmod]
+            token = self.tokens[muldivmod]
             expr1 = self._parse_expr(start, muldivmod - 1)
             expr2 = self._parse_expr(muldivmod + 1, end)
 
-            if token._type == Token.TYPE_MULTIPLY:
+            if token.type == Token.TYPE_MULTIPLY:
                 oper = operator.mul
-            elif token._type == Token.TYPE_DIVIDE:
+            elif token.type == Token.TYPE_DIVIDE:
                 oper = operator.truediv
-            elif token._type == Token.TYPE_FLOORDIV:
+            elif token.type == Token.TYPE_FLOORDIV:
                 oper = operator.floordiv
             else:
                 oper = operator.mod
 
             return BinaryExpr(
-                self._template._filename,
-                token._line,
+                self.template.filename,
+                token.line,
                 oper,
                 expr1,
                 expr2
@@ -1462,47 +981,47 @@ class TemplateParser(object):
 
         # Not
         if nott is not None:
-            token = self._tokens[nott]
+            token = self.tokens[nott]
             if nott == start:
                 return BooleanUnaryExpr(
-                    self._template._filename,
-                    token._line,
+                    self.template.filename,
+                    token.line,
                     lambda a: not a,
                     self._parse_expr(nott + 1, end)
                 )
             else:
                 raise SyntaxError(
                     "Unexpected token: !",
-                    self._template._filename,
-                    token._line
+                    self.template.filename,
+                    token.line
                 )
 
         # Posneg
         if posneg is not None:
-            token = self._tokens[posneg]
+            token = self.tokens[posneg]
             if posneg == start:
-                if token._type == Token.TYPE_PLUS:
+                if token.type == Token.TYPE_PLUS:
                     return self._parse_expr(posneg + 1, end)
                 else:
                     return UnaryExpr(
-                        self._template._filename,
-                        token._line,
+                        self.template.filename,
+                        token.line,
                         lambda a: -a,
                         self._parse_expr(posneg + 1, end)
                     )
             else:
                 raise SyntaxError(
                     "Unexpected token: {0}".format(
-                        "+" if token._type == Token.TYPE_PLUS else "-"
+                        "+" if token.type == Token.TYPE_PLUS else "-"
                     ),
-                    self._template._filename,
-                    token._line
+                    self.template.filename,
+                    token.line
                 )
-                
-        # Check what we have at the start
-        token = self._tokens[start]
 
-        if token._type == Token.TYPE_OPEN_PAREN:
+        # Check what we have at the start
+        token = self.tokens[start]
+
+        if token.type == Token.TYPE_OPEN_PAREN:
             # Find closing paren, treat all as expression
             closing = self._find_level0_closing(start, end)
             expr = self._parse_expr(start + 1, closing - 1)
@@ -1512,7 +1031,7 @@ class TemplateParser(object):
 
             return expr
 
-        if token._type == Token.TYPE_OPEN_BRACKET:
+        if token.type == Token.TYPE_OPEN_BRACKET:
             # Find closing bracket
             closing = self._find_level0_closing(start, end)
             expr = self._parse_expr_list(start + 1, closing - 1)
@@ -1522,87 +1041,87 @@ class TemplateParser(object):
 
             return expr
 
-        if token._type == Token.TYPE_WORD:
+        if token.type == Token.TYPE_WORD:
             # Variable
             var = self._get_token_var(start, end)
-            expr = VarExpr(self._template, token._line, var)
+            expr = VarExpr(self.template, token.line, var)
 
             if start < end:
                 expr = self._parse_continuation(expr, start + 1, end)
 
             return expr
 
-        if token._type in (Token.TYPE_STRING, Token.TYPE_INTEGER, Token.TYPE_FLOAT):
-            expr = ValueExpr(self._template, token._line, token._value)
-            
+        if token.type in (Token.TYPE_STRING, Token.TYPE_INTEGER, Token.TYPE_FLOAT):
+            expr = ValueExpr(self.template, token.line, token.value)
+
             if start < end:
                 expr = self._parse_continuation(expr, start + 1, end)
-            
+
             return expr
 
         raise SyntaxError(
             "Unexpected token",
-            self._template._filename,
-            token._line
+            self.template.filename,
+            token.line
         )
 
     def _parse_continuation(self, expr, start, end):
         """ Parse a continuation of an expression. """
 
         while start <= end:
-            token = self._tokens[start]
+            token = self.tokens[start]
 
-            if token._type == Token.TYPE_DOT:
+            if token.type == Token.TYPE_DOT:
                 start += 1
                 if start <= end:
                     var = self._get_token_var(start, end)
-                    expr = LookupAttrExpr(self._template, token._line, expr, var)
+                    expr = LookupAttrExpr(self.template, token.line, expr, var)
                     start += 1
                     continue
-                    
+
                 raise SyntaxError(
                     "Expected variable name",
-                    self._template._filename,
-                    token._line
+                    self.template.filename,
+                    token.line
                 )
 
-            if token._type == Token.TYPE_OPEN_PAREN:
+            if token.type == Token.TYPE_OPEN_PAREN:
                 closing = self._find_level0_closing(start, end)
                 if start < closing - 1:
                     exprs = self._parse_multi_expr(start + 1, closing - 1)
                 else:
                     exprs = []
-                expr = FuncExpr(self._template, token._line, expr, exprs)
+                expr = FuncExpr(self.template, token.line, expr, exprs)
                 start = closing + 1
                 continue
 
-            if token._type == Token.TYPE_OPEN_BRACKET:
+            if token.type == Token.TYPE_OPEN_BRACKET:
                 closing = self._find_level0_closing(start, end)
                 expr1 = self._parse_expr(start + 1, closing - 1)
-                expr = LookupItemExpr(self._template, token._line, expr, expr1)
+                expr = LookupItemExpr(self.template, token.line, expr, expr1)
                 start = closing + 1
                 continue
 
             raise SyntaxError(
                 "Unexpected token",
-                self._template._filename,
-                token._line
+                self.template.filename,
+                token.line
                 )
 
         return expr
 
     def _parse_expr_list(self, start, end):
         """ Pare an expression that's a list. """
-        line = self._tokens[start - 1]._line if start > 0 else 0
+        line = self.tokens[start - 1].line if start > 0 else 0
         if start <= end:
             nodes = self._parse_multi_expr(start, end)
         else:
             nodes = []
 
         if nodes and all(isinstance(node, ValueExpr) for node in nodes):
-            node = ValueExpr(self._template, nodes[0]._line, [node.eval(None) for node in nodes])
+            node = ValueExpr(self.template, nodes[0].line, [node.eval(None) for node in nodes])
         else:
-            node = ListExpr(self._template, line, nodes)
+            node = ListExpr(self.template, line, nodes)
         return node
 
     def _parse_multi_expr(self, start, end):
@@ -1624,8 +1143,8 @@ class TemplateParser(object):
         else:
             raise SyntaxError(
                 "Expected expression list",
-                self._template._filename,
-                self._tokens[start - 1] if start > 0 else 0
+                self.template.filename,
+                self.tokens[start - 1] if start > 0 else 0
             )
 
     def _parse_assign(self, start, end):
@@ -1659,8 +1178,8 @@ class TemplateParser(object):
         else:
             raise SyntaxError(
                 "Expected assignment list.",
-                self._template._filename,
-                self._tokens[start - 1]._line if start > 0 else 0
+                self.template.filename,
+                self.tokens[start - 1].line if start > 0 else 0
             )
 
     def _parse_multi_var(self, start, end):
@@ -1676,26 +1195,26 @@ class TemplateParser(object):
 
                 if start <= end:
                     # More left, should have a comma
-                    self._get_expect_token(start, end, Token.TYPE_COMMA)
+                    self._get_expected_token(start, end, Token.TYPE_COMMA)
                     start += 1
 
             return varlist
         else:
             raise SyntaxError(
                 "Expected variable list",
-                self._template._filename,
-                self._tokens[start - 1] if start > 0 else 0
+                self.template.filename,
+                self.tokens[start - 1].line if start > 0 else 0
             )
 
     def _flush_buffer(self, pre_ws_control, post_ws_control):
         """ Flush the buffer to output. """
         text = ""
-        if self._buffer:
-            text = "".join(self._buffer)
+        if self.buffer:
+            text = "".join(self.buffer)
 
-            if self._autostrip == self.AUTOSTRIP_STRIP:
+            if self.autostrip == self.AUTOSTRIP_STRIP:
                 text = text.strip()
-            elif self._autostrip == self.AUTOSTRIP_TRIM:
+            elif self.autostrip == self.AUTOSTRIP_TRIM:
                 tmp = []
                 need_nl = False
                 for line in text.splitlines():
@@ -1730,7 +1249,7 @@ class TemplateParser(object):
                     else:
                         nl = 0 if post_ws_control == Token.WS_TRIMTONL else 1
                         text = text[:last_nl + nl] + text[last_nl + nl:].rstrip()
-            
+
         if pre_ws_control == Token.WS_ADDNL:
             text = "\n" + text
         elif pre_ws_control == Token.WS_ADDSP:
@@ -1745,8 +1264,7 @@ class TemplateParser(object):
             # Use line 0 b/c we don't report errors on TextNodes
             # Other solution would be to append the text tokens instead of
             # values, then have access to the line
-            node = TextNode(self._template, 0, text)
-            self._stack[-1].append(node)
+            node = TextNode(self.template, 0, text)
+            self.stack[-1].append(node)
 
-        self._buffer = []
-
+        self.buffer = []

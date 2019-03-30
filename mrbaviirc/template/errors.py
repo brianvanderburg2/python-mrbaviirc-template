@@ -1,13 +1,14 @@
 """ Provide errors for the templates. """
 
-__author__      = "Brian Allen Vanderburg II"
-__copyright__   = "Copyright 2016"
-__license__     = "Apache License 2.0"
+__author__ = "Brian Allen Vanderburg II"
+__copyright__ = "Copyright 2016"
+__license__ = "Apache License 2.0"
 
 
 class Error(Exception):
     """ Base template engine error. """
     def __init__(self, message):
+        Exception.__init__(self, message)
         self.message = message
 
     def __str__(self):
@@ -58,5 +59,3 @@ class UnknownImportError(TemplateError):
 class RaisedError(TemplateError):
     """ Represent an error raised from the template itself. """
     pass
-
-

@@ -1,17 +1,17 @@
 """ Provide an environment for templates. """
 
-__author__      = "Brian Allen Vanderburg II"
-__copyright__   = "Copyright 2016"
-__license__     = "Apache License 2.0"
+__author__ = "Brian Allen Vanderburg II"
+__copyright__ = "Copyright 2016"
+__license__ = "Apache License 2.0"
+
+__all__ = ["Environment"]
 
 
 import threading
 
 
 from .template import Template
-from .scope import Scope
 from .loaders import UnrestrictedLoader
-from .errors import *
 
 from .lib import StdLib
 
@@ -21,49 +21,45 @@ class Environment(object):
     def __init__(self, loader=None, importers=None, allow_code=False):
         """ Initialize the template environment. """
 
-        self._importers = { "mrbaviirc.template.stdlib": StdLib }
-        self._imported = {}
-        self._allow_code = allow_code
-        self._lock = threading.Lock()
+        self.importers = {"mrbaviirc.template.stdlib": StdLib}
+        self.imported = {}
+        self.code_enabled = allow_code
+        self.lock = threading.Lock()
 
         if loader:
-            self._loader = loader
+            self.loader = loader
         else:
-            self._loader = UnrestrictedLoader()
+            self.loader = UnrestrictedLoader()
 
         if importers:
-            self._importers.update(importers)
+            self.importers.update(importers)
 
     def register_importer(self, name, importer):
         """ Register an importer """
-        self._importers[name] = importer
+        self.importers[name] = importer
 
     def allow_code(self, enabled=True):
         """ Enable use of the code tag in templates. """
-        self._allow_code = enabled
+        self.code_enabled = enabled
 
     def load_file(self, filename, parent=None):
         """ Load a template from a file. """
-        return self._loader.load_template(self, filename, parent)
+        return self.loader.load_template(self, filename, parent)
 
     def load_text(self, text, filename="", allow_code=False):
         """ Load a template direct from text. """
         template = Template(self, text, filename, allow_code)
-        self._loader.fix_load_text(template)
+        self.loader.fix_load_text(template)
         return template
-
-
 
     def load_import(self, name):
         """ Load a lib from an importer. """
 
-        with self._lock:
-            if not name in self._imported:
-                if not name in self._importers:
+        with self.lock:
+            if not name in self.imported:
+                if not name in self.importers:
                     raise KeyError(name)
 
-                self._imported[name] = self._importers[name]()
+                self.imported[name] = self.importers[name]()
 
-            return self._imported[name]
-
-
+            return self.imported[name]

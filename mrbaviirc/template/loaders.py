@@ -1,18 +1,18 @@
 """ Provide a loader for loading templates. """
+# pylint: disable=too-few-public-methods,too-many-branches
 
-__author__      = "Brian Allen Vanderburg II"
-__copyright__   = "Copyright 2016"
-__license__     = "Apache License 2.0"
+__author__ = "Brian Allen Vanderburg II"
+__copyright__ = "Copyright 2016"
+__license__ = "Apache License 2.0"
 
 __all__ = ["Loader", "UnrestrictedLoader", "SearchPathLoader", "MemoryLoader",
            "PrefixLoader", "PrefixSubLoader", "PrefixPathLoader", "PrefixMemoryLoader"]
 
 import os
-import posixpath
 import threading
 
 from .template import Template
-from .errors import *
+from .errors import RestrictedError
 
 
 class Loader(object):
@@ -23,9 +23,11 @@ class Loader(object):
         pass
 
     def load_template(self, env, filename, parent=None):
+        """ Load and return a template. """
         raise NotImplementedError
 
     def fix_load_text(self, template):
+        """ Perform fixup on a template loaded with env.load_text. """
         return
 
 
@@ -36,8 +38,8 @@ class UnrestrictedLoader(Loader):
         """ Initialized the loader. """
         Loader.__init__(self)
 
-        self._cache = {}
-        self._lock = threading.Lock()
+        self.cache = {}
+        self.lock = threading.Lock()
 
     def load_template(self, env, filename, parent=None):
         """ Load a template. """
@@ -45,23 +47,23 @@ class UnrestrictedLoader(Loader):
         # Determine filename from parent if needed
         if parent:
             filename = os.path.join(
-                os.path.dirname(parent._filename),
+                os.path.dirname(parent.filename),
                 filename.replace("/", os.sep)
             )
 
         filename = os.path.realpath(filename)
 
         # Available from cache?
-        with self._lock:
-            if filename in self._cache:
-                return self._cache[filename]
+        with self.lock:
+            if filename in self.cache:
+                return self.cache[filename]
 
             # Load and return
             with open(filename, "r", encoding="utf8", newline=None) as handle:
                 text = handle.read()
 
-            self._cache[filename] = Template(env, text, filename, allow_code=True)
-            return self._cache[filename]
+            self.cache[filename] = Template(env, text, filename, allow_code=True)
+            return self.cache[filename]
 
 
 class PrefixLoader(Loader):
@@ -72,14 +74,14 @@ class PrefixLoader(Loader):
         """ Initialize the loader. """
         Loader.__init__(self)
 
-        self._prefixes = []
-        self._cache = {}
-        self._lock = threading.Lock()
+        self.prefixes = []
+        self.cache = {}
+        self.lock = threading.Lock()
 
     def add_prefix(self, prefix, loader):
         """ Add a prefix to the loader. """
         prefix = tuple(i for i in prefix.split("/") if len(i.strip()))
-        self._prefixes.append((prefix, loader))
+        self.prefixes.append((prefix, loader))
 
     def load_template(self, env, filename, parent=None):
         """ Load a template. """
@@ -93,46 +95,46 @@ class PrefixLoader(Loader):
         # First normalize the name based on the parent and store the normalized
         # value in the parent's cache
         if parent:
-            parent._lock.acquire()
+            parent.lock.acquire()
 
         try:
-            if parent and filename in parent._private["normalized"]:
+            if parent and filename in parent.private["normalized"]:
                 # We've already included the same filename from the same parent
                 # and cached the normalized result, no need to normalize again
-                (path, index_start, cache_name) = parent._private["normalized"][filename]
+                (path, index_start, cache_name) = parent.private["normalized"][filename]
             elif filename == ":next:":
                 # Load the same path as the parent starting at the next prefix entry
                 if parent is None:
                     raise RestrictedError(":next: can only be ncluded from an existing template.")
 
-                path = parent._private["path"]
-                index_start = parent._private["index"] + 1
+                path = parent.private["path"]
+                index_start = parent.private["index"] + 1
                 cache_name = ":@@{0}@@:{1}".format(index_start, "/".join(path))
             else:
                 # Loading a template directly by path
-                path = self._normalize(filename, parent._private["path"] if parent else None)
+                path = self._normalize(filename, parent.private["path"] if parent else None)
                 index_start = 0
                 cache_name = "/".join(path)
 
             # Cache the normalization results if loading from an include
             if parent:
-                normalized = parent._private["normalized"]
+                normalized = parent.private["normalized"]
                 normalized[filename] = (path, index_start, cache_name)
         finally:
             if parent:
-                parent._lock.release()
+                parent.lock.release()
 
-        with self._lock:
+        with self.lock:
             # Check if already loaded
-            if cache_name in self._cache:
-                return self._cache[cache_name]
+            if cache_name in self.cache:
+                return self.cache[cache_name]
 
             # Find all matching prefixes and attempt to load the template
             template = None
             index = -1
             for index, (prefix, loader) in enumerate(
-                self._prefixes[index_start:],
-                index_start
+                    self.prefixes[index_start:],
+                    index_start
             ):
                 # Make sure first parts are common
                 if len(path) < len(prefix):
@@ -151,16 +153,16 @@ class PrefixLoader(Loader):
                     break
 
             if template:
-                template._private["path"] = path
-                template._private["index"] = index
-                template._private["normalized"] = {}
-                self._cache[cache_name] = template
+                template.private["path"] = path
+                template.private["index"] = index
+                template.private["normalized"] = {}
+                self.cache[cache_name] = template
                 return template
             elif parent:
                 raise RestrictedError(
                     "Template not found along prefix paths: {0}, Included from: {1}".format(
                         filename, # We use filename so user can tell which include cause the problem
-                        "/".join(parent._private["path"])
+                        "/".join(parent.private["path"])
                     )
                 )
             else:
@@ -170,9 +172,9 @@ class PrefixLoader(Loader):
 
     def fix_load_text(self, template):
         """ Perform fixup on directly loaded text templates. """
-        template._private["path"] = ("",) # Tuple representing empty filename in root
-        template._private["index"] = 0
-        template._private["normalized"] = {}
+        template.private["path"] = ("",) # Tuple representing empty filename in root
+        template.private["index"] = 0
+        template.private["normalized"] = {}
 
     def _normalize(self, filename, path):
         """ Normalize the path and return the path tuple """
@@ -215,7 +217,7 @@ class PrefixSubLoader(object):
 
     def __init__(self, allow_code=False):
         """ Initialize the loader. """
-        self._allow_code = allow_code
+        self.allow_code = allow_code
 
     def load_template(self, env, subpath, fullpath):
         """ Load the template specified by the subpath. """
@@ -228,7 +230,7 @@ class PrefixPathLoader(PrefixSubLoader):
     def __init__(self, path, allow_code=False):
         """ Initialize the loader with a given path. """
         PrefixSubLoader.__init__(self, allow_code)
-        self._path = os.path.realpath(path)
+        self.path = os.path.realpath(path)
 
     def load_template(self, env, subpath, fullpath):
         """ Load a given template. """
@@ -237,7 +239,7 @@ class PrefixPathLoader(PrefixSubLoader):
             return None
 
         filename = os.path.join(
-            self._path,
+            self.path,
             "/".join(subpath)
         )
 
@@ -245,7 +247,7 @@ class PrefixPathLoader(PrefixSubLoader):
             with open(filename, "r", encoding="utf8", newline=None) as handle:
                 text = handle.read()
 
-            return Template(env, text, filename, self._allow_code)
+            return Template(env, text, filename, self.allow_code)
 
         return None
 
@@ -256,22 +258,22 @@ class PrefixMemoryLoader(PrefixSubLoader):
     def __init__(self, allow_code=False):
         """ Initialize the loader. """
         PrefixSubLoader.__init__(self, allow_code)
-        self._memory = {}
+        self.memory = {}
 
     def add_template(self, path, contents):
         """ Add a memory template. """
         path = tuple(i for i in path.split("/") if len(i.strip()))
-        self._memory[path] = contents
+        self.memory[path] = contents
 
     def load_template(self, env, subpath, fullpath):
         """ Load a given memory template. """
 
-        if subpath in self._memory:
+        if subpath in self.memory:
             return Template(
                 env,
-                self._memory[subpath],
+                self.memory[subpath],
                 ":memory:{0}".format("/".join(fullpath)),
-                self._allow_code
+                self.allow_code
             )
 
         return None
@@ -296,11 +298,10 @@ class MemoryLoader(PrefixLoader):
 
     def __init__(self):
         """ Initialize the loader. """
-        Loader.__init__(self);
-        self._memory = PrefixMemoryLoader(allow_code=True)
-        self.add_prefix("", self._memory)
+        PrefixLoader.__init__(self)
+        self.memory = PrefixMemoryLoader(allow_code=True)
+        self.add_prefix("", self.memory)
 
     def add_template(self, name, contents):
         """ Add an entry to the memory. """
-        self._memory.add_template(name, contents)
-
+        self.memory.add_template(name, contents)

@@ -1,71 +1,34 @@
 """ Represent a single template for the template engine. """
 
-__author__      = "Brian Allen Vanderburg II"
-__copyright__   = "Copyright 2016"
-__license__     = "Apache License 2.0"
+__author__ = "Brian Allen Vanderburg II"
+__copyright__ = "Copyright 2016"
+__license__ = "Apache License 2.0"
 
 
-import os
 import threading
 
-from .errors import *
 from .parser import TemplateParser
 from .scope import Scope
 
 
 class Template(object):
-    """ Simple template parser and renderer.
-
-    Extended variable access:
-
-        {{ expression }}
-
-        For example:
-
-            {{ value.subvalue }}
-
-            {{ value.subvalue | upper }}
-
-
-    Loops:
-
-        {% for var in list %}
-        {% endfor %}
-
-    Conditions:
-
-        {% if var %}
-        {% elif var %}
-        {% else %}
-        {% endif %}
-
-    Comments:
-
-        {# This is a commend. #}
-
-    Whitespace control.  A "-" after an opening block will eat any preceeding
-    whitespace up to and including the previous new line:
-
-        {#- ... #}
-        {{- ... }}
-        {%- ... %}
-    """
+    """ Main template object hold the nodes of the parsed template. """
 
     def __init__(self, env, text, filename, allow_code=False):
         """ Initialize a template with context variables. """
-        
-        # Initialize
-        self._env = env
-        self._text = text
-        self._filename = filename
-        self._allow_code = allow_code
 
-        self._private = {}
-        self._lock = threading.Lock()
+        # Initialize
+        self.env = env
+        self.text = text
+        self.filename = filename
+        self.code_enabled = allow_code
+
+        self.private = {}
+        self.lock = threading.Lock()
 
         # Parse the template
         parser = TemplateParser(self, text)
-        self._nodes = parser.parse()
+        self.nodes = parser.parse()
 
     def render(self, renderer, context=None):
         """ Render the template. """
@@ -75,9 +38,9 @@ class Template(object):
         if context is not None:
             scope.update(context)
 
-        return self._render(renderer, None, scope)
+        return self.nested_render(renderer, None, scope)
 
-    def _render(self, renderer, context, scope):
+    def nested_render(self, renderer, context, scope):
         """ Render the template. """
         new_scope = scope.push(True)
 
@@ -85,11 +48,10 @@ class Template(object):
             new_scope.update(context)
 
         # set certain variables
-        new_scope._template["__filename__"] = self._filename
+        new_scope.template_scope["__filename__"] = self.filename
 
-        self._nodes.render(renderer, new_scope)
+        self.nodes.render(renderer, new_scope)
 
         # Return any template return values:
-        retval = new_scope._template.get(":return:", {})
+        retval = new_scope.template_scope.get(":return:", {})
         return retval
-
