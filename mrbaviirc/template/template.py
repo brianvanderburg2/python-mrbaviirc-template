@@ -30,13 +30,15 @@ class Template(object):
         parser = TemplateParser(self, text)
         self.nodes = parser.parse()
 
-    def render(self, renderer, context=None):
+    def render(self, renderer, context=None, userdata=None):
         """ Render the template. """
 
         # Create the top (global) scope for this render
         scope = Scope()
         if context is not None:
             scope.update(context)
+        if userdata is not None:
+            scope.update_userdata(userdata)
 
         return self.nested_render(renderer, None, scope)
 

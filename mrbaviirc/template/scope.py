@@ -17,6 +17,7 @@ class Scope(object):
 
         self.parent = parent
         self.local_scope = {}
+        self.user_data = {}
 
         # Private variables can only be accessed from the scope that set them
         self.private_scope = {}
@@ -90,3 +91,21 @@ class Scope(object):
             raise KeyError(var)
 
         return found[var]
+
+    def set_userdata(self, name, value):
+        """ Set a userdata in the scope. """
+        self.user_data[name] = value
+
+    def get_userdata(self, name, defval=None):
+        """ Get userdata from the scope. """
+        scope = self
+        while scope:
+            if name in scope.user_data:
+                return scope.user_data[name]
+            scope = scope.parent
+
+        return defval
+
+    def update_userdata(self, values):
+        """ Update the userdata. """
+        self.user_data.update(values)

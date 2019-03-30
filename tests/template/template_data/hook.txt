@@ -1,6 +1,10 @@
 Hook1 A
 Hook1 B
 Count: 11
+User1: 10
+User2: 20
 Hook1 B
 Count: 7
+User1: 10
+User2: 20
 Hook1 A

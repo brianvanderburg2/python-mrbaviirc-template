@@ -20,6 +20,13 @@ def hook1b(env, template, renderer, scope, params):
     if "count" in params:
         renderer.render("Count: {0}\n".format(params["count"]))
 
+    u1 = scope.get_userdata("user1")
+    u2 = scope.get_userdata("user2")
+    if u1 is not None:
+        renderer.render("User1: {0}\n".format(u1))
+    if u2 is not None:
+        renderer.render("User2: {0}\n".format(u2))
+
 def register_hooks(env):
     env.register_hook("hook1", hook1a)
     env.register_hook("hook1", hook1b)
@@ -60,13 +67,14 @@ def do_test_compare(env, search_path_loader):
         data = json.load(handle)
 
     data["lib"] = StdLib()
+    userdata = {"user1": 10, "user2": 20}
 
     for path in sorted(glob.glob(os.path.join(DATADIR, "*.tmpl"))):
         source = path if not search_path_loader else os.path.basename(path)
 
         tmpl = env.load_file(filename=source)
         rndr = StringRenderer()
-        tmpl.render(rndr, data)
+        tmpl.render(rndr, data, userdata)
 
         target = path[:-5] + ".txt"
         contents = rndr.get()
