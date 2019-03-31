@@ -1,0 +1,18 @@
+{% autostrip %}
+
+{{ defined(x.y[12]("hello")) +}}
+
+{% set x=1, y=10 +%}
+{{ defined(x.y) +}}
+{{ defined(x) +}}
+{{ defined(y) +}}
+
+{% unset x +%}
+{{ defined(x.y) +}}
+{{ defined(x) +}}
+{{ defined(y) +}}
+
+{# +#}
+{{ default(x.y, 27) +}}
+{{ default(x, 14) +}}
+{{ default(y, 91) +}}

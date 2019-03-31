@@ -9,6 +9,7 @@ import threading
 
 from .parser import TemplateParser
 from .scope import Scope
+from .lib.builtin import context as builtin_context
 
 
 class Template(object):
@@ -35,6 +36,8 @@ class Template(object):
 
         # Create the top (global) scope for this render
         scope = Scope()
+        scope.update(builtin_context) # Add builtin only
+
         if context is not None:
             scope.update(context)
         if userdata is not None:

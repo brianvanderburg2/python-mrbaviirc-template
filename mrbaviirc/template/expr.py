@@ -54,8 +54,17 @@ class FuncExpr(Expr):
     def eval(self, scope):
         """ Evaluate the expression. """
         func = self.expr.eval(scope)
-        params = [node.eval(scope) for node in self.nodes]
-        return func(*params)
+        if hasattr(func, "_is_mrbaviirc_template_special"):
+            return func(
+                self.template.env,
+                self.template,
+                self.line,
+                scope,
+                self.nodes
+            )
+        else:
+            params = [node.eval(scope) for node in self.nodes]
+            return func(*params)
 
 
 class ListExpr(Expr):

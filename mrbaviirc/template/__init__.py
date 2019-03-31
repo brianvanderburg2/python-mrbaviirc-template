@@ -8,6 +8,7 @@ from .errors import *
 from .renderers import *
 from .env import Environment
 from .loaders import *
+from .util import *
 from .template import Template
 from .lib import Library, StdLib
 

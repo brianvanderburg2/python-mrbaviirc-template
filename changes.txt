@@ -45,4 +45,9 @@ Added
     Userdata passed can then be passed on to hooks and in the future special
     functions. These hooks and functions can then access the userdata.
 
+* Support for special functions
 
+    Special functions take a list of env, template, line, scope, params and
+    instead of having the parameters automatically evaluated, they are the
+    expression notes.  This allows special functions like defined and default
+    to exist which can evaluate a node when needed, check for errors, etc.
