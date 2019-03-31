@@ -70,7 +70,7 @@ class Environment(object):
 
             return self.imported[name]
 
-    def call_hook(self, hook, template, renderer, scope, params, reverse):
+    def call_hook(self, hook, template, line, renderer, scope, params, reverse):
         """ Call a hook if it exist, otherwise just return. """
 
         callbacks = self.hooks.get(hook, None)
@@ -78,8 +78,7 @@ class Environment(object):
             return
 
         if reverse:
-            for callback in reversed(callbacks):
-                callback(self, template, renderer, scope, params)
-        else:
-            for callback in callbacks:
-                callback(self, template, renderer, scope, params)
+            callbacks = reversed(callbacks)
+
+        for callback in callbacks:
+            callback(self, template, line, renderer, scope, params)

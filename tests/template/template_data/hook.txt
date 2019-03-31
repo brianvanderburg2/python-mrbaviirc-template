@@ -1,10 +1,10 @@
-Hook1 A
-Hook1 B
+Hook1 A: 7
+Hook1 B: 7
 Count: 11
 User1: 10
 User2: 20
-Hook1 B
+Hook1 B: 8
 Count: 7
 User1: 10
 User2: 20
-Hook1 A
+Hook1 A: 8

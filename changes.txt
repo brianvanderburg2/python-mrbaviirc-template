@@ -34,11 +34,12 @@ Added
 
 * Hook tag allows calling registered hooks.
 
-    Hooks can be registered that take env, template, renderer, scope, and params
-    Tags of {% hook ... ; with ... %} and {% rhook ... ; with ... %} can then
-    be used to call the hooks.  The call just returns if the hook doesn't exist.
-    Hooks may be used to generate output directly with renderer, include other
-    templates via env, template.render_nested, set variables in the scope, etc.
+    Hooks can be registered that take env, template, line, renderer, scope,
+    and params.  Tags {% hook ... ; with ... %} and {% rhook ... ; with ... %}
+    can then be used to call the hooks.  The call just returns if the hook
+    doesn't exist. Hooks may be used to generate output directly with renderer,
+    include other templates via env, template.render_nested, set variables in
+    the scope, etc.
 
 * Userdata can be passed to a template during render.
 

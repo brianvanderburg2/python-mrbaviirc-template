@@ -12,11 +12,11 @@ import glob
 from mrbaviirc.template import UnrestrictedLoader, Environment, StdLib, StringRenderer
 from mrbaviirc.template import PrefixLoader, PrefixPathLoader, SearchPathLoader
 
-def hook1a(env, template, renderer, scope, params):
-    renderer.render("Hook1 A\n")
+def hook1a(env, template, line, renderer, scope, params):
+    renderer.render("Hook1 A: {0}\n".format(line))
 
-def hook1b(env, template, renderer, scope, params):
-    renderer.render("Hook1 B\n")
+def hook1b(env, template, line, renderer, scope, params):
+    renderer.render("Hook1 B: {0}\n".format(line))
     if "count" in params:
         renderer.render("Count: {0}\n".format(params["count"]))
 

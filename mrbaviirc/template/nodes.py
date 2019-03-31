@@ -507,7 +507,15 @@ class HookNode(Node):
         for (name, expr) in self.assigns:
             params[name] = expr.eval(scope)
 
-        self.env.call_hook(hook, self.template, renderer, scope, params, self.reverse)
+        self.env.call_hook(
+            hook,
+            self.template,
+            self.line,
+            renderer,
+            scope,
+            params,
+            self.reverse
+        )
 
 
 class BreakNode(Node):
