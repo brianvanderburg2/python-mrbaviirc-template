@@ -440,6 +440,7 @@ class ErrorNode(Node):
             self.line
         )
 
+
 class ImportNode(Node):
     """ Import a library to a variable in the current scope. """
     def __init__(self, template, line, assigns):
@@ -462,6 +463,7 @@ class ImportNode(Node):
                     self.line
                 )
 
+
 class DoNode(Node):
     """ Evaluate expressions and discard the results. """
 
@@ -474,6 +476,7 @@ class DoNode(Node):
         """ Set the value. """
         for expr in self.exprs:
             expr.eval(scope)
+
 
 class UnsetNode(Node):
     """ Unset variable at the current scope rsults. """
