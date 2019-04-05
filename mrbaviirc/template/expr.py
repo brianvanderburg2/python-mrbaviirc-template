@@ -7,7 +7,7 @@ __copyright__ = "Copyright 2016"
 __license__ = "Apache License 2.0"
 
 __all__ = [
-    "Expr", "ValueExpr", "FuncExpr", "ListExpr", "VarExpr",
+    "Expr", "ValueExpr", "FuncExpr", "ListExpr", "DictExpr", "VarExpr",
     "LookupAttrExpr", "LookupItemExpr", "BooleanBinaryExpr", "BinaryExpr",
     "BooleanUnaryExpr", "UnaryExpr"
 ]
@@ -30,7 +30,11 @@ class Expr(object):
 
 
 class ValueExpr(Expr):
-    """ An expression that represents a value. """
+    """ An expression that represents a value.
+        This should be used only for immutable values since assigment simply
+        returns the value.  Else a template item may mutate the value in the
+        node and a later assigmnet may have an unexpcted value.
+    """
 
     def __init__(self, template, line, value):
         """ Initialize the value expression. """
@@ -78,6 +82,23 @@ class ListExpr(Expr):
     def eval(self, scope):
         """ Evaluate the expression. """
         return [node.eval(scope) for node in self.nodes]
+
+
+class DictExpr(Expr):
+    """ A dict expression node. """
+
+    def __init__(self, template, line, key_nodes, value_nodes):
+        """ Initialize the node. """
+        Expr.__init__(self, template, line)
+        self.key_nodes = key_nodes
+        self.value_nodes = value_nodes
+
+    def eval(self, scope):
+        """ Evaluate the expression. """
+        return dict(zip(
+            (key.eval(scope) for key in self.key_nodes),
+            (value.eval(scope) for value in self.value_nodes)
+        ))
 
 
 class VarExpr(Expr):

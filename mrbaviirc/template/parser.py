@@ -122,11 +122,14 @@ class TemplateParser(object):
             token.line
         )
 
-    def _find_level0_token(self, start, end, token=None):
+    def _find_level0_token(self, start, end, tokens=None):
         """ Find a token at level 0 nesting. """
 
         token_stack = []
         first = None
+
+        if tokens is not None and not isinstance(tokens, (list, tuple)):
+            tokens = [tokens]
 
         for pos in range(start, end + 1):
             newtoken = self.tokens[pos]
@@ -152,7 +155,7 @@ class TemplateParser(object):
                     )
 
             elif len(token_stack) == 0:
-                if token is None or token == newtoken.type:
+                if tokens is None or newtoken.type in tokens:
                     return pos
 
         if token_stack:
@@ -1076,7 +1079,7 @@ class TemplateParser(object):
         if token.type == Token.TYPE_OPEN_BRACKET:
             # Find closing bracket
             closing = self._find_level0_closing(start, end)
-            expr = self._parse_expr_list(start + 1, closing - 1)
+            expr = self._parse_expr_list_dict(start + 1, closing - 1)
 
             if closing < end:
                 expr = self._parse_continuation(expr, closing + 1, end)
@@ -1152,19 +1155,59 @@ class TemplateParser(object):
 
         return expr
 
-    def _parse_expr_list(self, start, end):
-        """ Pare an expression that's a list. """
+    def _parse_expr_list_dict(self, start, end):
+        """ Pare an expression that's a list or dictionary. """
         line = self.tokens[start - 1].line if start > 0 else 0
-        if start <= end:
-            nodes = self._parse_multi_expr(start, end)
-        else:
-            nodes = []
+        keys = []
+        values = []
 
-        if nodes and all(isinstance(node, ValueExpr) for node in nodes):
-            node = ValueExpr(self.template, nodes[0].line, [node.eval(None) for node in nodes])
+        # Special cases first
+        if end == start - 1:
+            # [] - empty list
+            return ListExpr(self.template, line, [])
+
+        if start == end and self.tokens[start].type == Token.TYPE_COLON:
+            # [:] - empty dict
+            return DictExpr(self.template, line, [], [])
+
+        # Determine if we are a dictionary
+        pos = self._find_level0_token(start, end, Token.TYPE_COLON)
+        is_dict = pos is not None
+
+        while start <= end:
+            # If dict, find the first part
+            if is_dict:
+                pos = self._find_level0_token(start, end, Token.TYPE_COLON)
+                if pos is None:
+                    raise SyntaxError(
+                        "Dictionary expecting ':'",
+                        self.template.filename,
+                        line
+                    )
+
+                keys.append(self._parse_expr(start, pos - 1))
+                start = pos + 1
+
+            # Now find the second part
+            pos = self._find_level0_token(start, end, Token.TYPE_COMMA)
+            if pos is None:
+                # No more parts
+                values.append(self._parse_expr(start, end))
+                start = end + 1
+            else:
+                # Found comma
+                values.append(self._parse_expr(start, pos - 1))
+                start = pos + 1
+
+        # We no longer return ValueExpr even if the list is all ValueExpr
+        # It was an optimization, but since the reference is to a mutable list
+        # The value of the ValueExpr's result could be change then another
+        # iteration on the same set tag could have a different value.
+        # ValueExpr should only be used for immutable values for this reason
+        if is_dict:
+            return DictExpr(self.template, line, keys, values)
         else:
-            node = ListExpr(self.template, line, nodes)
-        return node
+            return ListExpr(self.template, line, values)
 
     def _parse_multi_expr(self, start, end):
         """ Parse a list of expressions separated by comma. """
@@ -1194,7 +1237,7 @@ class TemplateParser(object):
         var = self._get_token_var(start, end)
         start += 1
 
-        token = self._get_expected_token(start, end, Token.TYPE_ASSIGN, "Expected '='")
+        self._get_expected_token(start, end, Token.TYPE_ASSIGN, "Expected '='")
         start += 1
 
         expr = self._parse_expr(start, end)

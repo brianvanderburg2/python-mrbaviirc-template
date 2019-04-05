@@ -52,3 +52,8 @@ Added
     instead of having the parameters automatically evaluated, they are the
     expression nodes.  This allows special functions like defined and default
     to exist which can evaluate a node when needed, check for errors, etc.
+
+* Support for dictionarys in the template.
+
+    Dictionary syntax borrows from list syntax: [key:value, key:value, ...]
+    An empty dictionary can be created as [:]

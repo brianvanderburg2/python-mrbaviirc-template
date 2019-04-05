@@ -28,6 +28,7 @@ class Token(object):
         TYPE_OPEN_PAREN,
         TYPE_CLOSE_PAREN,
         TYPE_COMMA,
+        TYPE_COLON,
         TYPE_ASSIGN,
         TYPE_PLUS,
         TYPE_MINUS,
@@ -47,7 +48,7 @@ class Token(object):
         TYPE_AND,
         TYPE_OR,
         TYPE_FLOORDIV
-    ) = range(34)
+    ) = range(35)
 
     (
         WS_NONE,
@@ -233,6 +234,12 @@ class Tokenizer(object):
             # ,
             if char == ",":
                 self.tokens.append(Token(Token.TYPE_COMMA, self.line))
+                pos += 1
+                continue
+
+            # :
+            if char == ":":
+                self.tokens.append(Token(Token.TYPE_COLON, self.line))
                 pos += 1
                 continue
 
