@@ -22,6 +22,8 @@ Changed
 
 * Code formatting changes
 
+* Action tags are now handled in a more modular way
+
 Added
 -----
 

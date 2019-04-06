@@ -16,6 +16,7 @@ from .nodes import *
 from .expr import *
 from .scope import *
 from .tokenizer import *
+from .actions import ACTION_HANDLERS
 
 
 class TemplateParser(object):
@@ -43,7 +44,6 @@ class TemplateParser(object):
         self.tokens = None
 
         # Stack and line number
-        self._ops_stack = []
         self.nodes = NodeList()
         self.stack = [self.nodes]
 
@@ -51,6 +51,82 @@ class TemplateParser(object):
         self.buffer = []
         self.autostrip = self.AUTOSTRIP_NONE
         self.autostrip_stack = []
+
+        # Handlers
+        self.action_line = 0
+        self.action_handlers = ACTION_HANDLERS
+        self.action_handler_stack = [(0, self.handle_action)] # tuple of (line, handler)
+
+    def push_handler(self, handler):
+        """ Push a handler onto the handler stack. """
+        self.action_handler_stack.append((self.action_line, handler))
+
+    def pop_handler(self):
+        """ Pop a handler off the stack. """
+
+        if len(self.action_handler_stack) > 1:
+            self.action_handler_stack.pop()
+        else:
+            raise SyntaxError(
+                "Unexpected handler pop",
+                self.template.filename,
+                self.action_line
+            )
+
+    def handle_action(self, parser, template, line, action, start, end):
+        """ Handle the main actions. """
+        assert self is parser
+
+        handler = self.action_handlers.get(action, None)
+        if handler:
+            handler(parser, template, line, action, start, end)
+        else:
+            raise SyntaxError(
+                "Unknown action: {0}".format(action),
+                template.filename,
+                line
+            )
+
+    def add_node(self, node):
+        """ Add a node to the current nodelist. """
+        self.stack[-1].append(node)
+
+    def push_nodestack(self, nodelist):
+        """ Push a new nodelist as the current nodelist. """
+        self.stack.append(nodelist)
+
+    def pop_nodestack(self):
+        """ Pop the nodelist and return the last node of the previous nodelist. """
+        if len(self.stack) > 1:
+            self.stack.pop()
+            return self.stack[-1][-1]
+        else:
+            raise SyntaxError(
+                "Unexpected nodelist pop",
+                self.template.filename,
+                self.action_line
+            )
+
+    def push_autostrip(self, value=None):
+        """ Push autostrip and optionally change the value. """
+        self.autostrip_stack.append(self.autostrip)
+        if value is not None:
+            self.autostrip = value
+
+    def pop_autostrip(self):
+        """ Pop autostrip value. """
+        if len(self.autostrip_stack) > 0:
+            self.autostrip = self.autostrip_stack.pop()
+        else:
+            raise SyntaxError(
+                "Unexpected autostrip pop",
+                self.template.filename,
+                self.action_line
+            )
+
+    def set_autostrip(self, value):
+        """ Set the autostrip value. """
+        self.autostrip = value
 
     def _get_token(self, pos, end, errmsg="Expected token"):
         """ Get a token at a position, raise error if not found/out of bound """
@@ -63,7 +139,6 @@ class TemplateParser(object):
                 self.template.filename,
                 self.tokens[pos - 1].line if pos > 0 else 0
             )
-
 
     def _get_expected_token(self, pos, end, types, errmsg="Unexpected token", values=None):
         """ Expect a specific type of token. """
@@ -299,11 +374,11 @@ class TemplateParser(object):
 
         self._flush_buffer(pre_ws_control, None)
 
-        if self._ops_stack:
+        if len(self.action_handler_stack) > 1:
             raise SyntaxError(
                 "Unmatched action tag",
                 self.template.filename,
-                self._ops_stack[-1][1]
+                self.action_handler_stack[-1][0]
             )
 
         return self.nodes
@@ -313,526 +388,21 @@ class TemplateParser(object):
 
         # Determine the action
         token = self._get_token(start, end, "Expected action")
+        self.action_line = token.line
+
         action = token.value
         start += 1
 
-        if action == "if":
-            self._parse_action_if(start, end)
-        elif action == "elif":
-            self._parse_action_elif(start, end)
-        elif action == "else":
-            self._parse_action_else(start, end)
-        elif action == "break":
-            self._parse_action_break(start, end)
-        elif action == "continue":
-            self._parse_action_continue(start, end)
-        elif action == "for":
-            self._parse_action_for(start, end)
-        elif action == "switch":
-            self._parse_action_switch(start, end)
-        elif action in SwitchNode.types:
-            self._parse_action_switch_item(start, end, action)
-        elif action == "set":
-            self._parse_action_set(start, end, Scope.SCOPE_LOCAL)
-        elif action == "global":
-            self._parse_action_set(start, end, Scope.SCOPE_GLOBAL)
-        elif action == "template":
-            self._parse_action_set(start, end, Scope.SCOPE_TEMPLATE)
-        elif action == "private":
-            self._parse_action_set(start, end, Scope.SCOPE_PRIVATE)
-        elif action == "unset":
-            self._parse_action_unset(start, end)
-        elif action == "scope":
-            self._parse_action_scope(start, end)
-        elif action == "code":
-            self._parse_action_code(start, end)
-        elif action == "include":
-            self._parse_action_include(start, end)
-        elif action == "return":
-            self._parse_action_return(start, end)
-        elif action == "expand":
-            self._parse_action_expand(start, end)
-        elif action == "section":
-            self._parse_action_section(start, end)
-        elif action == "use":
-            self._parse_action_use(start, end)
-        elif action == "var":
-            self._parse_action_var(start, end)
-        elif action == "error":
-            self._parse_action_error(start, end)
-        elif action == "import":
-            self._parse_action_import(start, end)
-        elif action == "do":
-            self._parse_action_do(start, end)
-        elif action == "hook":
-            self._parse_action_hook(start, end, False)
-        elif action == "rhook":
-            self._parse_action_hook(start, end, True)
-        elif action.startswith("end"):
-            self._parse_action_end(start, end, action)
-        elif action == "strip":
-            self._parse_action_strip(start, end)
-        elif action == "autostrip":
-            self.autostrip = self.AUTOSTRIP_STRIP
-        elif action == "autotrim":
-            self.autostrip = self.AUTOSTRIP_TRIM
-        elif action == "no_autostrip":
-            self.autostrip = self.AUTOSTRIP_NONE
-        else:
-            raise SyntaxError(
-                "Unknown action tag: {0}".format(action),
-                self.template.filename,
-                token.line
-            )
-
-    def _parse_action_if(self, start, end):
-        """ Parse an if action. """
-        expr = self._parse_expr(start, end)
-        line = self.tokens[start].line
-
-        node = IfNode(self.template, line, expr)
-
-        self._ops_stack.append(("if", line))
-        self.stack[-1].append(node)
-        self.stack.append(node.nodes)
-
-    def _parse_action_elif(self, start, end):
-        """ Parse an elif action. """
-        expr = self._parse_expr(start, end)
-        line = self.tokens[start].line
-
-        if not self._ops_stack:
-            raise SyntaxError(
-                "Mismatched elif",
-                self.template.filename,
-                line
-            )
-
-        what = self._ops_stack[-1]
-        if what[0] != "if":
-            raise SyntaxError(
-                "Mismatched elif",
-                self.template.filename,
-                line
-            )
-
-        self.stack.pop()
-        node = self.stack[-1][-1]
-        node.add_elif(expr)
-        self.stack.append(node.nodes)
-
-    def _parse_action_else(self, start, end):
-        """ Parse an else. """
-
-        self._get_no_more_tokens(start, end)
-        line = self.tokens[start - 1].line if start > 0 else 0
-
-        if not self._ops_stack:
-            raise SyntaxError(
-                "Mismatched else",
-                self.template.filename,
-                line
-            )
-
-        what = self._ops_stack[-1]
-        if not what[0] in ("if", "for"):
-            raise SyntaxError(
-                "Mismatched else",
-                self.template.filename,
-                line
-            )
-
-        # Both if and for do this the same way
-        self.stack.pop()
-        node = self.stack[-1][-1]
-        node.add_else()
-        self.stack.append(node.nodes)
-
-    def _parse_action_break(self, start, end):
-        """ Parse break. """
-
-        self._get_no_more_tokens(start, end)
-        line = self.tokens[start - 1].line if start > 0 else 0
-
-        node = BreakNode(self.template, line)
-        self.stack[-1].append(node)
-
-    def _parse_action_continue(self, start, end):
-        """ Parse continue. """
-
-        self._get_no_more_tokens(start, end)
-        line = self.tokens[start - 1].line if start > 0 else 0
-
-        node = ContinueNode(self.template, line)
-        self.stack[-1].append(node)
-
-        return start
-
-    def _parse_action_for(self, start, end):
-        """ Parse a for statement. """
-        # TODO: with new segments, support for <a>[,<b>] in expr and also
-        # for init ; test ; step (init and step are multi-assign, test is expr)
-        # Or, simplification, change for to foreach, both can still have else
-        # foreach if there are no results, for if first test is false/no iterations
-        # and break to break out of loop
-
-        var = self._get_token_var(start, end)
-        line = self.tokens[start].line
-        start += 1
-
-        token = self._get_expected_token(
+        # Use the current handler
+        handler = self.action_handler_stack[-1][1]
+        handler(
+            self,
+            self.template,
+            self.action_line,
+            action,
             start,
-            end,
-            [Token.TYPE_COMMA, Token.TYPE_WORD],
-            "Expected 'in' or ','",
-            "in"
+            end
         )
-        start += 1
-
-        cvar = None
-        if token.type == Token.TYPE_COMMA:
-
-            cvar = self._get_token_var(start, end)
-            start += 1
-
-            token = self._get_expected_token(
-                start,
-                end,
-                Token.TYPE_WORD,
-                "Expected 'in'",
-                "in"
-            )
-            start += 1
-
-        expr = self._parse_expr(start, end)
-
-        node = ForNode(self.template, line, var, cvar, expr)
-        self._ops_stack.append(("for", line))
-        self.stack[-1].append(node)
-        self.stack.append(node.nodes)
-
-    def _parse_action_switch(self, start, end):
-        """ Parse a switch statement. """
-        expr = self._parse_expr(start, end)
-        line = self.tokens[start].line
-
-        node = SwitchNode(self.template, line, expr)
-        self._ops_stack.append(("switch", line))
-        self.stack[-1].append(node)
-        self.stack.append(node.nodes)
-
-    def _parse_action_switch_item(self, start, end, item):
-        """ Parse the switch item. """
-        line = self.tokens[start - 1].line if start > 0 else 0
-
-        if not self._ops_stack:
-            raise SyntaxError(
-                "{0} can only occur in switch".format(item),
-                self.template.filename,
-                line
-            )
-
-        what = self._ops_stack[-1]
-        if what[0] != "switch":
-            raise SyntaxError(
-                "{0} can only occur in switch".format(item),
-                self.template.filename,
-                line
-            )
-
-        offset = SwitchNode.types.index(item)
-        argc = SwitchNode.argc[offset]
-
-        exprs = self._parse_multi_expr(start, end)
-
-        if len(exprs) != argc:
-            raise SyntaxError(
-                "Switch clause {0} takes {1} argument".format(item, argc),
-                self.template.filename,
-                line
-            )
-
-        self.stack.pop()
-        node = self.stack[-1][-1]
-        node.add_case(SwitchNode.cbs[offset], exprs)
-        self.stack.append(node.nodes)
-
-    def _parse_action_set(self, start, end, where):
-        """ Parse a set statement. """
-        assigns = self._parse_multi_assign(start, end)
-        line = self.tokens[start].line
-
-        node = AssignNode(self.template, line, assigns, where)
-        self.stack[-1].append(node)
-
-    def _parse_action_unset(self, start, end):
-        """ Parse an unset statement. """
-        varlist = self._parse_multi_var(start, end)
-        line = self.tokens[start].line
-
-        node = UnsetNode(self.template, line, varlist)
-        self.stack[-1].append(node)
-
-    def _parse_action_scope(self, start, end):
-        """ Parse a scope statement. """
-        line = self.tokens[start - 1].line if start > 0 else 0
-        if start <= end:
-            assigns = self._parse_multi_assign(start, end)
-        else:
-            assigns = []
-
-        node = ScopeNode(self.template, line, assigns)
-        self._ops_stack.append(("scope", line))
-        self.stack[-1].append(node)
-        self.stack.append(node.nodes)
-
-    def _parse_action_code(self, start, end):
-        """ Parse a code node. """
-        line = self.tokens[start - 1].line if start > 0 else 0
-
-        # disable autostrip for this block
-        self.autostrip_stack.append(self.autostrip)
-        self.autostrip = self.AUTOSTRIP_NONE
-
-        retvar = None
-        assigns = []
-        segments = self._find_tag_segments(start, end)
-        for segment in segments:
-            (start, end) = segment
-
-            token = self._get_token(start, end)
-            start += 1
-
-            # expecting either return or with
-            if token.type == Token.TYPE_WORD and token.value == "return":
-                retvar = self._get_token_var(start, end)
-                start += 1
-
-                self._get_no_more_tokens(start, end)
-                continue
-
-            if token.type == Token.TYPE_WORD and token.value == "with":
-                assigns = self._parse_multi_assign(start, end)
-                continue
-
-            raise SyntaxError(
-                "Unexpected token",
-                self.template.filename,
-                self.tokens[start].line
-            )
-
-
-        self._ops_stack.append(("code", line))
-        node = CodeNode(self.template, line, assigns, retvar)
-        self.stack[-1].append(node)
-        self.stack.append(node.nodes)
-
-    def _parse_action_include(self, start, end):
-        """ Parse an include node. """
-        line = self.tokens[start - 1].line if start > 0 else start
-
-        expr = None
-        retvar = None
-        assigns = []
-        segments = self._find_tag_segments(start, end)
-        for segment in segments:
-            (start, end) = segment
-
-            token = self._get_token(start, end)
-            start += 1
-
-            # expecting either return or with
-            if token.type == Token.TYPE_WORD and token.value == "return":
-                retvar = self._get_token_var(start, end)
-                start += 1
-
-                self._get_no_more_tokens(start, end)
-                continue
-
-            if token.type == Token.TYPE_WORD and token.value == "with":
-                assigns = self._parse_multi_assign(start, end)
-                continue
-
-            # neither return or with, so expression
-            start -= 1
-            expr = self._parse_expr(start, end)
-
-        if expr is None:
-            raise SyntaxError(
-                "Include expecting path expression",
-                self.template.filename,
-                line
-            )
-
-        node = IncludeNode(self.template, line, expr, assigns, retvar)
-        self.stack[-1].append(node)
-
-    def _parse_action_return(self, start, end):
-        """ Parse a return variable node. """
-        assigns = self._parse_multi_assign(start, end)
-        line = self.tokens[start].line
-
-        node = ReturnNode(self.template, line, assigns)
-        self.stack[-1].append(node)
-
-    def _parse_action_expand(self, start, end):
-        """ Parse an expand node. """
-        expr = self._parse_expr(start, end)
-        line = self.tokens[start].line
-
-        node = ExpandNode(self.template, line, expr)
-        self.stack[-1].append(node)
-
-    def _parse_action_section(self, start, end):
-        """ Parse a section node. """
-        expr = self._parse_expr(start, end)
-        line = self.tokens[start].line
-
-        self._ops_stack.append(("section", line))
-        node = SectionNode(self.template, line, expr)
-        self.stack[-1].append(node)
-        self.stack.append(node.nodes)
-
-    def _parse_action_use(self, start, end):
-        """ Parse a use section node. """
-        expr = self._parse_expr(start, end)
-        line = self.tokens[start].line
-
-        node = UseSectionNode(self.template, line, expr)
-        self.stack[-1].append(node)
-
-    def _parse_action_var(self, start, end):
-        """ Parse a block to store rendered output in a variable. """
-        var = self._get_token_var(start, end)
-        line = self.tokens[start].line
-        start += 1
-
-        self._get_no_more_tokens(start, end)
-
-        node = VarNode(self.template, line, var)
-        self._ops_stack.append(("var", line))
-        self.stack[-1].append(node)
-        self.stack.append(node.nodes)
-
-    def _parse_action_error(self, start, end):
-        """ Raise an error from the template. """
-        expr = self._parse_expr(start, end)
-        line = self.tokens[start].line
-
-        node = ErrorNode(self.template, line, expr)
-        self.stack[-1].append(node)
-
-    def _parse_action_import(self, start, end):
-        """ Parse an import action. """
-        assigns = self._parse_multi_assign(start, end)
-        line = self.tokens[start].line
-
-        node = ImportNode(self.template, line, assigns)
-        self.stack[-1].append(node)
-
-    def _parse_action_do(self, start, end):
-        """ Parse a do tag. """
-        nodes = self._parse_multi_expr(start, end)
-        line = self.tokens[start].line
-
-        node = DoNode(self.template, line, nodes)
-        self.stack[-1].append(node)
-
-    def _parse_action_hook(self, start, end, reverse):
-        """ Parse a hook tag. """
-        line = self.tokens[start - 1].line if start > 0 else 0
-
-        hook = None
-        assigns = []
-        segments = self._find_tag_segments(start, end)
-        for segment in segments:
-            (start, end) = segment
-
-            token = self._get_token(start, end)
-            start += 1
-
-            # expecting either with or expression
-            if token.type == Token.TYPE_WORD and token.value == "with":
-                assigns = self._parse_multi_assign(start, end)
-                continue
-
-            # not with, then should be expression
-            start -= 1
-            hook = self._parse_expr(start, end)
-
-        if hook is None:
-            raise SyntaxError(
-                "Hook expecting name expression",
-                self.template.filename,
-                line)
-
-        node = HookNode(self.template, line, hook, assigns, reverse)
-        self.stack[-1].append(node)
-
-    def _parse_action_end(self, start, end, action):
-        """ Parse an end tag """
-        self._get_no_more_tokens(start, end)
-        line = self.tokens[start - 1].line if start > 0 else 0
-
-        if not self._ops_stack:
-            raise SyntaxError(
-                "To many ends: {0}".format(action),
-                self.template.filename,
-                line
-            )
-        elif start <= end:
-            raise SyntaxError(
-                "Unexpected token",
-                self.template.filename,
-                self.tokens[start].line
-            )
-
-        what = self._ops_stack[-1]
-        if what[0] != action[3:]:
-            raise SyntaxError(
-                "Mismatched end tag: {0}".format(action),
-                self.template.filename,
-                line
-            )
-
-        self._ops_stack.pop()
-
-        # Handle certain tags
-
-        # Pop node stack for any op that created a new node stack
-        if not what[0] == "strip":
-            self.stack.pop()
-
-        # Restore autostrip value for any op that pushed the value
-        if what[0] in ("strip", "code"):
-            self.autostrip = self.autostrip_stack.pop()
-
-    def _parse_action_strip(self, start, end):
-        """ Change the autostrip state. """
-        line = self.tokens[start - 1].line if start > 0 else 0
-
-        self.autostrip_stack.append(self.autostrip)
-        self._ops_stack.append(("strip", line))
-
-        if start <= end:
-            token = self._get_expected_token(
-                start,
-                end,
-                Token.TYPE_WORD,
-                "Expected on, off, or trim",
-                ["on", "off", "trim"]
-            )
-            start += 1
-        else:
-            # No change
-            return
-
-        if token.value == "on":
-            self.autostrip = self.AUTOSTRIP_STRIP
-        elif token.value == "trim":
-            self.autostrip = self.AUTOSTRIP_TRIM
-        else:
-            self.autostrip = self.AUTOSTRIP_NONE
 
     def _parse_tag_emitter(self, start, end):
         """ Parse an emitter tag. """
