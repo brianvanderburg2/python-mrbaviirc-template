@@ -7,7 +7,7 @@ __license__ = "Apache License 2.0"
 
 from ..nodes import IncludeNode
 from ..tokenizer import Token
-from ..errors import SyntaxError
+from ..errors import ParserError
 
 
 def include_handler(parser, template, line, action, start, end):
@@ -39,7 +39,7 @@ def include_handler(parser, template, line, action, start, end):
         expr = parser._parse_expr(start, end)
 
     if expr is None:
-        raise SyntaxError(
+        raise ParserError(
             "Include expecting path expression",
             template.filename,
             line

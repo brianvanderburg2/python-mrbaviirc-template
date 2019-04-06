@@ -7,7 +7,7 @@ __license__ = "Apache License 2.0"
 
 from ..nodes import CodeNode
 from ..tokenizer import Token
-from ..errors import SyntaxError
+from ..errors import ParserError
 
 
 def code_handler(parser, template, line, action, start, end):
@@ -33,7 +33,7 @@ def code_handler(parser, template, line, action, start, end):
             assigns = parser._parse_multi_assign(start, end)
             continue
 
-        raise SyntaxError(
+        raise ParserError(
             "Unexpected token",
             template.filename,
             line
@@ -56,7 +56,7 @@ def code_subhandler(parser, template, line, action, start, end):
         parser.pop_autostrip()
 
     else:
-        raise SyntaxError(
+        raise ParserError(
             "Nested tags not allowed in code",
             template.filename,
             line

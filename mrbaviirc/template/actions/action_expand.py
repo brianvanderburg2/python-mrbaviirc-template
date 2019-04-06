@@ -6,7 +6,7 @@ __license__ = "Apache License 2.0"
 
 
 from ..nodes import ExpandNode
-from ..errors import SyntaxError
+from ..errors import ParserError
 
 
 def expand_handler(parser, template, line, action, start, end):

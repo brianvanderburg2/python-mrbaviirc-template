@@ -7,7 +7,7 @@ __license__ = "Apache License 2.0"
 
 from ..nodes import ForNode
 from ..tokenizer import Token
-from ..errors import SyntaxError
+from ..errors import ParserError
 
 
 def for_handler(parser, template, line, action, start, end):

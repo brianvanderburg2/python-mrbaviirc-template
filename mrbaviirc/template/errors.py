@@ -33,8 +33,8 @@ class TemplateError(Error):
         self.line = line
 
 
-class SyntaxError(TemplateError):
-    """ Represent a syntax error in the template. """
+class ParserError(TemplateError):
+    """ Represent a parsing syntax error in the template. """
     pass
 
 

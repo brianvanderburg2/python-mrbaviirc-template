@@ -67,7 +67,7 @@ class TemplateParser(object):
         if len(self.action_handler_stack) > 1:
             self.action_handler_stack.pop()
         else:
-            raise SyntaxError(
+            raise ParserError(
                 "Unexpected handler pop",
                 self.template.filename,
                 self.action_line
@@ -81,7 +81,7 @@ class TemplateParser(object):
         if handler:
             handler(parser, template, line, action, start, end)
         else:
-            raise SyntaxError(
+            raise ParserError(
                 "Unknown action: {0}".format(action),
                 template.filename,
                 line
@@ -101,7 +101,7 @@ class TemplateParser(object):
             self.stack.pop()
             return self.stack[-1][-1]
         else:
-            raise SyntaxError(
+            raise ParserError(
                 "Unexpected nodelist pop",
                 self.template.filename,
                 self.action_line
@@ -118,7 +118,7 @@ class TemplateParser(object):
         if len(self.autostrip_stack) > 0:
             self.autostrip = self.autostrip_stack.pop()
         else:
-            raise SyntaxError(
+            raise ParserError(
                 "Unexpected autostrip pop",
                 self.template.filename,
                 self.action_line
@@ -134,7 +134,7 @@ class TemplateParser(object):
         if pos <= end:
             return self.tokens[pos]
         else:
-            raise SyntaxError(
+            raise ParserError(
                 errmsg,
                 self.template.filename,
                 self.tokens[pos - 1].line if pos > 0 else 0
@@ -148,7 +148,7 @@ class TemplateParser(object):
             types = [types]
 
         if token.type not in types:
-            raise SyntaxError(
+            raise ParserError(
                 errmsg,
                 self.template.filename,
                 token.line
@@ -159,7 +159,7 @@ class TemplateParser(object):
                 values = [values]
 
             if token.value not in values:
-                raise SyntaxError(
+                raise ParserError(
                     errmsg,
                     self.template.filename,
                     token.line
@@ -171,7 +171,7 @@ class TemplateParser(object):
         """ Expect the end of the range. """
 
         if pos <= end:
-            raise SyntaxError(
+            raise ParserError(
                 errmsg,
                 self.template.filename,
                 self.tokens[pos].line
@@ -184,14 +184,14 @@ class TemplateParser(object):
         if re.match("[a-zA-Z_][a-zA-Z0-9_]*", token.value):
             return token.value
         else:
-            raise SyntaxError(
+            raise ParserError(
                 "Invalid variable name: {0}".format(token.value),
                 self.template.filename,
                 token.line
             )
 
         # If we got here, it wasn't a variable
-        raise SyntaxError(
+        raise ParserError(
             errmsg,
             self.template.filename,
             token.line
@@ -223,7 +223,7 @@ class TemplateParser(object):
                     last = None
 
                 if last is None or newtoken.type != self.OPEN_CLOSE_MAP[last]:
-                    raise SyntaxError(
+                    raise ParserError(
                         "Mismatched or unclosed token",
                         self.template.filename,
                         newtoken.line
@@ -234,7 +234,7 @@ class TemplateParser(object):
                     return pos
 
         if token_stack:
-            raise SyntaxError(
+            raise ParserError(
                 "Unmatched braces/parenthesis",
                 self.template.filename,
                 self.tokens[first].line
@@ -247,7 +247,7 @@ class TemplateParser(object):
 
         token = self.tokens[start]
         if not token.type in self.OPEN_CLOSE_MAP:
-            raise SyntaxError(
+            raise ParserError(
                 "Unexpected token",
                 self.template.filename,
                 token.line
@@ -268,7 +268,7 @@ class TemplateParser(object):
                     last = None
 
                 if last is None or token.type != self.OPEN_CLOSE_MAP[last]:
-                    raise SyntaxError(
+                    raise ParserError(
                         "Mismatched or unclosed token",
                         self.template.filename,
                         token.line
@@ -279,7 +279,7 @@ class TemplateParser(object):
                     return pos
 
         # If we get here, we never found the closing token
-        raise SyntaxError(
+        raise ParserError(
             "Unmatched braces/parenthesis",
             self.template.filename,
             self.tokens[start].line
@@ -298,7 +298,7 @@ class TemplateParser(object):
                 break
 
             if pos == start or pos == end:
-                raise SyntaxError(
+                raise ParserError(
                     "Unexpected semicolon",
                     self.template.filename,
                     self.tokens[pos].line # find_level0 doesn't use get_token
@@ -351,7 +351,7 @@ class TemplateParser(object):
                     if self.tokens[endpos].type == ending:
                         break
                 else:
-                    raise SyntaxError(
+                    raise ParserError(
                         "Opening tag missing closing tag.",
                         self.template.filename,
                         token.line
@@ -375,7 +375,7 @@ class TemplateParser(object):
         self._flush_buffer(pre_ws_control, None)
 
         if len(self.action_handler_stack) > 1:
-            raise SyntaxError(
+            raise ParserError(
                 "Unmatched action tag",
                 self.template.filename,
                 self.action_handler_stack[-1][0]
@@ -438,7 +438,7 @@ class TemplateParser(object):
             # We ignore many dependency how we split
 
             if token.type == Token.TYPE_SEMICOLON:
-                raise SyntaxError(
+                raise ParserError(
                     "Unexpected semicolon",
                     self.template.filename,
                     token.line
@@ -605,7 +605,7 @@ class TemplateParser(object):
                     self._parse_expr(nott + 1, end)
                 )
             else:
-                raise SyntaxError(
+                raise ParserError(
                     "Unexpected token: !",
                     self.template.filename,
                     token.line
@@ -625,7 +625,7 @@ class TemplateParser(object):
                         self._parse_expr(posneg + 1, end)
                     )
             else:
-                raise SyntaxError(
+                raise ParserError(
                     "Unexpected token: {0}".format(
                         "+" if token.type == Token.TYPE_PLUS else "-"
                     ),
@@ -674,7 +674,7 @@ class TemplateParser(object):
 
             return expr
 
-        raise SyntaxError(
+        raise ParserError(
             "Unexpected token",
             self.template.filename,
             token.line
@@ -694,7 +694,7 @@ class TemplateParser(object):
                     start += 1
                     continue
 
-                raise SyntaxError(
+                raise ParserError(
                     "Expected variable name",
                     self.template.filename,
                     token.line
@@ -717,7 +717,7 @@ class TemplateParser(object):
                 start = closing + 1
                 continue
 
-            raise SyntaxError(
+            raise ParserError(
                 "Unexpected token",
                 self.template.filename,
                 token.line
@@ -749,7 +749,7 @@ class TemplateParser(object):
             if is_dict:
                 pos = self._find_level0_token(start, end, Token.TYPE_COLON)
                 if pos is None:
-                    raise SyntaxError(
+                    raise ParserError(
                         "Dictionary expecting ':'",
                         self.template.filename,
                         line
@@ -796,7 +796,7 @@ class TemplateParser(object):
 
             return items
         else:
-            raise SyntaxError(
+            raise ParserError(
                 "Expected expression list",
                 self.template.filename,
                 self.tokens[start - 1] if start > 0 else 0
@@ -831,7 +831,7 @@ class TemplateParser(object):
 
             return assigns
         else:
-            raise SyntaxError(
+            raise ParserError(
                 "Expected assignment list.",
                 self.template.filename,
                 self.tokens[start - 1].line if start > 0 else 0
@@ -855,7 +855,7 @@ class TemplateParser(object):
 
             return varlist
         else:
-            raise SyntaxError(
+            raise ParserError(
                 "Expected variable list",
                 self.template.filename,
                 self.tokens[start - 1].line if start > 0 else 0

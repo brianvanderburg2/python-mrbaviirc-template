@@ -6,7 +6,7 @@ __license__ = "Apache License 2.0"
 
 
 from ..nodes import SwitchNode
-from ..errors import SyntaxError
+from ..errors import ParserError
 
 
 def switch_handler(parser, template, line, action, start, end):
@@ -28,7 +28,7 @@ def switch_subhandler(parser, template, line, action, start, end):
         exprs = parser._parse_multi_expr(start, end)
 
         if len(exprs) != argc:
-            raise SyntaxError(
+            raise ParserError(
                 "Switch clause {0} takes {1} argument".format(action, argc),
                 template.filename,
                 line

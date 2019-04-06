@@ -8,7 +8,7 @@ __license__ = "Apache License 2.0"
 __all__ = ["context"]
 
 
-from ..errors import UnknownVariableError, SyntaxError
+from ..errors import UnknownVariableError, ParserError
 from ..util import specialfunc
 
 
@@ -41,7 +41,7 @@ def defined(env, template, line, scope, params):
 def default(env, template, line, scope, params):
     """ Return a default if the first parameter does not evaluate. """
     if len(params) != 2:
-        raise SyntaxError(
+        raise ParserError(
             "Template builting 'default' expects 2 arguments",
             template,
             line

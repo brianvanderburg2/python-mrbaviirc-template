@@ -7,7 +7,7 @@ __license__ = "Apache License 2.0"
 
 __all__ = ["Token", "Tokenizer"]
 
-from .errors import SyntaxError
+from .errors import ParserError
 
 
 class Token(object):
@@ -394,7 +394,7 @@ class Tokenizer(object):
                     break
 
             # Unknown character in input
-            raise SyntaxError(
+            raise ParserError(
                 "Unexpected character {0}".format(char),
                 self.filename,
                 self.line
@@ -476,7 +476,7 @@ class Tokenizer(object):
                 self.line += 1
 
         if not end:
-            raise SyntaxError("Unclosed string", self.filename, self.line)
+            raise ParserError("Unclosed string", self.filename, self.line)
 
         token = Token(Token.TYPE_STRING, self.line, "".join(result))
         self.tokens.append(token)

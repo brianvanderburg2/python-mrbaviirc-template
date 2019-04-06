@@ -7,7 +7,7 @@ __license__ = "Apache License 2.0"
 
 from ..nodes import HookNode
 from ..tokenizer import Token
-from ..errors import SyntaxError
+from ..errors import ParserError
 
 
 def _hook_handler(parser, template, line, action, start, end, reverse):
@@ -31,7 +31,7 @@ def _hook_handler(parser, template, line, action, start, end, reverse):
         hook = parser._parse_expr(start, end)
 
     if hook is None:
-        raise SyntaxError(
+        raise ParserError(
             "Hook expecting name expression",
             template.filename,
             line)
