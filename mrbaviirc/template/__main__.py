@@ -24,7 +24,7 @@ if __name__ == "__main__":
         args = parser.parse_args()
 
 
-        e = Environment({"lib": StdLib()})
+        e = Environment()
         t = e.load_file(args.template)
 
         data = json.loads(open(args.data, "rU").read())
