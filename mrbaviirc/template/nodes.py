@@ -6,11 +6,11 @@ __copyright__ = "Copyright 2016"
 __license__ = "Apache License 2.0"
 
 __all__ = [
-    "Node", "NodeList", "TextNode", "IfNode", "ForNode", "SwitchNode",
-    "EmitNode", "IncludeNode", "ReturnNode", "AssignNode", "SectionNode",
-    "UseSectionNode", "ScopeNode", "VarNode", "ErrorNode", "ImportNode",
-    "DoNode", "UnsetNode", "CodeNode", "ExpandNode", "HookNode", "BreakNode",
-    "ContinueNode"
+    "Node", "NodeList", "TextNode", "IfNode", "ForIterNode", "ForIncrNode",
+    "SwitchNode", "EmitNode", "IncludeNode", "ReturnNode", "AssignNode",
+    "SectionNode", "UseSectionNode", "ScopeNode", "VarNode", "ErrorNode",
+    "ImportNode", "DoNode", "UnsetNode", "CodeNode", "ExpandNode", "HookNode",
+    "BreakNode", "ContinueNode"
 ]
 
 
@@ -111,8 +111,8 @@ class IfNode(Node):
             return self.else_nodes.render(renderer, scope)
 
 
-class ForNode(Node):
-    """ A node for handling for loops. """
+class ForIterNode(Node):
+    """ A node for handling iteration for loops. """
 
     def __init__(self, template, line, var, cvar, expr):
         """ Initialize the for node. """
@@ -150,6 +150,49 @@ class ForNode(Node):
                     break
                 elif result == Node.RENDER_CONTINUE:
                     continue
+
+        if do_else and self.else_nodes:
+            return self.else_nodes.render(renderer, scope)
+
+
+class ForIncrNode(Node):
+    """ A node for handling increment for loops. """
+
+    def __init__(self, template, line, init, test, incr):
+        """ Initialize the for node. """
+        Node.__init__(self, template, line)
+        self.init = init
+        self.test = test
+        self.incr = incr
+
+        self.for_nodes = NodeList()
+        self.else_nodes = None
+        self.nodes = self.for_nodes
+
+    def add_else(self):
+        """ Add an else section. """
+        self.else_nodes = NodeList()
+        self.nodes = self.else_nodes
+
+    def render(self, renderer, scope):
+        """ Render the for node. """
+        # Init
+        for (var, expr) in self.init:
+            scope.set(var, expr.eval(scope))
+
+        # Test
+        do_else = True
+        while bool(self.test.eval(scope)):
+            do_else = False
+
+            # Render nodes
+            result = self.for_nodes.render(renderer, scope)
+            if result == Node.RENDER_BREAK:
+                break
+
+            # Incr
+            for (var, expr) in self.incr:
+                scope.set(var, expr.eval(scope))
 
         if do_else and self.else_nodes:
             return self.else_nodes.render(renderer, scope)

@@ -59,3 +59,19 @@ Added
 
     Dictionary syntax borrows from list syntax: [key:value, key:value, ...]
     An empty dictionary can be created as [:]
+
+* Support for iteration or increment loops.
+
+    An iteration loop has the same syntax:
+
+        {% for var in items %} or {% for var,pos in items %}
+
+    An increment loop takes three segments, init, test, and incr.  The
+    init and incr are multi-assign expressions segments while test is
+    an expression:
+
+        {% for i = 0, j = 0 ; i < 10 ; i = i + 1 %}
+
+    In all othere ways they are the same, ending with {% endfor %}.  The
+    {% else %} tag behaves the same, being rendered only if the loop didn't
+    have any iterations.
