@@ -35,13 +35,11 @@ class Template(object):
         """ Render the template. """
 
         # Create the top (global) scope for this render
-        scope = Scope(abort_fn=abort_fn)
-        scope.update(builtin_context) # Add builtin only
+        scope = Scope(userdata=userdata, abort_fn=abort_fn)
 
+        scope.update(builtin_context) # Add builtin only
         if context is not None:
             scope.update(context)
-        if userdata is not None:
-            scope.update_userdata(userdata)
 
         return self.nested_render(renderer, None, scope)
 

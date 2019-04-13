@@ -14,7 +14,7 @@ __all__ = [
 ]
 
 
-from .errors import TemplateError, RaisedError, UnknownImportError, RestrictedError
+from .errors import TemplateError, RaisedError, UnknownImportError, RestrictedError, AbortError
 from .renderers import StringRenderer
 
 
@@ -57,7 +57,8 @@ class NodeList(object):
 
     def render(self, renderer, scope):
         """ Render all nodes. """
-        scope.check_abort()
+        if scope.abort_fn and scope.abort_fn():
+            raise AbortError("Nodelist render aborted")
 
         for node in self.nodes:
             result = node.render(renderer, scope)

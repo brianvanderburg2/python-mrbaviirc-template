@@ -23,8 +23,8 @@ def hook1b(env, template, line, renderer, scope, params):
     if "count" in params:
         renderer.render("Count: {0}\n".format(params["count"]))
 
-    u1 = scope.get_userdata("user1")
-    u2 = scope.get_userdata("user2")
+    u1 = scope.userdata["user1"]
+    u2 = scope.userdata["user2"]
     if u1 is not None:
         renderer.render("User1: {0}\n".format(u1))
     if u2 is not None:

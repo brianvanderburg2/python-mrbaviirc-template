@@ -5,9 +5,6 @@ __copyright__ = "Copyright 2016"
 __license__ = "Apache License 2.0"
 
 
-from .errors import AbortError
-
-
 class Scope(object):
     """ Represent the different variable levels at the current scope. """
     SCOPE_LOCAL = 0
@@ -15,40 +12,36 @@ class Scope(object):
     SCOPE_TEMPLATE = 2
     SCOPE_PRIVATE = 3
 
-    def __init__(self, parent=None, template=False, abort_fn=None):
-        """ Initialize the current scope. """
+    def __init__(self, userdata=None, abort_fn=None):
+        """ Initialize our render scope. """
 
-        self.parent = parent
+        # Per-top-level-render data
+        self.userdata = userdata
+        self.abort_fn = abort_fn
+
+        # Scope data
+        self.parent = None
         self.local_scope = {}
-        self.user_data = {}
-
-        # Private variables can only be accessed from the scope that set them
         self.private_scope = {}
 
-        # Set global and template
-        if parent:
-            self.global_scope = parent.global_scope
-
-            if template:
-                # We are starting a template scope
-                self.template_scope = self.local_scope
-            else:
-                self.template_scope = parent.template_scope
-        else:
-            self.global_scope = self.local_scope
-            self.template_scope = None
-
-        # Abort function from main scope
-        if abort_fn:
-            self.abort_fn = abort_fn
-        elif parent:
-            self.abort_fn = parent.abort_fn
-        else:
-            self.abort_fn = None
+        # We are a new top-level scope, so set defaults
+        self.global_scope = self.local_scope
+        self.template_scope = None
 
     def push(self, template=False):
-        """ Create new scope and return it. """
-        return Scope(self, template)
+        """ Create a new nested scope. """
+        # Create new scope with top-level-render data
+        scope = Scope(self.userdata, self.abort_fn)
+
+        # Point to use as parent and set global/template scopes accordingly
+        scope.parent = self
+        scope.global_scope = self.global_scope
+        if template:
+            scope.template_scope = scope.local_scope
+        else:
+            scope.template_scope = self.template_scope
+
+        return scope
 
     def set(self, name, value, where=SCOPE_LOCAL):
         """ Set a value in the a scope. """
@@ -102,26 +95,3 @@ class Scope(object):
             raise KeyError(var)
 
         return found[var]
-
-    def set_userdata(self, name, value):
-        """ Set a userdata in the scope. """
-        self.user_data[name] = value
-
-    def get_userdata(self, name, defval=None):
-        """ Get userdata from the scope. """
-        scope = self
-        while scope:
-            if name in scope.user_data:
-                return scope.user_data[name]
-            scope = scope.parent
-
-        return defval
-
-    def update_userdata(self, values):
-        """ Update the userdata. """
-        self.user_data.update(values)
-
-    def check_abort(self):
-        """ Check for an abort. """
-        if self.abort_fn and self.abort_fn():
-            raise AbortError("Template render aborted")
