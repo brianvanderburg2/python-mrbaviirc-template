@@ -99,11 +99,6 @@ class UnknownVariableError(TemplateError):
     pass
 
 
-class UnknownDefineError(TemplateError):
-    """ Represent an unknown definition access. """
-    pass
-
-
 class UnknownIndexError(TemplateError):
     """ Represent an unknown index into a variable. """
     pass

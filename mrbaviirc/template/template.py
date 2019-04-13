@@ -73,7 +73,6 @@ class Template(object):
 
         # Initialize
         self.env = env
-        self.text = text
         self.filename = filename
         self.code_enabled = allow_code
 
