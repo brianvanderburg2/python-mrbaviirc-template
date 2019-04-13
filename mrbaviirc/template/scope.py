@@ -1,4 +1,10 @@
-""" Provide a scope to hold variables. """
+""" Provide a scope to hold variables.
+
+Classes
+-------
+Scope
+    The scope holdes variables as well as render-specific data.
+"""
 
 __author__ = "Brian Allen Vanderburg II"
 __copyright__ = "Copyright 2016"
@@ -6,14 +12,74 @@ __license__ = "Apache License 2.0"
 
 
 class Scope(object):
-    """ Represent the different variable levels at the current scope. """
+    """ Represent the variables and render data.
+
+    Constants
+    ---------
+    SCOPE_LOCAL
+        Specify to act on the current local scope.
+    SCOPE_GLOBAL
+        Specify to act on the global scope (the top scope's local scope).
+    SCOPE_TEMPLATE
+        Specify to act on the template scope (the scope pushed when the last
+        template.render_nested call was issued).
+    SCOPE_PRIVATE
+        Specify to operate on the current private scope (the current local scope
+        but none of the parent scopes).
+
+    Attributes
+    ----------
+    userdata : variant
+        Userdata passed to top render call.
+
+    Methods
+    -------
+    push(self, template=False)
+        Push a new nested scope.
+    set(self, name, value, where=SCOPE_LOCAL)
+        Set a value in the scope at a specific level.
+    update(self, values)
+        Update values in the local scope.
+    unset(self, name)
+        Unset a name in the local and private scope.
+    get(self, variable)
+        Get a variable by walking up the scope until it is found.
+
+    Internal API Attributes
+    -----------------------
+    abort_fn : callable
+        An abort function passed to the top render call.
+        callback() : bool
+            Parameters
+            ----------
+            None
+
+            Returns
+            -------
+            bool
+                True to abort, otherwise continue.
+    template_scope : dict
+        Reference to the current template scope.  This is used mainly by the
+        return template tag to set and update the returned values.  set
+        can't directly be used b/c we need to get/update the value directly
+        from the template scope dict.
+    """
     SCOPE_LOCAL = 0
     SCOPE_GLOBAL = 1
     SCOPE_TEMPLATE = 2
     SCOPE_PRIVATE = 3
 
     def __init__(self, userdata=None, abort_fn=None):
-        """ Initialize our render scope. """
+        """ Initialize our render scope.
+
+        Parameters
+        ----------
+        userdata : variant, default=None
+            User data to be passed to special functions and hooks.
+
+        abort_fn : callback, default=None
+            A callback to set for the abort function.
+        """
 
         # Per-top-level-render data
         self.userdata = userdata
@@ -29,7 +95,20 @@ class Scope(object):
         self.template_scope = None
 
     def push(self, template=False):
-        """ Create a new nested scope. """
+        """ Create a new nested scope.
+
+        Parameters
+        ----------
+        template : bool, default=False
+            If Frue, the new scope's template scope will be set to it's local
+            scope.  If False, the new scope's template scope will be the same
+            as the current scope's template scope.
+
+        Returns
+        -------
+        template.Scope
+            The new scope object.
+        """
         # Create new scope with top-level-render data
         scope = Scope(self.userdata, self.abort_fn)
 
@@ -44,7 +123,25 @@ class Scope(object):
         return scope
 
     def set(self, name, value, where=SCOPE_LOCAL):
-        """ Set a value in the a scope. """
+        """ Set a value in the a scope.
+
+        Parameters
+        ----------
+        name : str
+            The name of the value to set
+        value : variant
+            The value to set
+        where : enum
+            One of SCOPE_LOCAL, SCOPE_GLOBAL, SCOPE_TEMPLATE or SCOPE_PRIVATE
+            to specify where the template is set.  SCOPE_PRIVATE is a special
+            variation of SCOPE_LOCAL in that a variable that is set in the
+            private scope will only be returned by "get" when it is the current
+            scope, but if it is a parent scope.
+
+        Returns
+        -------
+        None
+        """
         if where == Scope.SCOPE_LOCAL:
             self.local_scope[name] = value
         elif where == Scope.SCOPE_GLOBAL:
@@ -58,11 +155,31 @@ class Scope(object):
             self.local_scope[name] = value
 
     def update(self, values):
-        """ Update values in the context. """
+        """ Update values in the local scope.
+
+        Parameters
+        ----------
+        values : dict
+            Dictionary of name : variant values to update.
+
+        Returns
+        -------
+        None
+        """
         self.local_scope.update(values)
 
     def unset(self, name):
-        """ Unset a variable from the current scope. """
+        """ Unset a variable from the current scope.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable to remove.
+
+        Returns
+        -------
+        None
+        """
         self.local_scope.pop(name, None)
         self.private_scope.pop(name, None)
 
@@ -72,7 +189,23 @@ class Scope(object):
         self.private_scope.clear()
 
     def get(self, var):
-        """ Get a variable. """
+        """ Get a variable by walking up the scopes until it is found.
+
+        Parameters
+        ----------
+        var : str
+            The name of the variable to get.
+
+        Returns
+        -------
+        variant
+            The value of the found variable.
+
+        Raises
+        ------
+        KeyErorr
+            Raised if the variable was not found.
+        """
 
         # Find the scope dict it is in
         cur = self
