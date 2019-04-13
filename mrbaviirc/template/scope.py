@@ -5,6 +5,9 @@ __copyright__ = "Copyright 2016"
 __license__ = "Apache License 2.0"
 
 
+from .errors import AbortError
+
+
 class Scope(object):
     """ Represent the different variable levels at the current scope. """
     SCOPE_LOCAL = 0
@@ -12,7 +15,7 @@ class Scope(object):
     SCOPE_TEMPLATE = 2
     SCOPE_PRIVATE = 3
 
-    def __init__(self, parent=None, template=False):
+    def __init__(self, parent=None, template=False, abort_fn=None):
         """ Initialize the current scope. """
 
         self.parent = parent
@@ -34,6 +37,14 @@ class Scope(object):
         else:
             self.global_scope = self.local_scope
             self.template_scope = None
+
+        # Abort function from main scope
+        if abort_fn:
+            self.abort_fn = abort_fn
+        elif parent:
+            self.abort_fn = parent.abort_fn
+        else:
+            self.abort_fn = None
 
     def push(self, template=False):
         """ Create new scope and return it. """
@@ -109,3 +120,8 @@ class Scope(object):
     def update_userdata(self, values):
         """ Update the userdata. """
         self.user_data.update(values)
+
+    def check_abort(self):
+        """ Check for an abort. """
+        if self.abort_fn and self.abort_fn():
+            raise AbortError("Template render aborted")

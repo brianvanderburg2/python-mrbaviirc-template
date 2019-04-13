@@ -20,6 +20,11 @@ class RestrictedError(Error):
     pass
 
 
+class AbortError(Error):
+    """ Represent an aborted template render. """
+    pass
+
+
 class TemplateError(Error):
     """ An error at a specific location in atemplate file. """
 

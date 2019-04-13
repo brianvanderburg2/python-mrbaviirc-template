@@ -57,6 +57,8 @@ class NodeList(object):
 
     def render(self, renderer, scope):
         """ Render all nodes. """
+        scope.check_abort()
+
         for node in self.nodes:
             result = node.render(renderer, scope)
             if result in (Node.RENDER_BREAK, Node.RENDER_CONTINUE):

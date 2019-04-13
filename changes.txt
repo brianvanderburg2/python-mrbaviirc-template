@@ -75,3 +75,9 @@ Added
     In all othere ways they are the same, ending with {% endfor %}.  The
     {% else %} tag behaves the same, being rendered only if the loop didn't
     have any iterations.
+
+* Support for an abort function.
+
+    A call to Template.render can now pass an abort function which gets called
+    at the start of each node list's render.  If the abort function returns
+    True, then an AbortError will be raised.

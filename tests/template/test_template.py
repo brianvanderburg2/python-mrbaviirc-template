@@ -9,8 +9,11 @@ import os
 import json
 import glob
 
+import pytest
+
 from mrbaviirc.template import UnrestrictedLoader, Environment, StdLib, StringRenderer
 from mrbaviirc.template import PrefixLoader, PrefixPathLoader, SearchPathLoader
+from mrbaviirc.template import AbortError
 
 def hook1a(env, template, line, renderer, scope, params):
     renderer.render("Hook1 A: {0}\n".format(line))
@@ -59,6 +62,25 @@ def test_compare_prefix_loader():
 
     do_test_compare(env, True)
 
+def test_abort_fn():
+    loader = PrefixLoader()
+    loader.add_prefix("", PrefixPathLoader(DATADIR, allow_code=True))
+
+    env = Environment(loader=loader)
+
+    template = env.load_file("comment_1.tmpl")
+    rndr = StringRenderer()
+
+    def abort_fn1():
+        return True
+
+    def abort_fn2():
+        return False
+
+    with pytest.raises(AbortError):
+        template.render(rndr, None, None, abort_fn1)
+
+    template.render(rndr, None, None, abort_fn2)
 
 def do_test_compare(env, search_path_loader):
     """ Run tests by applying template to input and comparing output. """

@@ -31,11 +31,11 @@ class Template(object):
         parser = TemplateParser(self, text)
         self.nodes = parser.parse()
 
-    def render(self, renderer, context=None, userdata=None):
+    def render(self, renderer, context=None, userdata=None, abort_fn=None):
         """ Render the template. """
 
         # Create the top (global) scope for this render
-        scope = Scope()
+        scope = Scope(abort_fn=abort_fn)
         scope.update(builtin_context) # Add builtin only
 
         if context is not None:
