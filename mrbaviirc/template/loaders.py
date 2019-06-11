@@ -30,6 +30,10 @@ class Loader(object):
         """ Perform fixup on a template loaded with env.load_text. """
         return
 
+    def clear_cache(self): # pylint: disable=no-self-use
+        """ Clear the template cache. """
+        return
+
 
 class UnrestrictedLoader(Loader):
     """ A loader that loads any template specified. """
@@ -64,6 +68,11 @@ class UnrestrictedLoader(Loader):
 
             self.cache[filename] = Template(env, text, filename, allow_code=True)
             return self.cache[filename]
+
+    def clear_cache(self):
+        """ Clear cache. """
+        with self.lock:
+            self.cache = {}
 
 
 class PrefixLoader(Loader):
@@ -210,6 +219,11 @@ class PrefixLoader(Loader):
                 newpath.append(part)
 
         return tuple(newpath)
+
+    def clear_cache(self):
+        """ Clear the cache. """
+        with self.lock:
+            self.cache = {}
 
 
 class PrefixSubLoader(object):
