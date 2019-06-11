@@ -5,7 +5,26 @@ __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
 
-from ..nodes import ScopeNode
+from ..nodes import Node, NodeList
+
+
+class ScopeNode(Node):
+    """ Create and remove scopes. """
+
+    def __init__(self, template, line, assigns):
+        """ Initialize. """
+        Node.__init__(self, template, line)
+        self.assigns = assigns
+        self.nodes = NodeList()
+
+    def render(self, renderer, scope):
+        """ Render the scope. """
+        new_scope = scope.push()
+
+        for (var, expr) in self.assigns:
+            new_scope.set(var, expr.eval(new_scope))
+
+        self.nodes.render(renderer, new_scope)
 
 
 def scope_handler(parser, template, line, action, start, end):

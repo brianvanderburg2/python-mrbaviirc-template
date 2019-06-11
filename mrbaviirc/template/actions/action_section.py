@@ -5,8 +5,26 @@ __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
 
-from ..nodes import SectionNode
+from ..nodes import Node, NodeList
 from ..errors import ParserError
+
+
+class SectionNode(Node):
+    """ A node to redirect template output to a section. """
+
+    def __init__(self, template, line, expr):
+        """ Initialize. """
+        Node.__init__(self, template, line)
+        self.expr = expr
+        self.nodes = NodeList()
+
+    def render(self, renderer, scope):
+        """ Redirect output to a section. """
+
+        section = str(self.expr.eval(scope))
+        renderer.push_section(section)
+        self.nodes.render(renderer, scope)
+        renderer.pop_section()
 
 
 def section_handler(parser, template, line, action, start, end):

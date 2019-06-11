@@ -5,8 +5,23 @@ __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
 
-from ..nodes import AssignNode
+from ..nodes import Node
 from ..scope import Scope
+
+
+class AssignNode(Node):
+    """ Set a variable to a subvariable. """
+
+    def __init__(self, template, line, assigns, where):
+        """ Initialize. """
+        Node.__init__(self, template, line)
+        self.assigns = assigns
+        self.where = where
+
+    def render(self, renderer, scope):
+        """ Set the value. """
+        for (var, expr) in self.assigns:
+            scope.set(var, expr.eval(scope), self.where)
 
 
 def _set_handler(parser, template, line, action, start, end, where):

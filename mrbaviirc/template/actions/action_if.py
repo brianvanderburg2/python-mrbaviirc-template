@@ -5,8 +5,40 @@ __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
 
-from ..nodes import IfNode
+from ..nodes import Node, NodeList
 from ..errors import ParserError
+
+
+class IfNode(Node):
+    """ A node that manages if/elif/else. """
+
+    def __init__(self, template, line, expr):
+        """ Initialize the if node. """
+        Node.__init__(self, template, line)
+        self.ifs_nodes = [(expr, NodeList())]
+        self.else_nodes = None
+        self.nodes = self.ifs_nodes[0][1]
+
+    def add_elif(self, expr):
+        """ Add an if section. """
+        # TODO: error if self.elses exists
+        self.ifs_nodes.append((expr, NodeList()))
+        self.nodes = self.ifs_nodes[-1][1]
+
+    def add_else(self):
+        """ Add an else. """
+        self.else_nodes = NodeList()
+        self.nodes = self.else_nodes
+
+    def render(self, renderer, scope):
+        """ Render the if node. """
+        for (expr, nodes) in self.ifs_nodes:
+            result = expr.eval(scope)
+            if result:
+                return nodes.render(renderer, scope)
+
+        if self.else_nodes:
+            return self.else_nodes.render(renderer, scope)
 
 
 def if_handler(parser, template, line, action, start, end):

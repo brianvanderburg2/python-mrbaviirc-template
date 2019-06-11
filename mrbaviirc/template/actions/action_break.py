@@ -5,7 +5,21 @@ __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
 
-from ..nodes import BreakNode, ContinueNode
+from ..nodes import Node
+
+
+class BreakNode(Node):
+    """ Return RENDER_BREAK. """
+
+    def render(self, renderer, scope):
+        return Node.RENDER_BREAK
+
+
+class ContinueNode(Node):
+    """ Return RENDER_CONTINUE. """
+
+    def render(self, renderer, scope):
+        return Node.RENDER_CONTINUE
 
 
 def break_handler(parser, template, line, action, start, end):
@@ -14,6 +28,7 @@ def break_handler(parser, template, line, action, start, end):
 
     node = BreakNode(template, line)
     parser.add_node(node)
+
 
 def continue_handler(parser, template, line, action, start, end):
     """ Parse the action """

@@ -5,9 +5,69 @@ __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
 
-from ..nodes import CodeNode
+from ..nodes import Node, NodeList
 from ..tokenizer import Token
 from ..errors import ParserError
+from ..renderers import StringRenderer
+
+
+class CodeNode(Node):
+    """ A node to execute python code. """
+
+    def __init__(self, template, line, assigns, retvar):
+        """ Initialize the include node. """
+        Node.__init__(self, template, line)
+        self.assigns = assigns
+        self.retvar = retvar
+        self.nodes = NodeList()
+        self.code = None
+
+    def render(self, renderer, scope):
+        """ Actually do the work of including the template. """
+
+        # Must be allowed globally in env and also locally in template
+        if not self.env.code_enabled or not self.template.code_enabled:
+            raise TemplateError(
+                "Use of direct python code not allowed",
+                self.template.filename,
+                self.line
+            )
+
+        # Compile the code only once
+        # TODO: does this need lock for threading
+        if not self.code:
+            # Get the code
+            new_renderer = StringRenderer()
+            self.nodes.render(new_renderer, scope)
+            code = new_renderer.get()
+
+            # Compile it
+            try:
+                self.code = compile(code, "<string>", "exec")
+            except Exception as error:
+                raise TemplateError(
+                    str(error),
+                    self.template.filename,
+                    self.line
+                )
+
+        # Execute the code
+        data = {}
+        for (var, expr) in self.assigns:
+            data[var] = expr.eval(scope)
+
+        try:
+            exec(self.code, data, data)
+        except Exception as error:
+            raise TemplateError(
+                str(error),
+                self.template.filename,
+                self.line
+            )
+
+        # Handle return values
+        if self.retvar:
+            scope.set(self.retvar, data)
 
 
 def code_handler(parser, template, line, action, start, end):
@@ -48,7 +108,7 @@ def code_handler(parser, template, line, action, start, end):
 
 def code_subhandler(parser, template, line, action, start, end):
     """ Handle nested action tags """
-    
+
     if action == "endcode":
         parser._get_no_more_tokens(start, end)
         parser.pop_nodestack()

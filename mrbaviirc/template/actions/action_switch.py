@@ -5,8 +5,47 @@ __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
 
-from ..nodes import SwitchNode
+from ..nodes import Node, NodeList
 from ..errors import ParserError
+
+
+class SwitchNode(Node):
+    """ A node for basic if/elif/elif/else nesting. """
+    types = ["lt", "le", "gt", "ge", "ne", "eq", "bt"]
+    argc = [1, 1, 1, 1, 1, 1, 2]
+    cbs = [
+        lambda *args: args[0] < args[1],
+        lambda *args: args[0] <= args[1],
+        lambda *args: args[0] > args[1],
+        lambda *args: args[0] >= args[1],
+        lambda *args: args[0] != args[1],
+        lambda *args: args[0] == args[1],
+        lambda *args: args[0] >= args[1] and args[0] <= args[2]
+    ]
+
+    def __init__(self, template, line, expr):
+        """ Initialize the switch node. """
+        Node.__init__(self, template, line)
+        self.expr = expr
+        self.default_nodes = NodeList()
+        self.cases_nodes = []
+        self.nodes = self.default_nodes
+
+    def add_case(self, testfunc, exprs):
+        """ Add a case node. """
+        self.cases_nodes.append((testfunc, NodeList(), exprs))
+        self.nodes = self.cases_nodes[-1][1]
+
+    def render(self, renderer, scope):
+        """ Render the node. """
+        value = self.expr.eval(scope)
+
+        for testfunc, nodes, exprs in self.cases_nodes:
+            params = [expr.eval(scope) for expr in exprs]
+            if testfunc(value, *params):
+                return nodes.render(renderer, scope)
+
+        return self.default_nodes.render(renderer, scope)
 
 
 def switch_handler(parser, template, line, action, start, end):

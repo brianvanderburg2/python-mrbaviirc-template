@@ -5,9 +5,42 @@ __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
 
-from ..nodes import IncludeNode
+from ..nodes import Node
 from ..tokenizer import Token
 from ..errors import ParserError
+
+
+class IncludeNode(Node):
+    """ A node to include another template. """
+
+    def __init__(self, template, line, expr, assigns, retvar):
+        """ Initialize the include node. """
+        Node.__init__(self, template, line)
+        self.expr = expr
+        self.assigns = assigns
+        self.retvar = retvar
+
+    def render(self, renderer, scope):
+        """ Actually do the work of including the template. """
+        try:
+            template = self.env.load_file(
+                str(self.expr.eval(scope)),
+                self.template
+            )
+        except (IOError, OSError, RestrictedError) as error:
+            raise TemplateError(
+                str(error),
+                self.template.filename,
+                self.line
+            )
+
+        context = {}
+        for (var, expr) in self.assigns:
+            context[var] = expr.eval(scope)
+
+        retval = template.nested_render(renderer, context, scope)
+        if self.retvar:
+            scope.set(self.retvar, retval)
 
 
 def include_handler(parser, template, line, action, start, end):

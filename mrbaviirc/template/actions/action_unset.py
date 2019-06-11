@@ -5,7 +5,21 @@ __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
 
-from ..nodes import UnsetNode
+from ..nodes import Node
+
+
+class UnsetNode(Node):
+    """ Unset variable at the current scope rsults. """
+
+    def __init__(self, template, line, varlist):
+        """ Initialize. """
+        Node.__init__(self, template, line)
+        self.varlist = varlist
+
+    def render(self, renderer, scope):
+        """ Set the value. """
+        for item in self.varlist:
+            scope.unset(item)
 
 
 def unset_handler(parser, template, line, action, start, end):

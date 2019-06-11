@@ -5,7 +5,30 @@ __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
 
-from ..nodes import ImportNode
+from ..nodes import Node
+
+
+class ImportNode(Node):
+    """ Import a library to a variable in the current scope. """
+    def __init__(self, template, line, assigns):
+        Node.__init__(self, template, line)
+        self.assigns = assigns
+
+    def render(self, renderer, scope):
+        """ Do the import. """
+        env = self.env
+
+        for (var, expr) in self.assigns:
+            name = expr.eval(scope)
+            try:
+                imp = env.load_import(name)
+                scope.set(var, imp)
+            except KeyError:
+                raise UnknownImportError(
+                    "No such import: {0}".format(name),
+                    self.template.filename,
+                    self.line
+                )
 
 
 def import_handler(parser, template, line, action, start, end):

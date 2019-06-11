@@ -5,9 +5,38 @@ __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
 
-from ..nodes import HookNode
+from ..nodes import Node
 from ..tokenizer import Token
 from ..errors import ParserError
+
+
+class HookNode(Node):
+    """ A node to call a registered hook. """
+
+    def __init__(self, template, line, hook, assigns, reverse):
+        """ Initialize """
+        Node.__init__(self, template, line)
+        self.hook = hook
+        self.assigns = assigns
+        self.reverse = reverse
+
+    def render(self, renderer, scope):
+        """ Expand the variables. """
+
+        hook = self.hook.eval(scope)
+        params = {}
+        for (name, expr) in self.assigns:
+            params[name] = expr.eval(scope)
+
+        self.env.call_hook(
+            hook,
+            self.template,
+            self.line,
+            renderer,
+            scope,
+            params,
+            self.reverse
+        )
 
 
 def _hook_handler(parser, template, line, action, start, end, reverse):
