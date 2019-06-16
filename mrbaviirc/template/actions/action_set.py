@@ -1,4 +1,6 @@
 """ Handler for the set action tag. """
+# pylint: disable=too-few-public-methods,too-many-arguments,protected-access,unused-argument
+# pylint: disable=missing-docstring
 
 __author__ = "Brian Allen Vanderburg II"
 __copyright__ = "Copyright 2016-2019"

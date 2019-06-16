@@ -1,5 +1,5 @@
 """ Handler for the do action tag. """
-
+# pylint: disable=too-few-public-methods,too-many-arguments,protected-access,unused-argument
 __author__ = "Brian Allen Vanderburg II"
 __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"

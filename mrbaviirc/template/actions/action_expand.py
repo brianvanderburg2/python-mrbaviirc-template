@@ -1,4 +1,5 @@
 """ Handler for the expand action tag. """
+# pylint: disable=too-few-public-methods,too-many-arguments,protected-access,unused-argument
 
 __author__ = "Brian Allen Vanderburg II"
 __copyright__ = "Copyright 2016-2019"
@@ -6,7 +7,7 @@ __license__ = "Apache License 2.0"
 
 
 from ..nodes import Node
-from ..errors import ParserError
+from ..errors import TemplateError
 
 
 class ExpandNode(Node):

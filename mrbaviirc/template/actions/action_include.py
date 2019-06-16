@@ -1,4 +1,5 @@
 """ Handler for the include action tag. """
+# pylint: disable=too-many-arguments, too-few-public-methods, protected-access, unused-argument
 
 __author__ = "Brian Allen Vanderburg II"
 __copyright__ = "Copyright 2016-2019"
@@ -7,7 +8,8 @@ __license__ = "Apache License 2.0"
 
 from ..nodes import Node
 from ..tokenizer import Token
-from ..errors import ParserError
+from ..errors import ParserError, TemplateError, RestrictedError
+from ..util import DictToAttr
 
 
 class IncludeNode(Node):
@@ -40,7 +42,7 @@ class IncludeNode(Node):
 
         retval = template.nested_render(renderer, context, scope)
         if self.retvar:
-            scope.set(self.retvar, retval)
+            scope.set(self.retvar, DictToAttr(retval))
 
 
 def include_handler(parser, template, line, action, start, end):

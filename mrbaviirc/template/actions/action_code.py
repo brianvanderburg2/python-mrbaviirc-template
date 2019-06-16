@@ -1,4 +1,6 @@
 """ Handler for the code action tag. """
+# pylint: disable=too-few-public-methods, too-many-arguments, protected-access, unused-argument
+# pylint: disable=exec-used
 
 __author__ = "Brian Allen Vanderburg II"
 __copyright__ = "Copyright 2016-2019"
@@ -7,8 +9,9 @@ __license__ = "Apache License 2.0"
 
 from ..nodes import Node, NodeList
 from ..tokenizer import Token
-from ..errors import ParserError
+from ..errors import ParserError, TemplateError
 from ..renderers import StringRenderer
+from ..util import DictToAttr
 
 
 class CodeNode(Node):
@@ -67,7 +70,7 @@ class CodeNode(Node):
 
         # Handle return values
         if self.retvar:
-            scope.set(self.retvar, data)
+            scope.set(self.retvar, DictToAttr(data))
 
 
 def code_handler(parser, template, line, action, start, end):

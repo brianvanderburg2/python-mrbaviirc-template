@@ -5,7 +5,7 @@
 value = "Hello"
 
 {% endcode %}
-{{ result["value"] +}}
+{{ result.value +}}
 
 {% set name = "Allen" %}
 {% code return result ; with name=name, age=23 %}
@@ -16,4 +16,4 @@ value = get_result(name, age)
 del get_result
 
 {% endcode %}
-{{ result["value"] +}}
+{{ result.value +}}

@@ -1,4 +1,5 @@
 """ Handler for the strip action tag. """
+# pylint: disable=too-few-public-methods,too-many-arguments,protected-access,unused-argument
 
 __author__ = "Brian Allen Vanderburg II"
 __copyright__ = "Copyright 2016-2019"
@@ -35,7 +36,7 @@ def strip_handler(parser, template, line, action, start, end):
 
 def strip_subhandler(parser, template, line, action, start, end):
     """ Handle nested action tags """
-    
+
     if action == "endstrip":
         parser._get_no_more_tokens(start, end)
         parser.pop_autostrip()

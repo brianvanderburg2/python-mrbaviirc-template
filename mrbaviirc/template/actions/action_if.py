@@ -1,4 +1,5 @@
 """ Handler for the if action tag. """
+# pylint: disable=too-few-public-methods,too-many-arguments,protected-access,unused-argument
 
 __author__ = "Brian Allen Vanderburg II"
 __copyright__ = "Copyright 2016-2019"
@@ -6,7 +7,6 @@ __license__ = "Apache License 2.0"
 
 
 from ..nodes import Node, NodeList
-from ..errors import ParserError
 
 
 class IfNode(Node):
@@ -53,7 +53,7 @@ def if_handler(parser, template, line, action, start, end):
 
 def if_subhandler(parser, template, line, action, start, end):
     """ Handle nested action tags """
-    
+
     if action == "elif":
         expr = parser._parse_expr(start, end)
         node = parser.pop_nodestack()

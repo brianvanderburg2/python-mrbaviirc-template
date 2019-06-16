@@ -489,7 +489,7 @@ class Tokenizer(object):
         for pos in range(start, len(self.text)):
             char = self.text[pos]
 
-            if char in self.ALPHA or char in self.DIGIT or char in ("_", "@", "#"):
+            if char in self.ALPHA or char in self.DIGIT or char in ("_",):
                 result.append(char)
                 continue
             else:
