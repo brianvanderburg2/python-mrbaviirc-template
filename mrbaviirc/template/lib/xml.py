@@ -83,6 +83,6 @@ class ElementTreeWrapper(object):
         return child
 
     def str(self):
-        return ET.tostring(self._node)
+        return ET.tostring(self._node, encoding="unicode")
 
 
