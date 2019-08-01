@@ -712,8 +712,17 @@ class TemplateParser(object):
 
             if token.type == Token.TYPE_OPEN_BRACKET:
                 closing = self._find_level0_closing(start, end)
-                expr1 = self._parse_expr(start + 1, closing - 1)
-                expr = LookupItemExpr(self.template, token.line, expr, expr1)
+                expr1 = self._parse_multi_expr(start + 1, closing - 1, True)
+                if len(expr1) == 1 and expr1[0] is not None:
+                    expr = LookupItemExpr(self.template, token.line, expr, expr1[0])
+                elif len(expr1) == 2 or len(expr1) == 3:
+                    expr = LookupSliceExpr(self.template, token.line, expr, expr1)
+                else:
+                    raise SyntaxError(
+                        "Invalid item or slice lookup",
+                        self.template.filename,
+                        token.line
+                    )
                 start = closing + 1
                 continue
 
@@ -779,7 +788,7 @@ class TemplateParser(object):
         else:
             return ListExpr(self.template, line, values)
 
-    def _parse_multi_expr(self, start, end):
+    def _parse_multi_expr(self, start, end, empty=False):
         """ Parse a list of expressions separated by comma. """
         items = []
 
@@ -788,10 +797,16 @@ class TemplateParser(object):
             while pos <= end:
                 commapos = self._find_level0_token(pos, end, Token.TYPE_COMMA)
                 if commapos is not None:
-                    items.append(self._parse_expr(pos, commapos - 1))
+                    if pos == commapos and empty:
+                        items.append(None)
+                    else:
+                        items.append(self._parse_expr(pos, commapos - 1))
                     pos = commapos + 1
                 else:
-                    items.append(self._parse_expr(pos, end))
+                    if pos == end + 1 and empty:
+                        items.append(None)
+                    else:
+                        items.append(self._parse_expr(pos, end))
                     pos = end + 1
 
             return items

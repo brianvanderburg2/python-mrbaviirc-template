@@ -8,8 +8,8 @@ __license__ = "Apache License 2.0"
 
 __all__ = [
     "Expr", "ValueExpr", "FuncExpr", "ListExpr", "DictExpr", "VarExpr",
-    "LookupAttrExpr", "LookupItemExpr", "BooleanBinaryExpr", "BinaryExpr",
-    "BooleanUnaryExpr", "UnaryExpr"
+    "LookupAttrExpr", "LookupItemExpr", "LookupSliceExpr", "BooleanBinaryExpr",
+    "BinaryExpr", "BooleanUnaryExpr", "UnaryExpr"
 ]
 
 
@@ -165,6 +165,32 @@ class LookupItemExpr(Expr):
                 self.line
             )
 
+
+class LookupSliceExpr(Expr):
+    """ An array index expression node. """
+
+    def __init__(self, template, line, expr, items):
+        """ Initialize the node. """
+        Expr.__init__(self, template, line)
+        self.expr = expr
+        self.items = items
+
+    def eval(self, scope):
+        """ Evaluate the expression. """
+        result = self.expr.eval(scope)
+        # Eval each slice item
+        parts = list(item.eval(scope) if item is not None else None for item in self.items)
+        parts.extend([None, None, None]) # Ensure at least 3 parts
+        (p0, p1, p2) = parts[0:3]
+
+        try:
+            return result[slice(p0, p1, p2)]
+        except (KeyError, IndexError, TypeError):
+            raise UnknownIndexError(
+                "{0},{1},{2}".format(str(p0), str(p1), str(p2)),
+                self.template.filename,
+                self.line
+            )
 
 class BooleanBinaryExpr(Expr):
     """ Return boolean binary operation of two expressions. """
