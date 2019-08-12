@@ -9,7 +9,7 @@ __license__ = "Apache License 2.0"
 __all__ = [
     "Expr", "ValueExpr", "FuncExpr", "ListExpr", "DictExpr", "VarExpr",
     "LookupAttrExpr", "LookupItemExpr", "LookupSliceExpr", "BooleanBinaryExpr",
-    "BinaryExpr", "BooleanUnaryExpr", "UnaryExpr"
+    "BinaryExpr", "AndExpr", "OrExpr", "BooleanUnaryExpr", "UnaryExpr"
 ]
 
 
@@ -226,6 +226,44 @@ class BinaryExpr(Expr):
             self.expr1.eval(scope),
             self.expr2.eval(scope)
         )
+
+
+class AndExpr(Expr):
+    """ Return boolean AND of two expressions. This used instead of BinaryExpr
+        to allow for shortcut evaluation. """
+    def __init__(self, template, line, expr1, expr2):
+        """ Initialize the node. """
+        Expr.__init__(self, template, line)
+        self.expr1 = expr1
+        self.expr2 = expr2
+
+    def eval(self, scope):
+        """ Evaluate the expression. """
+
+        result = self.expr1.eval(scope)
+        if result:
+            result = self.expr2.eval(scope)
+
+        return bool(result)
+
+
+class OrExpr(Expr):
+    """ Return boolean OR of two expressions. This used instead of BinaryExpr
+        to allow for shortcut evaluation. """
+    def __init__(self, template, line, expr1, expr2):
+        """ Initialize the node. """
+        Expr.__init__(self, template, line)
+        self.expr1 = expr1
+        self.expr2 = expr2
+
+    def eval(self, scope):
+        """ Evaluate the expression. """
+
+        result = self.expr1.eval(scope)
+        if not result:
+            result = self.expr2.eval(scope)
+
+        return bool(result)
 
 
 class BooleanUnaryExpr(Expr):

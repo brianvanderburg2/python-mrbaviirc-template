@@ -511,17 +511,19 @@ class TemplateParser(object):
             expr2 = self._parse_expr(andor + 1, end)
 
             if token.type == Token.TYPE_AND:
-                oper = lambda a, b: a and b
+                return AndExpr(
+                    self.template.filename,
+                    token.line,
+                    expr1,
+                    expr2
+                )
             else:
-                oper = lambda a, b: a or b
-
-            return BooleanBinaryExpr(
-                self.template.filename,
-                token.line,
-                oper,
-                expr1,
-                expr2
-            )
+                return OrExpr(
+                    self.template.filename,
+                    token.line,
+                    expr1,
+                    expr2
+                )
 
         # Split on comparison next
         if compare is not None:
