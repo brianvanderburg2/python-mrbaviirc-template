@@ -104,7 +104,7 @@ def do_test_compare(env, search_path_loader):
         with open(target, "r", newline=None) as handle:
             target_contents = handle.read()
 
-        assert contents == target_contents
+        assert contents == target_contents, "Mismatch in file " +  target
         #self.assertEqual(
         #    contents,
         #    target_contents,
@@ -119,7 +119,7 @@ def do_test_compare(env, search_path_loader):
             with open(target, "r", newline=None) as handle:
                 target_contents = handle.read()
 
-            assert contents == target_contents
+            assert contents == target_contents, "Mismatch in file " + target
             #self.assertEqual(
             #    contents,
             #    target_contents,
