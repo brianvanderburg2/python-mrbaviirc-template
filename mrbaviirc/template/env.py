@@ -14,7 +14,7 @@ import threading
 from .template import Template
 from .loaders import UnrestrictedLoader
 
-from .lib import StandardLib, StdLib
+from .lib import StandardLib
 
 class Environment(object):
     """ Represent a template environment.
@@ -41,8 +41,7 @@ class Environment(object):
         """
 
         self.importers = {
-            "mrbaviirc.template": StandardLib,
-            "mrbaviirc.template.stdlib": StdLib
+            "mrbaviirc.template": StandardLib
         }
         self.imported = {}
         self.hooks = {}

@@ -11,7 +11,7 @@ import glob
 
 import pytest
 
-from mrbaviirc.template import UnrestrictedLoader, Environment, StdLib, StringRenderer
+from mrbaviirc.template import UnrestrictedLoader, Environment, StandardLib, StringRenderer
 from mrbaviirc.template import PrefixLoader, PrefixPathLoader, SearchPathLoader
 from mrbaviirc.template import AbortError
 
@@ -88,7 +88,7 @@ def do_test_compare(env, search_path_loader):
     with open(os.path.join(DATADIR, "data.json"), "r", newline=None) as handle:
         data = json.load(handle)
 
-    data["lib"] = StdLib()
+    data["lib"] = StandardLib()
     userdata = {"user1": 10, "user2": 20}
 
     for path in sorted(glob.glob(os.path.join(DATADIR, "*.tmpl"))):
@@ -165,7 +165,7 @@ def do_test_search_path(loader):
     with open(os.path.join(DATADIR, "data.json"), "r", newline=None) as handle:
         data = json.load(handle)
 
-    data["lib"] = StdLib()
+    data["lib"] = StandardLib()
 
     tmpl = env.load_file("/main.tmpl")
     rndr = StringRenderer()
@@ -197,7 +197,7 @@ def test_load_text():
     with open(os.path.join(DATADIR, "loadtext/main.tmpl"), "r", newline=None) as handle:
         text = handle.read()
 
-    data["lib"] = StdLib()
+    data["lib"] = StandardLib()
 
     tmpl = env.load_text(text, "loadtext/main.tmpl")
     rndr = StringRenderer()

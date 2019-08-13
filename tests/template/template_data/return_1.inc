@@ -1,4 +1,4 @@
 {% autostrip %}
 
-{% return a = lib.add(a, b), b = lib.sub(a, b) %}
-{% return c = lib.mul(a, b) %}
+{% return a = a + b, b = a - b %}
+{% return c = a * b %}

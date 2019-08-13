@@ -1,14 +1,14 @@
 {% autostrip %}
 {% set l = [] %}
-{{ lib.count(l) +}}
-{% do lib.list.append(l, 12) %}
-{{ lib.count(l) +}}
+{{ lib.len(l) +}}
+{% do l.append(12) %}
+{{ lib.len(l) +}}
 {{ l[0] +}}
 
 {# Test to ensure each iteration sets the same value +#}
 {% for i in [1,2,3] %}
 {% set k = [1,2,3,4] %}
-{% do lib.list.append(k, 5) %}
+{% do k.append(5) %}
 {% for j in k %}
 {{ j }}
 {% endfor +%}

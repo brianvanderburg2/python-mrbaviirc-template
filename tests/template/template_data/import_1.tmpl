@@ -5,21 +5,21 @@
 {% scope %}
 
 {% import
-    mylib = "mrbaviirc.template.stdlib",
-    yourlib = "mrbaviirc.template.stdlib"
+    mylib = "mrbaviirc.template",
+    yourlib = "mrbaviirc.template"
 %}
-{% import otherlib = "mrbaviirc.template.stdlib" %}
+{% import otherlib = "mrbaviirc.template" %}
 
 {# Imports always happen in local scope.  However they can be assigned
    To other scopes by setting the variable in that scope. #}
 {% global otherlib = otherlib %}
 
-{{ mylib.string.concat("Hello", "World", "Goodbye", "World") +}}
-{{ yourlib.string.concat("Feed", "Me") +}}
-{{ otherlib.string.concat("Feed", "Me", "Pizza") +}}
+{{ mylib.stringlib.concat("Hello", "World", "Goodbye", "World") +}}
+{{ yourlib.stringlib.concat("Feed", "Me") +}}
+{{ otherlib.stringlib.concat("Feed", "Me", "Pizza") +}}
 
 {% endscope %}
 
-{{ otherlib.string.concat("FeedMe", mylib, "Pizzas") }}
+{{ otherlib.stringlib.concat("FeedMe", mylib, "Pizzas") }}
 
 {# Give ending newline +#}

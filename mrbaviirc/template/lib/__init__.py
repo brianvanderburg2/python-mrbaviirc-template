@@ -4,7 +4,7 @@ __author__      =   "Brian Allen Vanderburg II"
 __copyright__   =   "Copyright (C) 2017 Brian Allen Vanderburg II"
 __license__     =   "Apache License 2.0"
 
-__all__ = []
+__all__ = ["Library", "StandardLib"]
 
 
 import builtins
@@ -15,7 +15,6 @@ from ..errors import UnknownVariableError, ParserError
 from ..util import specialfunction
 
 
-__all__.append("Library")
 class Library:
     """ Base class for a library of functions.  While not required, it provides
         some utility for the function libraries. """
@@ -36,17 +35,8 @@ class Library:
         raise AttributeError(name)
 
 
-from .stdlib import StdLib
-__all__.append("StdLib")
-
-
-# The new library
-#################
-
-
-# Special functions
-
 class _Defined(specialfunction):
+    """ Special function to determine if an expression is defined. """
     def __call__(self, env, template, line, scope, params):
         """ Return true if all params evaluate successfully. """
         try:
@@ -57,6 +47,7 @@ class _Defined(specialfunction):
 
 
 class _Default(specialfunction):
+    """ Special function to default to a value if an expression is not defined. """
     def __call__(self, env, template, line, scope, params):
         """ Return a default if the first parameter does not evaluate. """
         if len(params) != 2:
@@ -72,10 +63,6 @@ class _Default(specialfunction):
             return params[1].eval(scope)
 
 
-# Standard library
-##################
-
-__all__.append("StandardLib")
 class StandardLib(Library):
     """ Template library. """
 

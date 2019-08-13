@@ -10,6 +10,6 @@ from .env import Environment
 from .loaders import *
 from .util import *
 from .template import Template
-from .lib import Library, StdLib
+from .lib import Library, StandardLib
 
 
