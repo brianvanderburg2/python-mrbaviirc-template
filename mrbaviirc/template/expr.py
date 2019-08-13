@@ -14,6 +14,7 @@ __all__ = [
 
 
 from .errors import UnknownVariableError, UnknownIndexError
+from .util import specialfunction
 
 
 class Expr(object):
@@ -58,7 +59,7 @@ class FuncExpr(Expr):
     def eval(self, scope):
         """ Evaluate the expression. """
         func = self.expr.eval(scope)
-        if hasattr(func, "_is_mrbaviirc_template_special"):
+        if isinstance(func, specialfunction):
             return func(
                 self.template.env,
                 self.template,

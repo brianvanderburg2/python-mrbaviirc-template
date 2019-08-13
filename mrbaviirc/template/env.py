@@ -14,7 +14,7 @@ import threading
 from .template import Template
 from .loaders import UnrestrictedLoader
 
-from .lib import StdLib
+from .lib import StandardLib, StdLib
 
 class Environment(object):
     """ Represent a template environment.
@@ -40,7 +40,10 @@ class Environment(object):
                 disable even if they are enabled locally for a given template.
         """
 
-        self.importers = {"mrbaviirc.template.stdlib": StdLib}
+        self.importers = {
+            "mrbaviirc.template": StandardLib,
+            "mrbaviirc.template.stdlib": StdLib
+        }
         self.imported = {}
         self.hooks = {}
         self.code_enabled = allow_code

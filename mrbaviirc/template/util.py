@@ -5,14 +5,20 @@ __author__ = "Brian Allen Vanderburg II"
 __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
-__all__ = ["specialfunc", "DictToAttr"]
+__all__ = ["specialfunction", "DictToAttr"]
 
 
-def specialfunc(func):
-    """ Create a special callable function from a regular function. """
-    # pylint: disable=protected-access
-    func._is_mrbaviirc_template_special = True
-    return func
+class specialfunction:
+    """ A base class for a sepcial special function which receives expression nodes. """
+
+    def __init__(self):
+        """ Initialize  the function. """
+        pass
+
+    def __call__(self, env, template, line, scope, params):
+        """ Call the special function. """
+        return None
+
 
 class DictToAttr(dict):
     """ Make dictionary items accessible as attributes. """

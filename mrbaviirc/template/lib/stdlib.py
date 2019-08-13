@@ -5,8 +5,9 @@ __copyright__   = "Copyright 2016"
 __license__     = "Apache License 2.0"
 
 __all__ = []
-import os
 
+
+import os
 
 
 class _PathLib(object):
@@ -163,13 +164,14 @@ class _IndentLib(object):
         """ Return the indent. """
         return self._value
 
+
+# Old STDLIB below, to be eventually removed.
 __all__.append("StdLib")
-class StdLib(object):
+class StdLib:
     """ Represent the top-level standard library. """
 
     def __init__(self):
         """ Initialize the standard library. """
-        super(StdLib, self).__init__()
         self._path = None
         self._string = None
         self._list = None
@@ -282,3 +284,4 @@ class StdLib(object):
         """ Return a generater sequence from start up to end. """
         return range(start, end, 1)
 
+FACTORY = StdLib

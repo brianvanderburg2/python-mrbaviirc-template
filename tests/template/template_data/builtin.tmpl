@@ -1,18 +1,19 @@
 {% autostrip %}
+{% import std="mrbaviirc.template" %}
 
-{{ defined(x.y[12]("hello")) +}}
+{{ std.defined(x.y[12]("hello")) +}}
 
 {% set x=1, y=10 +%}
-{{ defined(x.y) +}}
-{{ defined(x) +}}
-{{ defined(y) +}}
+{{ std.defined(x.y) +}}
+{{ std.defined(x) +}}
+{{ std.defined(y) +}}
 
 {% unset x +%}
-{{ defined(x.y) +}}
-{{ defined(x) +}}
-{{ defined(y) +}}
+{{ std.defined(x.y) +}}
+{{ std.defined(x) +}}
+{{ std.defined(y) +}}
 
 {# +#}
-{{ default(x.y, 27) +}}
-{{ default(x, 14) +}}
-{{ default(y, 91) +}}
+{{ std.default(x.y, 27) +}}
+{{ std.default(x, 14) +}}
+{{ std.default(y, 91) +}}
