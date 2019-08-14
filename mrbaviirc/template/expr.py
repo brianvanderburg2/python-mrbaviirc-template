@@ -54,7 +54,8 @@ class FuncExpr(Expr):
         """ Initialize the node. """
         Expr.__init__(self, template, line)
         self.expr = expr
-        self.nodes = nodes
+        self.nodes = list(expr for (var, expr) in nodes if var is None)
+        self.namednodes = list((var, expr) for (var, expr) in nodes if var is not None)
 
     def eval(self, scope):
         """ Evaluate the expression. """
@@ -69,7 +70,8 @@ class FuncExpr(Expr):
             )
         else:
             params = [node.eval(scope) for node in self.nodes]
-            return func(*params)
+            namedparams = {var: node.eval(scope) for (var, node) in self.namednodes}
+            return func(*params, **namedparams)
 
 
 class ListExpr(Expr):

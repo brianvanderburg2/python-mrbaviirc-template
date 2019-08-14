@@ -415,6 +415,14 @@ class TemplateParser(object):
             node = EmitNode(self.template, line, expr)
         self.stack[-1].append(node)
 
+    def _parse_expr_or_assign(self, start, end):
+        """ Parse an expression or an assignment. """
+
+        if end > start and self.tokens[start + 1].type == Token.TYPE_ASSIGN:
+            return self._parse_assign(start, end)
+
+        return (None, self._parse_expr(start, end))
+
     def _parse_expr(self, start, end):
         """ Parse the expression. """
 
@@ -705,7 +713,7 @@ class TemplateParser(object):
             if token.type == Token.TYPE_OPEN_PAREN:
                 closing = self._find_level0_closing(start, end)
                 if start < closing - 1:
-                    exprs = self._parse_multi_expr(start + 1, closing - 1)
+                    exprs = self._parse_multi_expr(start + 1, closing - 1, allow_assign=True)
                 else:
                     exprs = []
                 expr = FuncExpr(self.template, token.line, expr, exprs)
@@ -714,7 +722,7 @@ class TemplateParser(object):
 
             if token.type == Token.TYPE_OPEN_BRACKET:
                 closing = self._find_level0_closing(start, end)
-                expr1 = self._parse_multi_expr(start + 1, closing - 1, True)
+                expr1 = self._parse_multi_expr(start + 1, closing - 1, allow_empty=True)
                 if len(expr1) == 1 and expr1[0] is not None:
                     expr = LookupItemExpr(self.template, token.line, expr, expr1[0])
                 elif len(expr1) == 2 or len(expr1) == 3:
@@ -790,7 +798,7 @@ class TemplateParser(object):
         else:
             return ListExpr(self.template, line, values)
 
-    def _parse_multi_expr(self, start, end, empty=False):
+    def _parse_multi_expr(self, start, end, allow_empty=False, allow_assign=False):
         """ Parse a list of expressions separated by comma. """
         items = []
 
@@ -799,17 +807,20 @@ class TemplateParser(object):
             while pos <= end:
                 commapos = self._find_level0_token(pos, end, Token.TYPE_COMMA)
                 if commapos is not None:
-                    if pos == commapos and empty:
-                        items.append(None)
-                    else:
-                        items.append(self._parse_expr(pos, commapos - 1))
-                    pos = commapos + 1
+                    partend = commapos - 1
+                    nextstart = commapos + 1
                 else:
-                    if pos == end + 1 and empty:
-                        items.append(None)
-                    else:
-                        items.append(self._parse_expr(pos, end))
-                    pos = end + 1
+                    partend = end
+                    nextstart = end + 1
+
+                if pos > partend and allow_empty:
+                    items.append(None)
+                elif allow_assign:
+                    items.append(self._parse_expr_or_assign(pos, partend))
+                else:
+                    items.append(self._parse_expr(pos, partend))
+
+                pos = nextstart
 
             return items
         else:
