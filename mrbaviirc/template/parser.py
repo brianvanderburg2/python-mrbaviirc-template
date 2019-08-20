@@ -822,6 +822,16 @@ class TemplateParser(object):
 
                 pos = nextstart
 
+            # The code above looks for the stuff before a comma or the end
+            # See if there was an ending comma
+            if commapos == pos - 1:
+                if allow_empty:
+                    items.append(None)
+                elif allow_assign:
+                    items.append(self._parse_expr_or_assign(pos, pos - 1))
+                else:
+                    items.append(self._parse_expr(pos, pos - 1))
+
             return items
         else:
             raise ParserError(
