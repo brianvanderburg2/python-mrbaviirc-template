@@ -285,33 +285,52 @@ class TemplateParser(object):
             self.tokens[start].line
         )
 
-    def _find_tag_segments(self, start, end):
-        """ Return list of (start, end) for any tag segments. """
+    def _split_tokens(self, start, end, sep, allow_blank=None, errmsg="Expected Token"):
+        """ Split a stream of tokens by another token.
+            If allow_blank is True, allow for blank items in the result
+            (if the seperator token is at the start, end, or back to back) """
 
+        # Check for empty token set if allowed
+        if start > end:
+            return []
+
+        # First find all ranges before any separators
         result = []
-        if end < start:
-            return result
-
         while start <= end:
-            pos = self._find_level0_token(start, end, Token.TYPE_SEMICOLON)
+            pos = self._find_level0_token(start, end, sep)
             if pos is None:
                 break
 
-            if pos == start or pos == end:
+            if pos > start:
+                result.append((start, pos - 1))
+            elif allow_blank:
+                result.append((None, None))
+            else:
                 raise ParserError(
-                    "Unexpected semicolon",
+                    errmsg,
                     self.template.filename,
-                    self.tokens[pos].line # find_level0 doesn't use get_token
+                    self.tokens[pos].line
                 )
 
-            result.append((start, pos - 1))
             start = pos + 1
 
-        # Anything left is last segment
+        # Anything left is the last or only range
         if start <= end:
             result.append((start, end))
+        elif allow_blank:
+            result.append((None, None))
+        else:
+            raise ParserError(
+                errmsg,
+                self.template.filename,
+                self.tokens[end].line if end < len(self.tokens) else 0
+            )
 
         return result
+
+    def _find_tag_segments(self, start, end):
+        """ Return list of (start, end) for any tag segments. """
+        return self._split_tokens(start, end, Token.TYPE_SEMICOLON)
 
     def parse(self):
         """ Parse the template and return the node list. """
@@ -759,12 +778,17 @@ class TemplateParser(object):
             # [:] - empty dict
             return DictExpr(self.template, line, [], [])
 
-        # Determine if we are a dictionary
-        pos = self._find_level0_token(start, end, Token.TYPE_COLON)
-        is_dict = pos is not None
+        # Process the parts
+        splits = self._split_tokens(start, end, Token.TYPE_COMMA)
+        is_dict = None
 
-        while start <= end:
-            # If dict, find the first part
+        for (start, end) in splits:
+            # Determine if we are a dictionary, if we don't already know
+            if is_dict is None:
+                pos = self._find_level0_token(start, end, Token.TYPE_COLON)
+                is_dict = pos is not None
+
+            # If dict, get the key
             if is_dict:
                 pos = self._find_level0_token(start, end, Token.TYPE_COLON)
                 if pos is None:
@@ -777,16 +801,9 @@ class TemplateParser(object):
                 keys.append(self._parse_expr(start, pos - 1))
                 start = pos + 1
 
-            # Now find the second part
-            pos = self._find_level0_token(start, end, Token.TYPE_COMMA)
-            if pos is None:
-                # No more parts
-                values.append(self._parse_expr(start, end))
-                start = end + 1
-            else:
-                # Found comma
-                values.append(self._parse_expr(start, pos - 1))
-                start = pos + 1
+            # Get the value
+            values.append(self._parse_expr(start, end))
+
 
         # We no longer return ValueExpr even if the list is all ValueExpr
         # It was an optimization, but since the reference is to a mutable list
@@ -800,48 +817,28 @@ class TemplateParser(object):
 
     def _parse_multi_expr(self, start, end, allow_empty=False, allow_assign=False):
         """ Parse a list of expressions separated by comma. """
-        items = []
 
-        if start <= end:
-            pos = start
-            while pos <= end:
-                commapos = self._find_level0_token(pos, end, Token.TYPE_COMMA)
-                if commapos is not None:
-                    partend = commapos - 1
-                    nextstart = commapos + 1
-                else:
-                    partend = end
-                    nextstart = end + 1
+        splits = self._split_tokens(start, end, Token.TYPE_COMMA, allow_blank=allow_empty)
 
-                if pos > partend and allow_empty:
+        if splits:
+            items = []
+            for (start, end) in splits:
+                if start is None or end is None:
                     items.append(None)
                 elif allow_assign:
-                    items.append(self._parse_expr_or_assign(pos, partend))
+                    items.append(self._parse_expr_or_assign(start, end))
                 else:
-                    items.append(self._parse_expr(pos, partend))
-
-                pos = nextstart
-
-            # The code above looks for the stuff before a comma or the end
-            # See if there was an ending comma
-            if commapos == pos - 1:
-                if allow_empty:
-                    items.append(None)
-                elif allow_assign:
-                    items.append(self._parse_expr_or_assign(pos, pos - 1))
-                else:
-                    items.append(self._parse_expr(pos, pos - 1))
-
+                    items.append(self._parse_expr(start, end))
             return items
-        else:
-            raise ParserError(
-                "Expected expression list",
-                self.template.filename,
-                self.tokens[start - 1] if start > 0 else 0
-            )
+
+        raise ParserError(
+            "Expected expression list",
+            self.template.filename,
+            self.tokens[start - 1] if start > 0 else 0
+        )
 
     def _parse_assign(self, start, end):
-        """ Parse a var = expr assignment, return (var, expr, pos) """
+        """ Parse a var = expr assignment, return (var, expr) """
         var = self._get_token_var(start, end)
         start += 1
 
@@ -854,50 +851,38 @@ class TemplateParser(object):
 
     def _parse_multi_assign(self, start, end):
         """ Parse multiple var = expr statemetns, return [(var, expr)] """
-        assigns = []
 
-        if start <= end:
-            pos = start
-            while pos <= end:
-                commapos = self._find_level0_token(pos, end, Token.TYPE_COMMA)
-                if commapos is not None:
-                    assigns.append(self._parse_assign(pos, commapos - 1))
-                    pos = commapos + 1
-                else:
-                    assigns.append(self._parse_assign(pos, end))
-                    pos = end + 1
+        splits = self._split_tokens(start, end, Token.TYPE_COMMA)
+        if splits:
+            assigns = []
+            for (start, end) in splits:
+                assigns.append(self._parse_assign(start, end))
 
             return assigns
-        else:
-            raise ParserError(
-                "Expected assignment list.",
-                self.template.filename,
-                self.tokens[start - 1].line if start > 0 else 0
-            )
+
+        raise ParserError(
+            "Expected assignment list.",
+            self.template.filename,
+            self.tokens[start - 1].line if start > 0 else 0
+        )
 
     def _parse_multi_var(self, start, end):
-        """ Parse multiple variables and return (varlist, pos)
-            Note: Return pos points at ending token.
-        """
+        """ Parse multiple variables and return [var] """
 
-        if start <= end:
+        splits = self._split_tokens(start, end, Token.TYPE_COMMA)
+        if splits:
             varlist = []
-            while start <= end:
+            for (start, end) in splits:
                 varlist.append(self._get_token_var(start, end))
-                start += 1
-
-                if start <= end:
-                    # More left, should have a comma
-                    self._get_expected_token(start, end, Token.TYPE_COMMA)
-                    start += 1
+                self._get_no_more_tokens(start + 1, end)
 
             return varlist
-        else:
-            raise ParserError(
-                "Expected variable list",
-                self.template.filename,
-                self.tokens[start - 1].line if start > 0 else 0
-            )
+
+        raise ParserError(
+            "Expected variable list",
+            self.template.filename,
+            self.tokens[start - 1].line if start > 0 else 0
+        )
 
     def _flush_buffer(self, pre_ws_control, post_ws_control):
         """ Flush the buffer to output. """
