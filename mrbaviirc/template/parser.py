@@ -285,7 +285,7 @@ class TemplateParser(object):
             self.tokens[start].line
         )
 
-    def _split_tokens(self, start, end, sep, allow_blank=None, errmsg="Expected Token"):
+    def _split_tokens(self, start, end, sep, allow_blank=False, errmsg="Expected Token"):
         """ Split a stream of tokens by another token.
             If allow_blank is True, allow for blank items in the result
             (if the seperator token is at the start, end, or back to back) """
@@ -741,7 +741,7 @@ class TemplateParser(object):
 
             if token.type == Token.TYPE_OPEN_BRACKET:
                 closing = self._find_level0_closing(start, end)
-                expr1 = self._parse_multi_expr(start + 1, closing - 1, allow_empty=True)
+                expr1 = self._parse_multi_expr(start + 1, closing - 1, allow_blank=True)
                 if len(expr1) == 1 and expr1[0] is not None:
                     expr = LookupItemExpr(self.template, token.line, expr, expr1[0])
                 elif len(expr1) == 2 or len(expr1) == 3:
@@ -815,10 +815,10 @@ class TemplateParser(object):
         else:
             return ListExpr(self.template, line, values)
 
-    def _parse_multi_expr(self, start, end, allow_empty=False, allow_assign=False):
+    def _parse_multi_expr(self, start, end, allow_blank=False, allow_assign=False):
         """ Parse a list of expressions separated by comma. """
 
-        splits = self._split_tokens(start, end, Token.TYPE_COMMA, allow_blank=allow_empty)
+        splits = self._split_tokens(start, end, Token.TYPE_COMMA, allow_blank=allow_blank)
 
         if splits:
             items = []
