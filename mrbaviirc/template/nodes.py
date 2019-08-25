@@ -8,6 +8,8 @@ __license__ = "Apache License 2.0"
 __all__ = ["Node", "NodeList", "TextNode", "EmitNode"]
 
 
+import weakref
+
 from .errors import AbortError
 
 
@@ -19,9 +21,17 @@ class Node(object):
 
     def __init__(self, template, line):
         """ Initialize the node. """
-        self.template = template
+        self._template = weakref.ref(template)
         self.line = line
-        self.env = template.env
+        self._env = weakref.ref(template.env)
+
+    @property
+    def env(self):
+        return self._env()
+
+    @property
+    def template(self):
+        return self._template()
 
     def render(self, renderer, scope):
         """ Render the node to a renderer.

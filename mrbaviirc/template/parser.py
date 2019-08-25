@@ -539,14 +539,14 @@ class TemplateParser(object):
 
             if token.type == Token.TYPE_AND:
                 return AndExpr(
-                    self.template.filename,
+                    self.template,
                     token.line,
                     expr1,
                     expr2
                 )
             else:
                 return OrExpr(
-                    self.template.filename,
+                    self.template,
                     token.line,
                     expr1,
                     expr2
@@ -572,7 +572,7 @@ class TemplateParser(object):
                 oper = operator.le
 
             return BooleanBinaryExpr(
-                self.template.filename,
+                self.template,
                 token.line,
                 oper,
                 expr1,
@@ -591,7 +591,7 @@ class TemplateParser(object):
                 oper = operator.sub
 
             return BinaryExpr(
-                self.template.filename,
+                self.template,
                 token.line,
                 oper,
                 expr1,
@@ -614,7 +614,7 @@ class TemplateParser(object):
                 oper = operator.mod
 
             return BinaryExpr(
-                self.template.filename,
+                self.template,
                 token.line,
                 oper,
                 expr1,
@@ -628,7 +628,7 @@ class TemplateParser(object):
             token = self.tokens[nott]
             if nott == start:
                 return BooleanUnaryExpr(
-                    self.template.filename,
+                    self.template,
                     token.line,
                     lambda a: not a,
                     self._parse_expr(nott + 1, end)
@@ -648,7 +648,7 @@ class TemplateParser(object):
                     return self._parse_expr(posneg + 1, end)
                 else:
                     return UnaryExpr(
-                        self.template.filename,
+                        self.template,
                         token.line,
                         lambda a: -a,
                         self._parse_expr(posneg + 1, end)

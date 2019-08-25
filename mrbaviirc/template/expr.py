@@ -13,6 +13,8 @@ __all__ = [
 ]
 
 
+import weakref
+
 from .errors import UnknownVariableError, UnknownIndexError
 from .util import specialfunction
 
@@ -22,8 +24,12 @@ class Expr(object):
 
     def __init__(self, template, line):
         """ Initialize the expression object. """
-        self.template = template
+        self._template = weakref.ref(template)
         self.line = line
+
+    @property
+    def template(self):
+        return self._template()
 
     def eval(self, scope):
         """ Evaluate the expression object. """

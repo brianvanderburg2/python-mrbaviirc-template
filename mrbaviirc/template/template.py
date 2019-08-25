@@ -12,6 +12,7 @@ __license__ = "Apache License 2.0"
 
 
 import threading
+import weakref
 
 from .parser import TemplateParser
 from .scope import Scope
@@ -71,7 +72,7 @@ class Template(object):
         """
 
         # Initialize
-        self.env = env
+        self._env = weakref.ref(env)
         self.filename = filename
         self.code_enabled = allow_code
 
@@ -81,6 +82,10 @@ class Template(object):
         # Parse the template
         parser = TemplateParser(self, text)
         self.nodes = parser.parse()
+
+    @property
+    def env(self):
+        return self._env()
 
     def render(self, renderer, context=None, userdata=None, abort_fn=None):
         """ Render the template.
