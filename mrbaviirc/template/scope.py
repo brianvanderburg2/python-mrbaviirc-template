@@ -31,45 +31,17 @@ class Scope(object):
     ----------
     userdata : variant
         Userdata passed to top render call.
-
-    Methods
-    -------
-    push(self, template=False)
-        Push a new nested scope.
-    set(self, name, value, where=SCOPE_LOCAL)
-        Set a value in the scope at a specific level.
-    update(self, values)
-        Update values in the local scope.
-    unset(self, name)
-        Unset a name in the local and private scope.
-    get(self, variable)
-        Get a variable by walking up the scope until it is found.
-
-    Internal API Attributes
-    -----------------------
-    abort_fn : callable
-        An abort function passed to the top render call.
-        callback() : bool
-            Parameters
-            ----------
-            None
-
-            Returns
-            -------
-            bool
-                True to abort, otherwise continue.
-    template_scope : dict
-        Reference to the current template scope.  This is used mainly by the
-        return template tag to set and update the returned values.  set
-        can't directly be used b/c we need to get/update the value directly
-        from the template scope dict.
+    env : the environment object. Only valid during a render call
+    template : the template object. Only valid during a render call
+    line : The line number. Only valid during a render call.
     """
+
     SCOPE_LOCAL = 0
     SCOPE_GLOBAL = 1
     SCOPE_TEMPLATE = 2
     SCOPE_PRIVATE = 3
 
-    def __init__(self, userdata=None, abort_fn=None):
+    def __init__(self, env, userdata=None, abort_fn=None):
         """ Initialize our render scope.
 
         Parameters
@@ -80,6 +52,11 @@ class Scope(object):
         abort_fn : callback, default=None
             A callback to set for the abort function.
         """
+
+        # Values passed to hooks and special functions
+        self.env = env
+        self.template = None
+        self.line = 0
 
         # Per-top-level-render data
         self.userdata = userdata
@@ -94,30 +71,20 @@ class Scope(object):
         self.global_scope = self.local_scope
         self.template_scope = None
 
-    def push(self, template=False):
-        """ Create a new nested scope.
+    def push(self, template=None):
 
-        Parameters
-        ----------
-        template : bool, default=False
-            If Frue, the new scope's template scope will be set to it's local
-            scope.  If False, the new scope's template scope will be the same
-            as the current scope's template scope.
-
-        Returns
-        -------
-        template.Scope
-            The new scope object.
-        """
+        """ Create a new nested scope. """
         # Create new scope with top-level-render data
-        scope = Scope(self.userdata, self.abort_fn)
+        scope = Scope(self.env, self.userdata, self.abort_fn)
 
         # Point to use as parent and set global/template scopes accordingly
         scope.parent = self
         scope.global_scope = self.global_scope
-        if template:
+        if template is not None:
+            scope.template = template
             scope.template_scope = scope.local_scope
         else:
+            scope.template = self.template
             scope.template_scope = self.template_scope
 
         return scope

@@ -37,7 +37,7 @@ class Library:
 
 class _Defined(specialfunction):
     """ Special function to determine if an expression is defined. """
-    def __call__(self, env, template, line, scope, params):
+    def __call__(self, scope, params):
         """ Return true if all params evaluate successfully. """
         try:
             _ = [param.eval(scope) for param in params]
@@ -48,13 +48,13 @@ class _Defined(specialfunction):
 
 class _Default(specialfunction):
     """ Special function to default to a value if an expression is not defined. """
-    def __call__(self, env, template, line, scope, params):
+    def __call__(self, scope, params):
         """ Return a default if the first parameter does not evaluate. """
         if len(params) != 2:
             raise ParserError(
                 "Template builting 'default' expects 2 arguments",
-                template,
-                line
+                scope.template.filename,
+                scope.line
             )
 
         try:

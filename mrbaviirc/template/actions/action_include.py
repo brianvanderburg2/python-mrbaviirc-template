@@ -40,7 +40,7 @@ class IncludeNode(Node):
         for (var, expr) in self.assigns:
             context[var] = expr.eval(scope)
 
-        retval = template.nested_render(renderer, context, scope)
+        retval = template.nested_render(renderer, scope, context)
         if self.retvar:
             scope.set(self.retvar, DictToAttr(retval))
 

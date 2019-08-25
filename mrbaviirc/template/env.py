@@ -165,7 +165,7 @@ class Environment(object):
 
             return self.imported[name]
 
-    def call_hook(self, hook, template, line, renderer, scope, params, reverse):
+    def call_hook(self, hook, renderer, scope, params, reverse):
         callbacks = self.hooks.get(hook, None)
         if callbacks is None:
             return
@@ -174,4 +174,4 @@ class Environment(object):
             callbacks = reversed(callbacks)
 
         for callback in callbacks:
-            callback(self, template, line, renderer, scope, params)
+            callback(renderer, scope, params)

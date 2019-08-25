@@ -15,7 +15,7 @@ class specialfunction:
         """ Initialize  the function. """
         pass
 
-    def __call__(self, env, template, line, scope, params):
+    def __call__(self, scope, params):
         """ Call the special function. """
         return None
 

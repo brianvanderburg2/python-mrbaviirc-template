@@ -34,7 +34,7 @@ class Template(object):
 
     render(self, renderer, context=None, userdata=None, abort_fn=None)
         The top level call to a render.
-    nested_render(self, renderer, context, scope)
+    nested_render(self, renderer, scope, context)
         An including render passing along the previous scope.
 
     Internal API Attributes
@@ -109,23 +109,23 @@ class Template(object):
         """
 
         # Create the top (global) scope for this render
-        scope = Scope(userdata=userdata, abort_fn=abort_fn)
+        scope = Scope(self.env, userdata=userdata, abort_fn=abort_fn)
         if context is not None:
             scope.update(context)
 
-        return self.nested_render(renderer, None, scope)
+        return self.nested_render(renderer, scope, None)
 
-    def nested_render(self, renderer, context, scope):
+    def nested_render(self, renderer, scope, context):
         """ Render the template from within another template/scope.
 
         Paramters
         ---------
         renderer : template.Renderer
             The renderer the output should be rendered to.
-        context : dict
-            Variable to set into the template scope of the render.
         scope : template.Scope
             The scope to pass along to the render.
+        context : dict
+            Variable to set into the template scope of the render.
 
         Raises
         ------
@@ -134,7 +134,7 @@ class Template(object):
         Exception
             Any other error
         """
-        new_scope = scope.push(True)
+        new_scope = scope.push(self)
 
         if context is not None:
             new_scope.update(context)

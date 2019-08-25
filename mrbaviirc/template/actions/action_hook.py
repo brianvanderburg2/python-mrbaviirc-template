@@ -29,15 +29,8 @@ class HookNode(Node):
         for (name, expr) in self.assigns:
             params[name] = expr.eval(scope)
 
-        self.env.call_hook(
-            hook,
-            self.template,
-            self.line,
-            renderer,
-            scope,
-            params,
-            self.reverse
-        )
+        scope.line = self.line
+        self.env.call_hook(hook, renderer, scope, params, self.reverse)
 
 
 def _hook_handler(parser, template, line, action, start, end, reverse):

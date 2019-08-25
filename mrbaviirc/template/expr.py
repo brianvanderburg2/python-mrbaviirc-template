@@ -61,13 +61,8 @@ class FuncExpr(Expr):
         """ Evaluate the expression. """
         func = self.expr.eval(scope)
         if isinstance(func, specialfunction):
-            return func(
-                self.template.env,
-                self.template,
-                self.line,
-                scope,
-                self.nodes
-            )
+            scope.line = self.line
+            return func(scope, self.nodes)
         else:
             params = [node.eval(scope) for node in self.nodes]
             namedparams = {var: node.eval(scope) for (var, node) in self.namednodes}

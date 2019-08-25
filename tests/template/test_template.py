@@ -15,11 +15,11 @@ from mrbaviirc.template import UnrestrictedLoader, Environment, StandardLib, Str
 from mrbaviirc.template import PrefixLoader, PrefixPathLoader, SearchPathLoader
 from mrbaviirc.template import AbortError
 
-def hook1a(env, template, line, renderer, scope, params):
-    renderer.render("Hook1 A: {0}\n".format(line))
+def hook1a(renderer, scope, params):
+    renderer.render("Hook1 A: {0}\n".format(scope.line))
 
-def hook1b(env, template, line, renderer, scope, params):
-    renderer.render("Hook1 B: {0}\n".format(line))
+def hook1b(renderer, scope, params):
+    renderer.render("Hook1 B: {0}\n".format(scope.line))
     if "count" in params:
         renderer.render("Count: {0}\n".format(params["count"]))
 
