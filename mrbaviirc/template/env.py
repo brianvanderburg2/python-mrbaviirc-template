@@ -1,5 +1,4 @@
 """ Template Environment """
-# pylint: disable=too-many-arguments
 
 __author__ = "Brian Allen Vanderburg II"
 __copyright__ = "Copyright 2016"
@@ -26,48 +25,67 @@ class Environment(object):
     def __init__(self, loader=None, importers=None, allow_code=False):
         """ Initialize the template environment.
 
-        Args:
-            loader (template.Loader,optional):
-                Template loader to use when loading files. Defaults to None.
-            importers (dict,optional):
-                A dictionary of name: callback importers.  Defaults to None.
-                When a template imports a registered library, the return value
-                of the callback is returned to the template.  The result is
-                cached so the callback is only called once.
-            allow_code (bool,optional):
-                Global flag to enable or disable code blocks in the template.
-                Defaults to False. If this flag is false, code blocks will be
-                disable even if they are enabled locally for a given template.
+        Parameters
+        ----------
+        loader : template.Loader, optional
+            Loader to use when loading files.  A value of Null will result in
+            using an instance of template.UnrestrictedLoader
+        importers : dict, optional
+            Dictionary of name to import functions to use when a template loads
+            an import.  The function takes no arguments and returns the value
+            to be assigned in the template.  The result of the function is
+            cached.  An initial name of "mrbaviirc.template" maps to the
+            StandardLib class.
+        allow_code : bool, default=False:
+            Enables or disables the use of code sections within a template.
+            If this flag is False, code sections in a template are not executed
+            but result in an exception.  If this flag is True, code sections
+            are executed if the template's allow_code flag is True.
         """
 
-        self.importers = {
+        self._importers = {
             "mrbaviirc.template": StandardLib
         }
-        self.imported = {}
-        self.hooks = {}
-        self.code_enabled = allow_code
-        self.lock = threading.Lock()
+        self._imported = {}
+        self._hooks = {}
+        self._code_enabled = allow_code
+        self._lock = threading.Lock()
 
         if loader:
-            self.loader = loader
+            self._loader = loader
         else:
-            self.loader = UnrestrictedLoader()
+            self._loader = UnrestrictedLoader()
 
         if importers:
-            self.importers.update(importers)
+            self._importers.update(importers)
+
+    @property
+    def code_enabled(self):
+        """ Test if the code section usage is globally enabled.
+
+        Returns
+        -------
+        bool
+            True if the code section usage is globally enabled, else False
+        """
+        return bool(self._code_enabled)
 
     def register_importer(self, name, importer):
         """ Register an importer.
 
-        Register a callback to be used with the import template tag.
+        Register a callback to be used with the import template tag.  If an
+        importer of the same name already exists, it will be replaced.
 
-        Args:
-            name (str): The name of the importer used by the template.
-            importer (callable): A callable object that takes no arguments and
-                returns a value to assign in the template.  This returned value
-                will be cached and the importer is only called once.
+        Parameters
+        ----------
+        name : str
+            The name of the importer used by the template.
+        importer : callable
+            A callable object that takes no arguments and returns a value to
+            assign in the template.  This returned value will be cached and
+            the importer is only called once.
         """
-        self.importers[name] = importer
+        self._importers[name] = importer
 
     def register_hook(self, name, callback):
         """ Register a hook.
@@ -79,36 +97,41 @@ class Environment(object):
         renderer, set variables in the scope, or even include other templates
         into the renderer's output.
 
-        Args:
-            name (str): The name of the hook.
-            callback (callable):  A callable to register.
+        Parameters
+        ----------
+        name : str
+            The name of the hook.
+        callback : callable
+                A callable to register.
+
                 The signature of the callable is as follows::
 
                     callback(env, template, line, renderer, scope, params)
 
-                env (template.Environment):
+                env : template.Environment
                     The environment the template calling the hook is part of
-                template (template.Template):
+                template : template.Template
                     The template object the hook is called from
-                line (int):
+                line : int
                     The line number the hook tag is called from
-                renderer (template.Renderer):
+                renderer : template.Renderer
                     The renderer object being used
-                scope (template.Scope):
+                scope : template.Scope
                     The scope containing variables, userdata, etc
-                params (list):
+                params : list
                     A list of evaluated parameters passed to the hook
         """
-        self.hooks.setdefault(name, []).append(callback)
+        self._hooks.setdefault(name, []).append(callback)
 
     def allow_code(self, enabled=True):
         """ Enable use of the code tag in templates.
 
-        Args:
-            enabled (bool,optional): Set the global code enabled flag. Default
-                value is True.
+        Parameters
+        ----------
+        enabled : bool, default=True
+            The value to set the environment allow_code flag to.
         """
-        self.code_enabled = enabled
+        self._code_enabled = enabled
 
     def load_file(self, filename, parent=None):
         """ Load a template from a file.
@@ -130,7 +153,7 @@ class Environment(object):
             template.ParserError: An error occurred during parsing.
             Exception: Any other exceptions such as IO/OS errors.
         """
-        return self.loader.load_template(self, filename, parent)
+        return self._loader.load_template(self, filename, parent)
 
     def load_text(self, text, filename="", allow_code=False):
         """ Load a template direct from text.
@@ -152,21 +175,58 @@ class Environment(object):
             Exception: Another exception occurred
         """
         template = Template(self, text, filename, allow_code)
-        self.loader.fix_load_text(template)
+        self._loader.fix_load_text(template)
         return template
 
     def load_import(self, name):
-        with self.lock:
-            if not name in self.imported:
-                if not name in self.importers:
+        """ Internal API only.  Load an import by name and cache the value.
+
+        Parameters
+        ----------
+        name : str
+            The name of the importer to call
+
+        Returns
+        -------
+        Any
+            Returns any value returned from the importer.
+
+        Raises
+        ------
+        KeyError
+            Raised if the named importer does not exist.
+        """
+        with self._lock:
+            if not name in self._imported:
+                if not name in self._importers:
                     raise KeyError(name)
 
-                self.imported[name] = self.importers[name]()
+                self._imported[name] = self._importers[name]()
 
-            return self.imported[name]
+            return self._imported[name]
 
     def call_hook(self, hook, renderer, scope, params, reverse):
-        callbacks = self.hooks.get(hook, None)
+        """ Internal API only.  Call hooks from a template.
+
+        This method calls a hook of a given name in forward or reverse order.
+        It is not an error for the hook to not exists.  Various state paremters
+        are passed to the hook functions to use as they need.
+
+        Parameters
+        ----------
+        hook : str
+            The name of the hook to call
+        renderer : template.Renderer
+            The current renderer object to pass to the hook functions
+        scope : template.Scope
+            The current scope object to pass to the hook functions
+        params : list
+            A list of evaluated parameters to pass to the hook functions
+        reverse : bool
+            If True, the hook fuctions are called in the reverse order in which
+            they were registered. Otherwise they are called in order.
+        """
+        callbacks = self._hooks.get(hook, None)
         if callbacks is None:
             return
 

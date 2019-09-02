@@ -1,0 +1,31 @@
+[MESSAGES CONTROL]
+
+# Common disabled messages
+disable=too-many-arguments,too-few-public-methods,too-many-branches,
+    too-many-return-statements,too-many-instance-attributes,too-many-statements,
+    unused-wildcard-import
+
+[BASIC]
+
+good-names=i,j,k,ex,Run,_
+no-docstring-rgx=^_
+
+[FORMAT]
+
+max-module-lines=1000
+
+[DESIGN]
+
+max-args=5
+ignored-argument-names=_.*
+max-locals=15
+max-returns=6
+max-branches=12
+max-statements=50
+max-parents=7
+max-attributes=7
+min-public-methods=2
+max-public-methods=20
+max-bool-expr=5
+
+

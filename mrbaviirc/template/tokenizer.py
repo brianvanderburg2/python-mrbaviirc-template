@@ -414,7 +414,7 @@ class Tokenizer(object):
         elif self.text[start] == "+":
             start += 1
 
-        pos = start
+        pos = start # In case there's nothing in range
         for pos in range(start, len(self.text)):
             char = self.text[pos]
 
@@ -433,10 +433,18 @@ class Tokenizer(object):
             break
 
         result = "".join(result)
-        if found_dot:
-            token = Token(Token.TYPE_FLOAT, self.line, float(result))
-        else:
-            token = Token(Token.TYPE_INTEGER, self.line, int(result))
+        try:
+            if found_dot:
+                token = Token(Token.TYPE_FLOAT, self.line, float(result))
+            else:
+                token = Token(Token.TYPE_INTEGER, self.line, int(result))
+        except ValueError:
+            raise ParserError(
+                "Expected number, got {0}".format(result),
+                self.filename,
+                self.line
+            )
+
 
         self.tokens.append(token)
         return pos

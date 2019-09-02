@@ -1,7 +1,4 @@
 """ A parser for the template engine. """
-# pylint: disable=unused-wildcard-import,too-many-branches,too-many-statements
-# pylint: disable=too-many-lines,too-few-public-methods,too-many-arguments
-# pylint: disable=too-many-return-statements,too-many-instance-attributes
 
 __author__ = "Brian Allen Vanderburg II"
 __copyright__ = "Copyright 2016-2019"
@@ -189,13 +186,6 @@ class TemplateParser(object):
                 self.template.filename,
                 token.line
             )
-
-        # If we got here, it wasn't a variable
-        raise ParserError(
-            errmsg,
-            self.template.filename,
-            token.line
-        )
 
     def _find_level0_token(self, start, end, tokens=None):
         """ Find a token at level 0 nesting. """

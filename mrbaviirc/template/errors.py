@@ -1,30 +1,4 @@
-""" Provide errors for the templates.
-
-Classes
--------
-Error
-    Base exception for all template errors.
-RestrictedError
-    Exception raised when a restriction is encountered.
-AbortError
-    Exception raised during render when the render is aborted.
-TemplateError
-    Base exception related to template load and render issues.
-ParserError
-    Exception raised when a parsing error occurs during parsing a template
-    such as an invalid template syntax.
-UnknownVariableError
-    Exception raised if an unknown variable or attribute is accessed within the
-    template during a render.
-UnknownIndexError
-    Exception raised if an unknown index is accessed in a variable within the
-    template during a render.
-UnkownImportError
-    Exception raised if a template attempts to import a library which has not
-    been registered in the environment.
-RaisedError
-    Exception raised from the template in the error template tag.
-"""
+""" Provide errors for the templates. """
 
 __author__ = "Brian Allen Vanderburg II"
 __copyright__ = "Copyright 2016"
@@ -32,7 +6,17 @@ __license__ = "Apache License 2.0"
 
 
 class Error(Exception):
-    """ Base template engine error. """
+    """ Base template engine error.
+
+    This is the base error class for any errors that are geneted directly by
+    the template engine or captured and reraised as a template engine error.
+
+    Attributes
+    ----------
+    message : str
+        The exception message.
+    """
+
     def __init__(self, message):
         """ Initialize the exception.
 
@@ -56,7 +40,12 @@ class Error(Exception):
 
 
 class RestrictedError(Error):
-    """ Represent an restriction". """
+    """ Represent an restriction.
+
+    This exception is raised when restriction-related errors occur such as
+    accessing a template outside of the template path or using a code section
+    when code usage is disabled.
+    """
     pass
 
 
@@ -66,7 +55,15 @@ class AbortError(Error):
 
 
 class TemplateError(Error):
-    """ An error at a specific location in atemplate file. """
+    """ An error at a specific location in atemplate file.
+
+    Attributes
+    ----------
+    filename : str
+        The filename of the template where the error occured.
+    line : int
+        The line where the error occured.
+    """
 
     def __init__(self, message, filename, line):
         """ Initialze the template error.

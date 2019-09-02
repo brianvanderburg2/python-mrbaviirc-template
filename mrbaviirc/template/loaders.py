@@ -1,5 +1,4 @@
 """ Provide a loader for loading templates. """
-# pylint: disable=too-few-public-methods,too-many-branches
 
 __author__ = "Brian Allen Vanderburg II"
 __copyright__ = "Copyright 2016"

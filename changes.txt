@@ -4,6 +4,10 @@ Unreleased
 Changed
 -------
 
+* Added pylintrc configuration file in the project directory containing common
+  disabled messages so they don't  need to be added to the top of every other
+  file needing them.
+
 * Parser changes will require some template changes. In particular expression
   sections may now require a semicolon separator to define more information
   such as on include between the path expression, with and return segments
@@ -20,7 +24,7 @@ Changed
   data = user["name"]  - always user["name"]
   data = user@name - always user.name
 
-* Code formatting changes
+* Code formatting, layout, and documentatoin changes
 
 * Action tags are now handled in a more modular way
 
