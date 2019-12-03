@@ -4,6 +4,45 @@ Unreleased
 Changed
 -------
 
+* Overhauled how variables are accessed.  Originally, global variables were
+  just local variables set in the upper-most scope.  Since access to a variable
+  would walk up the scope, any variable set in the upper-most scope without a
+  variable of the same name set anywhere lower would be visible.
+
+  This change divides variables into three compartments.
+
+  Local variables are set in a template's render state, and each time another
+  template is included, the local variables are copied into the included
+  templates' variables. The included template has access to those variables and
+  can change them in its own context, but upon return the local variables in the
+  including template are restored.  Technically what happens is when a template
+  is include, a copy of the local variables is saved into a stack, and when that
+  template is finished, the local variables are restored.  A template can set
+  local variables knowing that nested templates will see those variable unless
+  they are unset and that the value of the local variable in the current
+  template is not affected by changes in nested templates.
+
+  Private variables are private to each included template. Whenever a template
+  is included, the current private variables are saved, and a new empty private
+  variable dictionary is created. Upon return the saved variables are restored.
+  A template can set private variable knowing that nested templates will not see
+  the those variables and the value of a private variable in the current
+  template is not affected by changes in a nested template.
+
+  Global variables are availabe to all templates.  A template can set a global
+  variable and any other template, nested or parent, can see the changes of that
+  global variable.
+
+  Variables must be accessed in the compartment they reside in.  Naming pattens
+  will cause a default to be applied.  Any variable that starts and ends with
+  an underscore "_" defaults to being global. Any variable that starts with but
+  does not end with an underscore default to being private. The underscore by
+  itself also defaults to being private. All other variables default to local.
+
+  Explicit control can be specified via a prefix to a variable name in the form
+  of <type>@<name>.  Type can be "l" for local, "g" for global, and "p" for
+  private.
+
 * Added pylintrc configuration file in the project directory containing common
   disabled messages so they don't  need to be added to the top of every other
   file needing them.
