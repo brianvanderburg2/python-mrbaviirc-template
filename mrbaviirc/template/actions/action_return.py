@@ -17,15 +17,16 @@ class ReturnNode(Node):
         Node.__init__(self, template, line)
         self.assigns = assigns
 
-    def render(self, renderer, scope):
+    def render(self, state):
         """ Set the return nodes. """
 
         result = {}
         for (var, expr) in self.assigns:
-            result[var] = expr.eval(scope)
+            result[var] = expr.eval(state)
 
-        current = scope.template_scope.setdefault(":return:", {})
+        current = state.get_default_var(":return:", {})
         current.update(result)
+        state.set_var(":return:", current)
 
 
 def return_handler(parser, template, line, action, start, end):

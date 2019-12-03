@@ -21,16 +21,16 @@ class HookNode(Node):
         self.assigns = assigns
         self.reverse = reverse
 
-    def render(self, renderer, scope):
+    def render(self, state):
         """ Expand the variables. """
 
-        hook = self.hook.eval(scope)
+        hook = self.hook.eval(state)
         params = {}
         for (name, expr) in self.assigns:
-            params[name] = expr.eval(scope)
+            params[name] = expr.eval(state)
 
-        scope.line = self.line
-        self.env.call_hook(hook, renderer, scope, params, self.reverse)
+        state.line = self.line
+        self.env.call_hook(hook, state, params, self.reverse)
 
 
 def _hook_handler(parser, template, line, action, start, end, reverse):

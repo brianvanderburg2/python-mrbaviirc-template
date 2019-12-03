@@ -51,14 +51,14 @@ class Expr:
         """
         return self._template()
 
-    def eval(self, scope):
+    def eval(self, state):
         """ Evaluate the expression object.
 
         This must be implemented by derived classes.
 
         Parameters
         ----------
-        scope : mrbaviirc.template.scope.Scope
+        state : mrbaviirc.template.state.RenderState
             The current template state
 
         Returns
@@ -91,8 +91,13 @@ class ValueExpr(Expr):
         Expr.__init__(self, template, line)
         self.value = value
 
-    def eval(self, scope):
+    def eval(self, state):
         """ Evaluate the expression.
+
+        Parameters
+        ----------
+        state
+            See parent class
 
         Returns
         -------
@@ -126,21 +131,21 @@ class FuncExpr(Expr):
         self.nodes = list(expr for (var, expr) in nodes if var is None)
         self.namednodes = list((var, expr) for (var, expr) in nodes if var is not None)
 
-    def eval(self, scope):
+    def eval(self, state):
         """ Evaluate the function call and return the results.
 
         If the function evaluates to an instance of a class derived from
         mrbaviirc.template.util.sepcialfunction, then the the function call
-        directly passes the scope and the unevaluated parameter nodes.  This
+        directly passes the state and the unevaluated parameter nodes.  This
         allows for creation of special functions that can catch exceptions in
         evaluation of paremters and return a result accordingly.
 
         In other cases, the function is called with the parameters from the
-        template evaluated then passed, without any scope object.
+        template evaluated then passed, without any state object.
 
         Parameters
         ----------
-        scope
+        state
             See parent class
 
         Returns
@@ -154,13 +159,13 @@ class FuncExpr(Expr):
             As this can call any function available within the template's
             variables, any exception may be raised from within those functions.
         """
-        func = self.expr.eval(scope)
+        func = self.expr.eval(state)
         if isinstance(func, specialfunction):
-            scope.line = self.line
-            return func(scope, self.nodes)
+            state.line = self.line
+            return func(state, self.nodes)
 
-        params = [node.eval(scope) for node in self.nodes]
-        namedparams = {var: node.eval(scope) for (var, node) in self.namednodes}
+        params = [node.eval(state) for node in self.nodes]
+        namedparams = {var: node.eval(state) for (var, node) in self.namednodes}
         return func(*params, **namedparams)
 
 
@@ -183,12 +188,12 @@ class ListExpr(Expr):
         Expr.__init__(self, template, line)
         self.nodes = nodes
 
-    def eval(self, scope):
+    def eval(self, state):
         """ Evaluate the expression.
 
         Parameters
         ----------
-        scope
+        state
             See parent class
 
         Returns
@@ -196,7 +201,7 @@ class ListExpr(Expr):
         list
             The list of evaluated items.
         """
-        return [node.eval(scope) for node in self.nodes]
+        return [node.eval(state) for node in self.nodes]
 
 
 class DictExpr(Expr):
@@ -222,8 +227,13 @@ class DictExpr(Expr):
         self.key_nodes = key_nodes
         self.value_nodes = value_nodes
 
-    def eval(self, scope):
+    def eval(self, state):
         """ Evaluate the expression.
+
+        Parameters
+        ----------
+        state
+            See parent class
 
         Returns
         -------
@@ -231,8 +241,8 @@ class DictExpr(Expr):
         pairs of keys and values.
         """
         return dict(zip(
-            (key.eval(scope) for key in self.key_nodes),
-            (value.eval(scope) for value in self.value_nodes)
+            (key.eval(state) for key in self.key_nodes),
+            (value.eval(state) for value in self.value_nodes)
         ))
 
 
@@ -254,21 +264,26 @@ class VarExpr(Expr):
         Expr.__init__(self, template, line)
         self.var = var
 
-    def eval(self, scope):
+    def eval(self, state):
         """ Evaluate the expression.
+
+        Parameters
+        ----------
+        state
+            See parent class
 
         Returns
         -------
         Any
-            The value of the variable found within the scope
+            The value of the variable found within the state
 
         Raises
         ------
         mrbaviirc.template.errors.UnknownVariableError
-            If the variable was not found in the scope
+            If the variable was not found in the state
         """
         try:
-            return scope.get(self.var)
+            return state.get_var(self.var[0], self.var[1])
         except KeyError:
             raise UnknownVariableError(
                 self.var,
@@ -298,12 +313,12 @@ class LookupAttrExpr(Expr):
         self.expr = expr
         self.attr = attr
 
-    def eval(self, scope):
+    def eval(self, state):
         """ Evaluate the expression.
 
         Parameters
         ----------
-        scope
+        state
             See parent class
 
         Returns
@@ -317,7 +332,7 @@ class LookupAttrExpr(Expr):
         mrbaviirc.template.errors.UnknownVariableError
             If the attribute could not be found
         """
-        result = self.expr.eval(scope)
+        result = self.expr.eval(state)
         try:
             return getattr(result, self.attr)
         except (TypeError, KeyError, IndexError, AttributeError):
@@ -349,12 +364,12 @@ class LookupItemExpr(Expr):
         self.expr = expr
         self.item = item
 
-    def eval(self, scope):
+    def eval(self, state):
         """ Evaluate the expression.
 
         Parameters
         ----------
-        scope
+        state
             See parent class
 
         Returns
@@ -369,8 +384,8 @@ class LookupItemExpr(Expr):
         mrbaviirc.template.errors.UnknownIndexError
             If the key or index is not found in the object.
         """
-        result = self.expr.eval(scope)
-        item = self.item.eval(scope)
+        result = self.expr.eval(state)
+        item = self.item.eval(state)
         try:
             return result[item]
         except (KeyError, IndexError, TypeError):
@@ -403,12 +418,12 @@ class LookupSliceExpr(Expr):
         self.expr = expr
         self.items = items
 
-    def eval(self, scope):
+    def eval(self, state):
         """ Evaluate the expression.
 
         Parameters
         ----------
-        scope
+        state
             See parent class
 
         Returns
@@ -424,9 +439,9 @@ class LookupSliceExpr(Expr):
             Raised if the slice lookup failed.
 
         """
-        result = self.expr.eval(scope)
+        result = self.expr.eval(state)
         # Eval each slice item
-        parts = list(item.eval(scope) if item is not None else None for item in self.items)
+        parts = list(item.eval(state) if item is not None else None for item in self.items)
         parts.extend([None, None, None]) # Ensure at least 3 parts
         (start, stop, step) = parts[0:3]
 
@@ -464,12 +479,12 @@ class BooleanBinaryExpr(Expr):
         self.expr1 = expr1
         self.expr2 = expr2
 
-    def eval(self, scope):
+    def eval(self, state):
         """ Evaluate the expression.
 
         Parameters
         ----------
-        scope
+        state
             See parent class
 
         Returns
@@ -480,8 +495,8 @@ class BooleanBinaryExpr(Expr):
         """
 
         return bool(self.oper(
-            self.expr1.eval(scope),
-            self.expr2.eval(scope)
+            self.expr1.eval(state),
+            self.expr2.eval(state)
         ))
 
 
@@ -509,12 +524,12 @@ class BinaryExpr(Expr):
         self.expr1 = expr1
         self.expr2 = expr2
 
-    def eval(self, scope):
+    def eval(self, state):
         """ Evaluate the expression.
 
         Parameters
         ----------
-        scope
+        state
             See parent class
 
         Returns
@@ -525,8 +540,8 @@ class BinaryExpr(Expr):
         """
 
         return self.oper(
-            self.expr1.eval(scope),
-            self.expr2.eval(scope)
+            self.expr1.eval(state),
+            self.expr2.eval(state)
         )
 
 
@@ -553,12 +568,12 @@ class AndExpr(Expr):
         self.expr1 = expr1
         self.expr2 = expr2
 
-    def eval(self, scope):
+    def eval(self, state):
         """ Evaluate the expression.
 
         Parameters
         ----------
-        scope
+        state
             See parent class
 
         Returns
@@ -570,9 +585,9 @@ class AndExpr(Expr):
             True value.
         """
 
-        result = self.expr1.eval(scope)
+        result = self.expr1.eval(state)
         if result:
-            result = self.expr2.eval(scope)
+            result = self.expr2.eval(state)
 
         return bool(result)
 
@@ -600,12 +615,12 @@ class OrExpr(Expr):
         self.expr1 = expr1
         self.expr2 = expr2
 
-    def eval(self, scope):
+    def eval(self, state):
         """ Evaluate the expression.
 
         Parameters
         ----------
-        scope
+        state
             See parent class
 
         Returns
@@ -617,9 +632,9 @@ class OrExpr(Expr):
             True value.
         """
 
-        result = self.expr1.eval(scope)
+        result = self.expr1.eval(state)
         if not result:
-            result = self.expr2.eval(scope)
+            result = self.expr2.eval(state)
 
         return bool(result)
 
@@ -645,14 +660,23 @@ class BooleanUnaryExpr(Expr):
         self.oper = oper
         self.expr1 = expr1
 
-    def eval(self, scope):
+    def eval(self, state):
         """ Evaluate the expression.
 
-        The expression is evaluated, is results passed to the callable, and the
-        results returned as a boolean.
+        Parameters
+        ----------
+        state
+            See parent class
+
+        Returns
+        -------
+        bool
+            The expression is evaluated, is results passed to the callable, and
+            the results returned as a boolean.
+
         """
 
-        return bool(self.oper(self.expr1.eval(scope)))
+        return bool(self.oper(self.expr1.eval(state)))
 
 
 class UnaryExpr(Expr):
@@ -675,11 +699,19 @@ class UnaryExpr(Expr):
         self.oper = oper
         self.expr1 = expr1
 
-    def eval(self, scope):
+    def eval(self, state):
         """ Evaluate the expression.
 
-        The expression is evaluated, is results passed to the callable, and the
-        results returned directly.
+        Parameters
+        ----------
+        state
+            See parent class
+
+        Returns
+        -------
+        bool
+            The expression is evaluated, is results passed to the callable, and
+            the results returned directly.
         """
 
-        return self.oper(self.expr1.eval(scope))
+        return self.oper(self.expr1.eval(state))

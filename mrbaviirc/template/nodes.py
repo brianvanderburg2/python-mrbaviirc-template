@@ -32,7 +32,7 @@ class Node(object):
     def template(self):
         return self._template()
 
-    def render(self, renderer, scope):
+    def render(self, state):
         """ Render the node to a renderer.
             If a value is returned other than None, then for most other
             nodes it should return that value instantly.  Certain nodes
@@ -57,13 +57,13 @@ class NodeList(object):
         """ Extend one node list with another. """
         self.nodes.extend(nodelist.nodes)
 
-    def render(self, renderer, scope):
+    def render(self, state):
         """ Render all nodes. """
-        if scope.abort_fn and scope.abort_fn():
+        if state.abort_fn and state.abort_fn():
             raise AbortError("Nodelist render aborted")
 
         for node in self.nodes:
-            result = node.render(renderer, scope)
+            result = node.render(state)
             if result in (Node.RENDER_BREAK, Node.RENDER_CONTINUE):
                 return result
 
@@ -79,9 +79,9 @@ class TextNode(Node):
         Node.__init__(self, template, line)
         self.text = text
 
-    def render(self, renderer, scope):
+    def render(self, state):
         """ Render content from a text node. """
-        renderer.render(self.text)
+        state.renderer.render(self.text)
 
 
 class EmitNode(Node):
@@ -92,6 +92,6 @@ class EmitNode(Node):
         Node.__init__(self, template, line)
         self.expr = expr
 
-    def render(self, renderer, scope):
+    def render(self, state):
         """ Render the output. """
-        renderer.render(str(self.expr.eval(scope)))
+        state.renderer.render(str(self.expr.eval(state)))

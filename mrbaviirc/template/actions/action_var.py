@@ -19,17 +19,21 @@ class VarNode(Node):
         self.var = var
         self.nodes = NodeList()
 
-    def render(self, renderer, scope):
+    def render(self, state):
         """ Render the results and capture into a variable. """
 
-        new_renderer = StringRenderer()
-        self.nodes.render(new_renderer, scope)
-        scope.set(self.var, new_renderer.get())
+        try:
+            original_renderer = state.renderer
+            state.renderer = StringRenderer()
+            self.nodes.render(state)
+            state.set_var(self.var[0], state.renderer.get(), self.var[1])
+        finally:
+            state.renderer = original_renderer
 
 
 def var_handler(parser, template, line, action, start, end):
     """ Parse the action """
-    var = parser._get_token_var(start, end)
+    var = parser._get_token_var(start, end, allow_type=True)
     start += 1
 
     parser._get_no_more_tokens(start, end)

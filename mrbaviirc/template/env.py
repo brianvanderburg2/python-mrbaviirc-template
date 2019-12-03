@@ -94,7 +94,7 @@ class Environment(object):
         All hooks registered with the same name are called in the order they
         were registered, or reverse order if the reverse parameter is True.
         Hooks are passed certain elements and can render data into the current
-        renderer, set variables in the scope, or even include other templates
+        renderer, set variables in the state, or even include other templates
         into the renderer's output.
 
         Parameters
@@ -106,18 +106,10 @@ class Environment(object):
 
                 The signature of the callable is as follows::
 
-                    callback(env, template, line, renderer, scope, params)
+                    callback(state, params)
 
-                env : template.Environment
-                    The environment the template calling the hook is part of
-                template : template.Template
-                    The template object the hook is called from
-                line : int
-                    The line number the hook tag is called from
-                renderer : template.Renderer
-                    The renderer object being used
-                scope : template.Scope
-                    The scope containing variables, userdata, etc
+                state : mrbaviirc.template.state.RenderState
+                    Contains the state information of the render
                 params : list
                     A list of evaluated parameters passed to the hook
         """
@@ -205,7 +197,7 @@ class Environment(object):
 
             return self._imported[name]
 
-    def call_hook(self, hook, renderer, scope, params, reverse):
+    def call_hook(self, hook, state, params, reverse):
         """ Internal API only.  Call hooks from a template.
 
         This method calls a hook of a given name in forward or reverse order.
@@ -216,10 +208,8 @@ class Environment(object):
         ----------
         hook : str
             The name of the hook to call
-        renderer : template.Renderer
-            The current renderer object to pass to the hook functions
-        scope : template.Scope
-            The current scope object to pass to the hook functions
+        state : mrbaviirc.template.state.RenderState
+            The current render state
         params : list
             A list of evaluated parameters to pass to the hook functions
         reverse : bool
@@ -234,4 +224,4 @@ class Environment(object):
             callbacks = reversed(callbacks)
 
         for callback in callbacks:
-            callback(renderer, scope, params)
+            callback(state, params)

@@ -11,7 +11,7 @@ import operator
 from .errors import *
 from .nodes import *
 from .expr import *
-from .scope import *
+from .state import RenderState
 from .tokenizer import *
 from .actions import ACTION_HANDLERS
 
@@ -174,18 +174,41 @@ class TemplateParser(object):
                 self.tokens[pos].line
             )
 
-    def _get_token_var(self, pos, end, errmsg="Expected variable."):
+    def _get_token_var(self, pos, end, allow_type=False, errmsg="Expected variable."):
         """ Parse a variable and return var """
 
         token = self._get_expected_token(pos, end, Token.TYPE_WORD, errmsg)
-        if re.match("[a-zA-Z_][a-zA-Z0-9_]*", token.value):
-            return token.value
-        else:
-            raise ParserError(
-                "Invalid variable name: {0}".format(token.value),
-                self.template.filename,
-                token.line
-            )
+        match = re.match("([lgp]@)?([a-zA-Z_][a-zA-Z0-9_]*)", token.value)
+
+        if match:
+            var_type = match.group(1) # May be None if type not directly specified
+            var_name = match.group(2)
+
+            if allow_type:
+                if var_type == "l@":
+                    return (var_name, RenderState.LOCAL_VAR)
+                elif var_type == "g@":
+                    return (var_name , RenderState.GLOBAL_VAR)
+                elif var_type == "p@":
+                    return (var_name, RenderState.PRIVATE_VAR)
+                elif var_type is None:
+                    # Guess type from variable name
+                    if var_name[0] == "_":
+                        if len(var_name) == 1 or var_name[-1] != "_":
+                            return (var_name, RenderState.PRIVATE_VAR)
+                        else:
+                            return (var_name, RenderState.GLOBAL_VAR)
+                    else:
+                        return (var_name, RenderState.LOCAL_VAR)
+            elif var_type is None: # If allow_type is False, var_type should not be specified
+                return var_name
+
+        # no match, invalid type, or type specified when allow_type False
+        raise ParserError(
+            "Invalid variable name: {0}".format(token.value),
+            self.template.filename,
+            token.line
+        )
 
     def _find_level0_token(self, start, end, tokens=None):
         """ Find a token at level 0 nesting. """
@@ -677,7 +700,7 @@ class TemplateParser(object):
 
         if token.type == Token.TYPE_WORD:
             # Variable
-            var = self._get_token_var(start, end)
+            var = self._get_token_var(start, end, allow_type=True)
             expr = VarExpr(self.template, token.line, var)
 
             if start < end:
@@ -827,9 +850,9 @@ class TemplateParser(object):
             self.tokens[start - 1] if start > 0 else 0
         )
 
-    def _parse_assign(self, start, end):
+    def _parse_assign(self, start, end, allow_type=False):
         """ Parse a var = expr assignment, return (var, expr) """
-        var = self._get_token_var(start, end)
+        var = self._get_token_var(start, end, allow_type=allow_type)
         start += 1
 
         self._get_expected_token(start, end, Token.TYPE_ASSIGN, "Expected '='")
@@ -839,14 +862,14 @@ class TemplateParser(object):
 
         return (var, expr)
 
-    def _parse_multi_assign(self, start, end):
+    def _parse_multi_assign(self, start, end, allow_type=False):
         """ Parse multiple var = expr statemetns, return [(var, expr)] """
 
         splits = self._split_tokens(start, end, Token.TYPE_COMMA)
         if splits:
             assigns = []
             for (start, end) in splits:
-                assigns.append(self._parse_assign(start, end))
+                assigns.append(self._parse_assign(start, end, allow_type=allow_type))
 
             return assigns
 
@@ -856,14 +879,14 @@ class TemplateParser(object):
             self.tokens[start - 1].line if start > 0 else 0
         )
 
-    def _parse_multi_var(self, start, end):
+    def _parse_multi_var(self, start, end, allow_type=False):
         """ Parse multiple variables and return [var] """
 
         splits = self._split_tokens(start, end, Token.TYPE_COMMA)
         if splits:
             varlist = []
             for (start, end) in splits:
-                varlist.append(self._get_token_var(start, end))
+                varlist.append(self._get_token_var(start, end, allow_type=allow_type))
                 self._get_no_more_tokens(start + 1, end)
 
             return varlist

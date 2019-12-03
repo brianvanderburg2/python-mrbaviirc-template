@@ -29,29 +29,29 @@ class ForIterNode(Node):
         self.else_nodes = NodeList()
         self.nodes = self.else_nodes
 
-    def render(self, renderer, scope):
+    def render(self, state):
         """ Render the for node. """
         # Iterate over each value
-        values = self.expr.eval(scope)
+        values = self.expr.eval(state)
         do_else = True
         if values:
             index = 0
             for var in values:
                 do_else = False
                 if self.cvar:
-                    scope.set(self.cvar, index)
-                scope.set(self.var, var)
+                    state.set_var(self.cvar[0], index, self.cvar[1])
+                state.set_var(self.var[0], var, self.var[1])
                 index += 1
 
                 # Execute each sub-node
-                result = self.for_nodes.render(renderer, scope)
+                result = self.for_nodes.render(state)
                 if result == Node.RENDER_BREAK:
                     break
                 elif result == Node.RENDER_CONTINUE:
                     continue
 
         if do_else and self.else_nodes:
-            return self.else_nodes.render(renderer, scope)
+            return self.else_nodes.render(state)
 
 
 class ForIncrNode(Node):
@@ -73,33 +73,33 @@ class ForIncrNode(Node):
         self.else_nodes = NodeList()
         self.nodes = self.else_nodes
 
-    def render(self, renderer, scope):
+    def render(self, state):
         """ Render the for node. """
         # Init
         for (var, expr) in self.init:
-            scope.set(var, expr.eval(scope))
+            state.set_var(var[0], expr.eval(state), var[1])
 
         # Test
         do_else = True
-        while bool(self.test.eval(scope)):
+        while bool(self.test.eval(state)):
             do_else = False
 
             # Render nodes
-            result = self.for_nodes.render(renderer, scope)
+            result = self.for_nodes.render(state)
             if result == Node.RENDER_BREAK:
                 break
 
             # Incr
             for (var, expr) in self.incr:
-                scope.set(var, expr.eval(scope))
+                state.set_var(var[0], expr.eval(state), var[1])
 
         if do_else and self.else_nodes:
-            return self.else_nodes.render(renderer, scope)
+            return self.else_nodes.render(state)
 
 
 def _for_iter_handler(parser, template, line, start, end):
     """ Parse the action """
-    var = parser._get_token_var(start, end)
+    var = parser._get_token_var(start, end, allow_type=True)
     start += 1
 
     token = parser._get_expected_token(
@@ -114,7 +114,7 @@ def _for_iter_handler(parser, template, line, start, end):
     cvar = None
     if token.type == Token.TYPE_COMMA:
 
-        cvar = parser._get_token_var(start, end)
+        cvar = parser._get_token_var(start, end, allow_type=True)
         start += 1
 
         token = parser._get_expected_token(
@@ -138,7 +138,7 @@ def _for_incr_handler(parser, template, line, segments):
     """ Parse the action """
     # Init
     (start, end) = segments[0]
-    init = parser._parse_multi_assign(start, end)
+    init = parser._parse_multi_assign(start, end, allow_type=True)
 
     # Test
     (start, end) = segments[1]
@@ -146,7 +146,7 @@ def _for_incr_handler(parser, template, line, segments):
 
     # Incr
     (start, end) = segments[2]
-    incr = parser._parse_multi_assign(start, end)
+    incr = parser._parse_multi_assign(start, end, allow_type=True)
 
     node = ForIncrNode(template, line, init, test, incr)
     parser.add_node(node)

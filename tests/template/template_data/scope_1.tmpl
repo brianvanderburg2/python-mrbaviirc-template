@@ -1,26 +1,16 @@
-{% set v1="Value 1", v2="Value 2" -%}
-{{ v1 }}
-{{ v2 }}
-{% scope -%}
-{% set v2 = "Value 3" -%}
-{{ v1 }}
-{{ v2 }}
-{% endscope -%}
-{{ v1 }}
-{{ v2 }}
-{% private v3="Value 4" -%}
-{{ v3 }}
-{% scope -%}
-{# Template scope is "higher" than private scope. So set a variable to see
-   Which we get.  We should skip over the private variable v4 above. -#}
-{% template v3="Value 5" -%}
-{{ v3 }}
-{% private v3="Value 6" -%}
-{% set v3="Value 7" -%}
-{{ v3 }}
-{% unset v3 -%}
-{{ v3 }}
-{% set v3="Value 7" -%}
-{{ v3 }}
-{% endscope -%}
-{{ v3 }}
+{% autostrip %}
+
+{% set x="local1", l@y="local2", l@_z="local3" %}
+{% set _px="private1", p@py="private2" %}
+{% set _global_ = 17 %}
+
+{{ _px +}}
+{{ p@_px +}}
+{{ p@py +}}
+{{ _global_ +}}
+
+{% include "scope_1.inc" %}
+{{ x +}}
+{{ y +}}
+{{ _global_ +}}
+

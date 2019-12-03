@@ -25,7 +25,7 @@ class CodeNode(Node):
         self.nodes = NodeList()
         self.code = None
 
-    def render(self, renderer, scope):
+    def render(self, state):
         """ Actually do the work of including the template. """
 
         # Must be allowed globally in env and also locally in template
@@ -40,9 +40,13 @@ class CodeNode(Node):
         # TODO: does this need lock for threading
         if not self.code:
             # Get the code
-            new_renderer = StringRenderer()
-            self.nodes.render(new_renderer, scope)
-            code = new_renderer.get()
+            try:
+                original_renderer = state.renderer
+                state.renderer = StringRenderer()
+                self.nodes.render(state)
+                code = state.renderer.get()
+            finally:
+                state.renderer = original_renderer
 
             # Compile it
             try:
@@ -57,7 +61,7 @@ class CodeNode(Node):
         # Execute the code
         data = {}
         for (var, expr) in self.assigns:
-            data[var] = expr.eval(scope)
+            data[var] = expr.eval(state)
 
         try:
             exec(self.code, data, data)
@@ -70,7 +74,7 @@ class CodeNode(Node):
 
         # Handle return values
         if self.retvar:
-            scope.set(self.retvar, DictToAttr(data))
+            state.set_var(self.retvar, DictToAttr(data))
 
 
 def code_handler(parser, template, line, action, start, end):

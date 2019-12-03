@@ -12,14 +12,14 @@ from ..nodes import Node
 class BreakNode(Node):
     """ Return RENDER_BREAK. """
 
-    def render(self, renderer, scope):
+    def render(self, state):
         return Node.RENDER_BREAK
 
 
 class ContinueNode(Node):
     """ Return RENDER_CONTINUE. """
 
-    def render(self, renderer, scope):
+    def render(self, state):
         return Node.RENDER_CONTINUE
 
 

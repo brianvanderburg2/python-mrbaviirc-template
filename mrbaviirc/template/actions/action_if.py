@@ -30,15 +30,15 @@ class IfNode(Node):
         self.else_nodes = NodeList()
         self.nodes = self.else_nodes
 
-    def render(self, renderer, scope):
+    def render(self, state):
         """ Render the if node. """
         for (expr, nodes) in self.ifs_nodes:
-            result = expr.eval(scope)
+            result = expr.eval(state)
             if result:
-                return nodes.render(renderer, scope)
+                return nodes.render(state)
 
         if self.else_nodes:
-            return self.else_nodes.render(renderer, scope)
+            return self.else_nodes.render(state)
 
 
 def if_handler(parser, template, line, action, start, end):

@@ -16,10 +16,10 @@ class DoNode(Node):
         Node.__init__(self, template, line)
         self.exprs = exprs
 
-    def render(self, renderer, scope):
+    def render(self, state):
         """ Set the value. """
         for expr in self.exprs:
-            expr.eval(scope)
+            expr.eval(state)
 
 
 def do_handler(parser, template, line, action, start, end):

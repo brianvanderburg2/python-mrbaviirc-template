@@ -8,51 +8,29 @@ __license__ = "Apache License 2.0"
 
 
 from ..nodes import Node
-from ..scope import Scope
 
 
 class AssignNode(Node):
     """ Set a variable to a subvariable. """
 
-    def __init__(self, template, line, assigns, where):
+    def __init__(self, template, line, assigns):
         """ Initialize. """
         Node.__init__(self, template, line)
         self.assigns = assigns
-        self.where = where
 
-    def render(self, renderer, scope):
+    def render(self, state):
         """ Set the value. """
         for (var, expr) in self.assigns:
-            scope.set(var, expr.eval(scope), self.where)
-
-
-def _set_handler(parser, template, line, action, start, end, where):
-    """ Parse the action """
-    assigns = parser._parse_multi_assign(start, end)
-
-    node = AssignNode(template, line, assigns, where)
-    parser.add_node(node)
+            state.set_var(var[0], expr.eval(state), var[1])
 
 
 def set_handler(parser, template, line, action, start, end):
-    return _set_handler(parser, template, line, action, start, end, Scope.SCOPE_LOCAL)
+    """ Parse the action """
+    assigns = parser._parse_multi_assign(start, end, allow_type=True)
 
-
-def global_handler(parser, template, line, action, start, end):
-    return _set_handler(parser, template, line, action, start, end, Scope.SCOPE_GLOBAL)
-
-
-def template_handler(parser, template, line, action, start, end):
-    return _set_handler(parser, template, line, action, start, end, Scope.SCOPE_TEMPLATE)
-
-
-def private_handler(parser, template, line, action, start, end):
-    return _set_handler(parser, template, line, action, start, end, Scope.SCOPE_PRIVATE)
-
+    node = AssignNode(template, line, assigns)
+    parser.add_node(node)
 
 ACTION_HANDLERS = {
     "set": set_handler,
-    "global": global_handler,
-    "template": template_handler,
-    "private": private_handler
 }

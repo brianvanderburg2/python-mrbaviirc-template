@@ -11,19 +11,19 @@ from ..errors import TemplateError
 
 
 class ExpandNode(Node):
-    """ A node to expand variables into the current scope. """
+    """ A node to expand variables into the local variables. """
 
     def __init__(self, template, line, expr):
         """ Initialize """
         Node.__init__(self, template, line)
         self.expr = expr
 
-    def render(self, renderer, scope):
+    def render(self, state):
         """ Expand the variables. """
 
-        result = self.expr.eval(scope)
+        result = self.expr.eval(state)
         try:
-            scope.update(result)
+            state.update_vars(result)
         except (KeyError, TypeError, ValueError) as error:
             raise TemplateError(
                 str(error),

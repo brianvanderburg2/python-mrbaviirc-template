@@ -15,20 +15,20 @@ from mrbaviirc.template import UnrestrictedLoader, Environment, StandardLib, Str
 from mrbaviirc.template import PrefixLoader, PrefixPathLoader, SearchPathLoader
 from mrbaviirc.template import AbortError
 
-def hook1a(renderer, scope, params):
-    renderer.render("Hook1 A: {0}\n".format(scope.line))
+def hook1a(state, params):
+    state.renderer.render("Hook1 A: {0}\n".format(state.line))
 
-def hook1b(renderer, scope, params):
-    renderer.render("Hook1 B: {0}\n".format(scope.line))
+def hook1b(state, params):
+    state.renderer.render("Hook1 B: {0}\n".format(state.line))
     if "count" in params:
-        renderer.render("Count: {0}\n".format(params["count"]))
+        state.renderer.render("Count: {0}\n".format(params["count"]))
 
-    u1 = scope.userdata["user1"]
-    u2 = scope.userdata["user2"]
+    u1 = state.user_data["user1"]
+    u2 = state.user_data["user2"]
     if u1 is not None:
-        renderer.render("User1: {0}\n".format(u1))
+        state.renderer.render("User1: {0}\n".format(u1))
     if u2 is not None:
-        renderer.render("User2: {0}\n".format(u2))
+        state.renderer.render("User2: {0}\n".format(u2))
 
 def register_hooks(env):
     env.register_hook("hook1", hook1a)
@@ -89,14 +89,14 @@ def do_test_compare(env, search_path_loader):
         data = json.load(handle)
 
     data["lib"] = StandardLib()
-    userdata = {"user1": 10, "user2": 20}
+    user_data = {"user1": 10, "user2": 20}
 
     for path in sorted(glob.glob(os.path.join(DATADIR, "*.tmpl"))):
         source = path if not search_path_loader else os.path.basename(path)
 
         tmpl = env.load_file(filename=source)
         rndr = StringRenderer()
-        tmpl.render(rndr, data, userdata)
+        tmpl.render(rndr, data, user_data)
 
         target = path[:-5] + ".txt"
         contents = rndr.get()

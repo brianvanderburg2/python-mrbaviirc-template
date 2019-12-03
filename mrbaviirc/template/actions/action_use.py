@@ -17,11 +17,11 @@ class UseSectionNode(Node):
         Node.__init__(self, template, line)
         self.expr = expr
 
-    def render(self, renderer, scope):
+    def render(self, state):
         """ Render the section to the output. """
 
-        section = str(self.expr.eval(scope))
-        renderer.render(renderer.get_section(section))
+        section = str(self.expr.eval(state))
+        state.renderer.render(state.renderer.get_section(section))
 
 
 def use_handler(parser, template, line, action, start, end):

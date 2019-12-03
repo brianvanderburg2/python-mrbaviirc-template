@@ -1,25 +1,10 @@
 {% autostrip %}
 
-{% set mylib = "50" %}
-
-{% scope %}
-
 {% import
     mylib = "mrbaviirc.template",
     yourlib = "mrbaviirc.template"
 %}
-{% import otherlib = "mrbaviirc.template" %}
-
-{# Imports always happen in local scope.  However they can be assigned
-   To other scopes by setting the variable in that scope. #}
-{% global otherlib = otherlib %}
 
 {{ mylib.stringlib.concat("Hello", "World", "Goodbye", "World") +}}
 {{ yourlib.stringlib.concat("Feed", "Me") +}}
-{{ otherlib.stringlib.concat("Feed", "Me", "Pizza") +}}
 
-{% endscope %}
-
-{{ otherlib.stringlib.concat("FeedMe", mylib, "Pizzas") }}
-
-{# Give ending newline +#}

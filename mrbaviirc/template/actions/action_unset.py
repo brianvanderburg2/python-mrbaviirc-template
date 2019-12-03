@@ -10,22 +10,22 @@ from ..nodes import Node
 
 
 class UnsetNode(Node):
-    """ Unset variable at the current scope rsults. """
+    """ Unset variables. """
 
     def __init__(self, template, line, varlist):
         """ Initialize. """
         Node.__init__(self, template, line)
         self.varlist = varlist
 
-    def render(self, renderer, scope):
+    def render(self, state):
         """ Set the value. """
         for item in self.varlist:
-            scope.unset(item)
+            state.unset_var(item[0], item[1])
 
 
 def unset_handler(parser, template, line, action, start, end):
     """ Parse the action """
-    varlist = parser._parse_multi_var(start, end)
+    varlist = parser._parse_multi_var(start, end, allow_type=True)
 
     node = UnsetNode(template, line, varlist)
     parser.add_node(node)

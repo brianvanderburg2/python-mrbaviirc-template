@@ -15,7 +15,7 @@ import threading
 import weakref
 
 from .parser import TemplateParser
-from .scope import Scope
+from .state import RenderState
 
 
 class Template(object):
@@ -33,10 +33,10 @@ class Template(object):
     Methods
     -------
 
-    render(self, renderer, context=None, userdata=None, abort_fn=None)
+    render(self, renderer, context=None, user_data=None, abort_fn=None)
         The top level call to a render.
-    nested_render(self, renderer, scope, context)
-        An including render passing along the previous scope.
+    nested_render(self, state, context)
+        An including render passing along the state information.
 
     Internal API Attributes
     -----------------------
@@ -87,7 +87,7 @@ class Template(object):
     def env(self):
         return self._env()
 
-    def render(self, renderer, context=None, userdata=None, abort_fn=None):
+    def render(self, renderer, context=None, user_data=None, abort_fn=None):
         """ Render the template.
 
         Parameters
@@ -95,11 +95,11 @@ class Template(object):
         renderer : template.Renderer
             The renderer the output should be rendered to.
         context : dict, default=None
-            Initial values to set into the local scope of the top render scope
-        userdata : variant, default=None
-            Userdata to pass to the scope
+            Initial values to set into the local variables
+        user_data : variant, default=None
+            Userdata to pass to the render state
         abort_fn : callback, default=None
-            The abort callback function to pass to the scope.
+            The abort callback function to pass to the render state
 
         Returns
         -------
@@ -113,24 +113,27 @@ class Template(object):
             Any other error
         """
 
-        # Create the top (global) scope for this render
-        scope = Scope(self.env, userdata=userdata, abort_fn=abort_fn)
-        if context is not None:
-            scope.update(context)
+        # Create the render state
+        state = RenderState()
+        state.env = self.env
+        state.user_data = user_data
+        state.abort_fn = abort_fn
+        state.renderer = renderer
 
-        return self.nested_render(renderer, scope, None)
+        if context:
+            state.update_vars(context)
 
-    def nested_render(self, renderer, scope, context):
-        """ Render the template from within another template/scope.
+        return self.nested_render(state, None)
+
+    def nested_render(self, state, context):
+        """ Render the template from within another template/state.
 
         Paramters
         ---------
-        renderer : template.Renderer
-            The renderer the output should be rendered to.
-        scope : template.Scope
-            The scope to pass along to the render.
+        state : mrbaviirc.template.state.RenderState
+            The current state of the render
         context : dict
-            Variable to set into the template scope of the render.
+            Variable to set into the local variables of the render.
 
         Raises
         ------
@@ -139,16 +142,18 @@ class Template(object):
         Exception
             Any other error
         """
-        new_scope = scope.push(self)
+        try:
+            state.enter_template(self)
+            if context is not None:
+                state.update_vars(context)
 
-        if context is not None:
-            new_scope.update(context)
+            # set certain variables
+            state.set_var("__filename__", self.filename) # Note this is local
 
-        # set certain variables
-        new_scope.template_scope["__filename__"] = self.filename
+            self.nodes.render(state)
 
-        self.nodes.render(renderer, new_scope)
-
-        # Return any template return values:
-        retval = new_scope.template_scope.get(":return:", {})
+            # Return any template return values:
+            retval = state.get_default_var(":return:", {})
+        finally:
+            state.leave_template()
         return retval

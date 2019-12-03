@@ -37,16 +37,16 @@ class SwitchNode(Node):
         self.cases_nodes.append((testfunc, NodeList(), exprs))
         self.nodes = self.cases_nodes[-1][1]
 
-    def render(self, renderer, scope):
+    def render(self, state):
         """ Render the node. """
-        value = self.expr.eval(scope)
+        value = self.expr.eval(state)
 
         for testfunc, nodes, exprs in self.cases_nodes:
-            params = [expr.eval(scope) for expr in exprs]
+            params = [expr.eval(state) for expr in exprs]
             if testfunc(value, *params):
-                return nodes.render(renderer, scope)
+                return nodes.render(state)
 
-        return self.default_nodes.render(renderer, scope)
+        return self.default_nodes.render(state)
 
 
 def switch_handler(parser, template, line, action, start, end):

@@ -18,10 +18,10 @@ class ErrorNode(Node):
         Node.__init__(self, template, line)
         self.expr = expr
 
-    def render(self, renderer, scope):
+    def render(self, state):
         """ Raise the error. """
         raise RaisedError(
-            str(self.expr.eval(scope)),
+            str(self.expr.eval(state)),
             self.template.filename,
             self.line
         )

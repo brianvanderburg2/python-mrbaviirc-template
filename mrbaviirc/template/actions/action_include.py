@@ -22,11 +22,11 @@ class IncludeNode(Node):
         self.assigns = assigns
         self.retvar = retvar
 
-    def render(self, renderer, scope):
+    def render(self, state):
         """ Actually do the work of including the template. """
         try:
             template = self.env.load_file(
-                str(self.expr.eval(scope)),
+                str(self.expr.eval(state)),
                 self.template
             )
         except (IOError, OSError, RestrictedError) as error:
@@ -38,11 +38,11 @@ class IncludeNode(Node):
 
         context = {}
         for (var, expr) in self.assigns:
-            context[var] = expr.eval(scope)
+            context[var] = expr.eval(state)
 
-        retval = template.nested_render(renderer, scope, context)
+        retval = template.nested_render(state, context)
         if self.retvar:
-            scope.set(self.retvar, DictToAttr(retval))
+            state.set_var(self.retvar[0], DictToAttr(retval), self.retvar[1])
 
 
 def include_handler(parser, template, line, action, start, end):
@@ -59,7 +59,7 @@ def include_handler(parser, template, line, action, start, end):
 
         # expecting either return or with
         if token.type == Token.TYPE_WORD and token.value == "return":
-            retvar = parser._get_token_var(start, end)
+            retvar = parser._get_token_var(start, end, allow_type=True)
             start += 1
 
             parser._get_no_more_tokens(start, end)

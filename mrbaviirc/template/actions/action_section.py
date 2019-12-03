@@ -18,13 +18,13 @@ class SectionNode(Node):
         self.expr = expr
         self.nodes = NodeList()
 
-    def render(self, renderer, scope):
+    def render(self, state):
         """ Redirect output to a section. """
 
-        section = str(self.expr.eval(scope))
-        renderer.push_section(section)
-        self.nodes.render(renderer, scope)
-        renderer.pop_section()
+        section = str(self.expr.eval(state))
+        state.renderer.push_section(section)
+        self.nodes.render(state)
+        state.renderer.pop_section()
 
 
 def section_handler(parser, template, line, action, start, end):

@@ -11,20 +11,20 @@ from ..nodes import Node
 
 
 class ImportNode(Node):
-    """ Import a library to a variable in the current scope. """
+    """ Import a library to a variable in the template. """
     def __init__(self, template, line, assigns):
         Node.__init__(self, template, line)
         self.assigns = assigns
 
-    def render(self, renderer, scope):
+    def render(self, state):
         """ Do the import. """
         env = self.env
 
         for (var, expr) in self.assigns:
-            name = expr.eval(scope)
+            name = expr.eval(state)
             try:
                 imp = env.load_import(name)
-                scope.set(var, imp)
+                state.set_var(var[0], imp, var[1])
             except KeyError:
                 raise UnknownImportError(
                     "No such import: {0}".format(name),
@@ -35,7 +35,7 @@ class ImportNode(Node):
 
 def import_handler(parser, template, line, action, start, end):
     """ Parse the action """
-    assigns = parser._parse_multi_assign(start, end)
+    assigns = parser._parse_multi_assign(start, end, allow_type=True)
 
     node = ImportNode(template, line, assigns)
     parser.add_node(node)
