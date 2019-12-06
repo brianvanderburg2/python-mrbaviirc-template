@@ -152,8 +152,8 @@ class Template(object):
 
             self.nodes.render(state)
 
-            # Return any template return values:
-            retval = state.get_default_var(":return:", {})
+            # Return any template return values.
+            retval = state.get_var(":return:", state.PRIVATE_VAR)
         finally:
             state.leave_template()
         return retval

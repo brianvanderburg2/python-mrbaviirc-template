@@ -94,25 +94,6 @@ class RenderState:
 
         return self._vars[where][name]
 
-    def get_default_var(self, name, defval=None, where=LOCAL_VAR):
-        """ Get a variable.
-
-        Parameters
-        ----------
-        name : str
-            The name of the variable to get
-        defval : Any, default=None
-            The default value if the name is not set
-        where : LOCAL_VAR or GLOBAL_VAR or PRIVATE_VAR
-            Where to look for the variable
-
-        Returns
-        -------
-        Any
-            The current value of the variable
-        """
-        return self._vars[where].get(name, defval)
-
     def unset_var(self, name, where=LOCAL_VAR):
         """ Remove a variable.
 
@@ -140,7 +121,8 @@ class RenderState:
             self._vars[self.LOCAL_VAR].copy(), # Copy local vars to restore them later
             self._vars[self.PRIVATE_VAR]
         ))
-        self._vars[self.PRIVATE_VAR] = {} # Setting private vars to a new empy dict
+        # Private is set to new dict, but include our return dictionary
+        self._vars[self.PRIVATE_VAR] = {":return:": {}}
         self.template = template
         self.line = 0
 
