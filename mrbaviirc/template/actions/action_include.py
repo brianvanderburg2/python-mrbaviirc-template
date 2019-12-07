@@ -50,21 +50,31 @@ def include_handler(parser, template, line, action, start, end):
     retvar = None
     assigns = []
     segments = parser._find_tag_segments(start, end)
-    for segment in segments:
+
+    # filename expr is first
+    if len(segments) > 0:
+        (start, end) = segments[0]
+        expr = parser._parse_expr(start, end)
+
+    for segment in segments[1:]:
         (start, end) = segment
 
-        token = parser._get_token(start, end)
+        token = parser._get_expected_token(
+            start,
+            end,
+            Token.TYPE_WORD,
+            values=["return", "with"]
+        )
         start += 1
 
-        # expecting either return or with
-        if token.type == Token.TYPE_WORD and token.value == "return":
+        if token.value == "return":
             retvar = parser._get_token_var(start, end, allow_type=True)
             start += 1
 
             parser._get_no_more_tokens(start, end)
             continue
 
-        if token.type == Token.TYPE_WORD and token.value == "with":
+        if token.value == "with":
             assigns = parser._parse_multi_assign(start, end)
             continue
 

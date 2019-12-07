@@ -38,26 +38,27 @@ def _hook_handler(parser, template, line, action, start, end, reverse):
     hook = None
     assigns = []
     segments = parser._find_tag_segments(start, end)
-    for segment in segments:
+
+    # First item should be expression
+    if len(segments) > 0:
+        (start, end) = segments[0]
+        hook = parser._parse_expr(start, end)
+
+    for segment in segments[1:]:
         (start, end) = segment
 
-        token = parser._get_token(start, end)
+        # Only support "with"
+        token = parser._get_expected_token(start, end, Token.TYPE_WORD, values="with")
         start += 1
 
-        # expecting either with or expression
-        if token.type == Token.TYPE_WORD and token.value == "with":
-            assigns = parser._parse_multi_assign(start, end)
-            continue
-
-        # not with, then should be expression
-        start -= 1
-        hook = parser._parse_expr(start, end)
+        assigns = parser._parse_multi_assign(start, end)
 
     if hook is None:
         raise ParserError(
             "Hook expecting name expression",
             template.filename,
-            line)
+            line
+        )
 
     node = HookNode(template, line, hook, assigns, reverse)
     parser.add_node(node)

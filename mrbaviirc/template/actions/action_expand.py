@@ -61,6 +61,7 @@ def expand_handler(parser, template, line, action, start, end):
             Token.TYPE_WORD,
             values=["local", "global", "private", "return"]
         )
+        start += 1
 
         where = {
             "local": RenderState.LOCAL_VAR,
@@ -68,6 +69,8 @@ def expand_handler(parser, template, line, action, start, end):
             "private": RenderState.PRIVATE_VAR,
             "return": RenderState.RETURN_VAR
         }.get(token.value, RenderState.LOCAL_VAR)
+
+        parser._get_no_more_tokens(start, end)
 
     if expr is None:
         raise ParserError(
