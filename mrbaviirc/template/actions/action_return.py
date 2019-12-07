@@ -24,7 +24,7 @@ class ReturnNode(Node):
         for (var, expr) in self.assigns:
             result[var] = expr.eval(state)
 
-        state.get_var(":return:", state.PRIVATE_VAR).update(result)
+        state.update_vars(result, state.RETURN_VAR)
 
 
 def return_handler(parser, template, line, action, start, end):

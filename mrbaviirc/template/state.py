@@ -29,6 +29,7 @@ class RenderState:
     LOCAL_VAR = 0
     GLOBAL_VAR = 1
     PRIVATE_VAR = 2
+    RETURN_VAR = 3
 
     def __init__(self):
         """ Initialize the render context. """
@@ -41,7 +42,7 @@ class RenderState:
 
         # Should only be accessed within the API or this class
         self.abort_fn = None
-        self._vars = [{}, {}, {}] # Indexed via the type of variable
+        self._vars = [{}, {}, {}, {}] # Indexed via the type of variable
         self._template_stack = []
 
     def set_var(self, name, value, where=LOCAL_VAR):
@@ -53,7 +54,7 @@ class RenderState:
             The name of a variable to set
         value : Any
             The value of a variable to set
-        where : LOCAL_VAR or GLOBAL_VAR or PRIVATE_VAR
+        where : LOCAL_VAR or GLOBAL_VAR or PRIVATE_VAR or RETURN_VAR
             Where to set the variable
         """
 
@@ -66,7 +67,7 @@ class RenderState:
         ----------
         values : dict
             A dictionary of values to update
-        where : LOCAL_VAR or GLOBAL_VAR or PRIVATE_VAR
+        where : LOCAL_VAR or GLOBAL_VAR or PRIVATE_VAR or RETURN_VAR
             Where to update the variables
         """
         self._vars[where].update(values)
@@ -78,7 +79,7 @@ class RenderState:
         ----------
         name : str
             The name of the variable to get
-        where : LOCAL_VAR or GLOBAL_VAR or PRIVATE_VAR
+        where : LOCAL_VAR or GLOBAL_VAR or PRIVATE_VAR or RETURN_VAR
             Where to look for the variable
 
         Returns
@@ -101,7 +102,7 @@ class RenderState:
         ----------
         name : str
             Name of the variable to remote
-        where : LOCAL_VAR or GLOBAL_VAR or PRIVATE_VAR
+        where : LOCAL_VAR or GLOBAL_VAR or PRIVATE_VAR or RETURN_VAR
             Where to remove the variable
         """
 
@@ -119,20 +120,33 @@ class RenderState:
         self._template_stack.append((
             self.template,
             self._vars[self.LOCAL_VAR].copy(), # Copy local vars to restore them later
-            self._vars[self.PRIVATE_VAR]
+            self._vars[self.PRIVATE_VAR],
+            self._vars[self.RETURN_VAR]
         ))
-        # Private is set to new dict, but include our return dictionary
-        self._vars[self.PRIVATE_VAR] = {":return:": {}}
+        # Private and return are new dictionaries
+        self._vars[self.PRIVATE_VAR] = {}
+        self._vars[self.RETURN_VAR] = {}
         self.template = template
         self.line = 0
 
-
-
     def leave_template(self):
         """ Leaving a template render, restore the state needed. """
+
         (
             self.template,
             self._vars[self.LOCAL_VAR],
-            self._vars[self.PRIVATE_VAR]
+            self._vars[self.PRIVATE_VAR],
+            self._vars[self.RETURN_VAR]
         ) = self._template_stack.pop()
 
+    def get_return(self):
+        """ Get the return results.
+
+        Returns
+        -------
+        dict
+            This returns the return dictionary. This is only a reference
+            to the internal dictionary so the returned value should not be
+            used or manipulated until after leave_template has been called.
+        """
+        return self._vars[self.RETURN_VAR]

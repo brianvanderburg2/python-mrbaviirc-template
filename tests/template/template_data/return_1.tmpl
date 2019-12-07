@@ -2,12 +2,14 @@
 
 {% include "return_1.inc" ; return result ; with a = 5, b = 10 %}
 
-{{ result.a +}}
-{{ result.b +}}
-{{ result.c +}}
+{{ result["a"] +}}
+{{ result["b"] +}}
+{{ result["c"] +}}
+{{ result["d"] +}}
 
 {% include "return_1.inc" ; return gamma ; with a = 10, b = 5 %}
 
-{{ gamma.a +}}
-{{ gamma.b +}}
-{{ gamma.c +}}
+{{ gamma["a"] +}}
+{{ gamma["b"] +}}
+{{ gamma["c"] +}}
+{{ gamma["d"] +}}

@@ -178,7 +178,7 @@ class TemplateParser(object):
         """ Parse a variable and return var """
 
         token = self._get_expected_token(pos, end, Token.TYPE_WORD, errmsg)
-        match = re.match("([lgp]@)?([a-zA-Z_][a-zA-Z0-9_]*)", token.value)
+        match = re.match("([lgpr]@)?([a-zA-Z_][a-zA-Z0-9_]*)", token.value)
 
         if match:
             var_type = match.group(1) # May be None if type not directly specified
@@ -191,6 +191,8 @@ class TemplateParser(object):
                     return (var_name , RenderState.GLOBAL_VAR)
                 elif var_type == "p@":
                     return (var_name, RenderState.PRIVATE_VAR)
+                elif var_type == "r@":
+                    return (var_name, RenderState.RETURN_VAR)
                 elif var_type is None:
                     # Guess type from variable name
                     if var_name[0] == "_":

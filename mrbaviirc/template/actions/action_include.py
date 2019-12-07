@@ -9,7 +9,6 @@ __license__ = "Apache License 2.0"
 from ..nodes import Node
 from ..tokenizer import Token
 from ..errors import ParserError, TemplateError, RestrictedError
-from ..util import DictToAttr
 
 
 class IncludeNode(Node):
@@ -42,7 +41,7 @@ class IncludeNode(Node):
 
         retval = template.nested_render(state, context)
         if self.retvar:
-            state.set_var(self.retvar[0], DictToAttr(retval), self.retvar[1])
+            state.set_var(self.retvar[0], retval, self.retvar[1])
 
 
 def include_handler(parser, template, line, action, start, end):

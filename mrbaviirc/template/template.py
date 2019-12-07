@@ -142,6 +142,7 @@ class Template(object):
         Exception
             Any other error
         """
+        retval = {}
         try:
             state.enter_template(self)
             if context is not None:
@@ -153,7 +154,7 @@ class Template(object):
             self.nodes.render(state)
 
             # Return any template return values.
-            retval = state.get_var(":return:", state.PRIVATE_VAR)
+            retval = state.get_return()
         finally:
             state.leave_template()
         return retval

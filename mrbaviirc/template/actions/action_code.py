@@ -11,7 +11,6 @@ from ..nodes import Node, NodeList
 from ..tokenizer import Token
 from ..errors import ParserError, TemplateError
 from ..renderers import StringRenderer
-from ..util import DictToAttr
 
 
 class CodeNode(Node):
@@ -74,7 +73,7 @@ class CodeNode(Node):
 
         # Handle return values
         if self.retvar:
-            state.set_var(self.retvar, DictToAttr(data))
+            state.set_var(self.retvar, data)
 
 
 def code_handler(parser, template, line, action, start, end):
