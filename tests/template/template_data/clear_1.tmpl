@@ -1,0 +1,25 @@
+{% autostrip %}
+
+{% set x=1, y=2, z=3, g@x=4, g@y=5, g@z=6 %}
+
+{{ x +}}
+{{ y +}}
+{{ z +}}
+{{ g@x +}}
+{{ g@y +}}
+{{ g@z +}}
+
+{% clear %}
+{% import lib="mrbaviirc.template" %}
+
+{{ lib.default(x, 0) +}}
+{{ lib.default(y, 1) +}}
+{{ lib.default(z, 2) +}}
+{{ lib.default(g@x, 0) +}}
+{{ lib.default(g@y, 1) +}}
+{{ lib.default(g@z, 2) +}}
+
+{% clear global %}
+{{ lib.default(g@x, 0) +}}
+{{ lib.default(g@y, 1) +}}
+{{ lib.default(g@z, 2) +}}

@@ -108,6 +108,16 @@ class RenderState:
 
         self._vars[where].pop(name, None)
 
+    def clear_vars(self, where=LOCAL_VAR):
+        """ Clear all variables in a compartment.
+
+        Parameters
+        ----------
+        where : LOCAL_VAR or GLOBAL_VAR or PRIVATE_VAR or RETURN_VAR
+            Where to remove the variable
+        """
+        self._vars[where].clear()
+
     def enter_template(self, template):
         """ Starting a template render, remember the current state needed.
 
