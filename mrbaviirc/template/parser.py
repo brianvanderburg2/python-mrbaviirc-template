@@ -8,15 +8,15 @@ __license__ = "Apache License 2.0"
 import re
 import operator
 
-from .errors import *
-from .nodes import *
-from .expr import *
+from .errors import * # pylint: disable=wildcard-import
+from .nodes import * # pylint: disable=wildcard-import
+from .expr import * # pylint: disable=wildcard-import
 from .state import RenderState
-from .tokenizer import *
+from .tokenizer import * # pylint: disable=wildcard-import
 from .actions import ACTION_HANDLERS
 
 
-class TemplateParser(object):
+class TemplateParser:
     """ A base tokenizer. """
 
     AUTOSTRIP_NONE = 0
@@ -97,12 +97,12 @@ class TemplateParser(object):
         if len(self.stack) > 1:
             self.stack.pop()
             return self.stack[-1][-1]
-        else:
-            raise ParserError(
-                "Unexpected nodelist pop",
-                self.template.filename,
-                self.action_line
-            )
+
+        raise ParserError(
+            "Unexpected nodelist pop",
+            self.template.filename,
+            self.action_line
+        )
 
     def push_autostrip(self, value=None):
         """ Push autostrip and optionally change the value. """
@@ -130,12 +130,12 @@ class TemplateParser(object):
 
         if pos <= end:
             return self.tokens[pos]
-        else:
-            raise ParserError(
-                errmsg,
-                self.template.filename,
-                self.tokens[pos - 1].line if pos > 0 else 0
-            )
+
+        raise ParserError(
+            errmsg,
+            self.template.filename,
+            self.tokens[pos - 1].line if pos > 0 else 0
+        )
 
     def _get_expected_token(self, pos, end, types, errmsg="Unexpected token", values=None):
         """ Expect a specific type of token. """
@@ -187,21 +187,22 @@ class TemplateParser(object):
             if allow_type:
                 if var_type == "l@":
                     return (var_name, RenderState.LOCAL_VAR)
-                elif var_type == "g@":
-                    return (var_name , RenderState.GLOBAL_VAR)
-                elif var_type == "p@":
+                if var_type == "g@":
+                    return (var_name, RenderState.GLOBAL_VAR)
+                if var_type == "p@":
                     return (var_name, RenderState.PRIVATE_VAR)
-                elif var_type == "r@":
+                if var_type == "r@":
                     return (var_name, RenderState.RETURN_VAR)
-                elif var_type is None:
+                if var_type is None:
                     # Guess type from variable name
+                    # _=private, _.*_ = global, _.*[^_]=private, others=local
                     if var_name[0] == "_":
                         if len(var_name) == 1 or var_name[-1] != "_":
                             return (var_name, RenderState.PRIVATE_VAR)
-                        else:
-                            return (var_name, RenderState.GLOBAL_VAR)
-                    else:
-                        return (var_name, RenderState.LOCAL_VAR)
+
+                        return (var_name, RenderState.GLOBAL_VAR)
+
+                    return (var_name, RenderState.LOCAL_VAR)
             elif var_type is None: # If allow_type is False, var_type should not be specified
                 return var_name
 
@@ -232,7 +233,7 @@ class TemplateParser(object):
 
             elif newtoken.type in self.CLOSE_TOKENS:
                 # Make sure it matches the
-                if len(token_stack):
+                if token_stack:
                     last = token_stack.pop()
                 else:
                     last = None
@@ -277,7 +278,7 @@ class TemplateParser(object):
                 token_stack.append(token.type)
 
             elif token.type in self.CLOSE_TOKENS:
-                if len(token_stack):
+                if token_stack:
                     last = token_stack.pop()
                 else:
                     last = None
@@ -458,6 +459,7 @@ class TemplateParser(object):
         return (None, self._parse_expr(start, end))
 
     def _parse_expr(self, start, end):
+        # pylint: disable=too-many-locals
         """ Parse the expression. """
 
         addsub = None
@@ -559,13 +561,12 @@ class TemplateParser(object):
                     expr1,
                     expr2
                 )
-            else:
-                return OrExpr(
-                    self.template,
-                    token.line,
-                    expr1,
-                    expr2
-                )
+            return OrExpr(
+                self.template,
+                token.line,
+                expr1,
+                expr2
+            )
 
         # Split on comparison next
         if compare is not None:
@@ -648,12 +649,11 @@ class TemplateParser(object):
                     lambda a: not a,
                     self._parse_expr(nott + 1, end)
                 )
-            else:
-                raise ParserError(
-                    "Unexpected token: !",
-                    self.template.filename,
-                    token.line
-                )
+            raise ParserError(
+                "Unexpected token: !",
+                self.template.filename,
+                token.line
+            )
 
         # Posneg
         if posneg is not None:
@@ -661,21 +661,21 @@ class TemplateParser(object):
             if posneg == start:
                 if token.type == Token.TYPE_PLUS:
                     return self._parse_expr(posneg + 1, end)
-                else:
-                    return UnaryExpr(
-                        self.template,
-                        token.line,
-                        lambda a: -a,
-                        self._parse_expr(posneg + 1, end)
-                    )
-            else:
-                raise ParserError(
-                    "Unexpected token: {0}".format(
-                        "+" if token.type == Token.TYPE_PLUS else "-"
-                    ),
-                    self.template.filename,
-                    token.line
+
+                return UnaryExpr(
+                    self.template,
+                    token.line,
+                    lambda a: -a,
+                    self._parse_expr(posneg + 1, end)
                 )
+
+            raise ParserError(
+                "Unexpected token: {0}".format(
+                    "+" if token.type == Token.TYPE_PLUS else "-"
+                ),
+                self.template.filename,
+                token.line
+            )
 
         # Check what we have at the start
         token = self.tokens[start]
@@ -797,15 +797,19 @@ class TemplateParser(object):
         splits = self._split_tokens(start, end, Token.TYPE_COMMA)
         is_dict = None
 
-        for (start, end) in splits:
+        for (split_start, split_end) in splits:
             # Determine if we are a dictionary, if we don't already know
             if is_dict is None:
-                pos = self._find_level0_token(start, end, Token.TYPE_COLON)
+                pos = self._find_level0_token(
+                    split_start, split_end, Token.TYPE_COLON
+                )
                 is_dict = pos is not None
 
             # If dict, get the key
             if is_dict:
-                pos = self._find_level0_token(start, end, Token.TYPE_COLON)
+                pos = self._find_level0_token(
+                    split_start, split_end, Token.TYPE_COLON
+                )
                 if pos is None:
                     raise ParserError(
                         "Dictionary expecting ':'",
@@ -813,11 +817,15 @@ class TemplateParser(object):
                         line
                     )
 
-                keys.append(self._parse_expr(start, pos - 1))
-                start = pos + 1
+                keys.append(self._parse_expr(
+                    split_start, pos - 1
+                ))
+                value_start = pos + 1
+            else:
+                value_start = split_start
 
             # Get the value
-            values.append(self._parse_expr(start, end))
+            values.append(self._parse_expr(value_start, split_end))
 
 
         # We no longer return ValueExpr even if the list is all ValueExpr
@@ -827,8 +835,8 @@ class TemplateParser(object):
         # ValueExpr should only be used for immutable values for this reason
         if is_dict:
             return DictExpr(self.template, line, keys, values)
-        else:
-            return ListExpr(self.template, line, values)
+
+        return ListExpr(self.template, line, values)
 
     def _parse_multi_expr(self, start, end, allow_blank=False, allow_assign=False):
         """ Parse a list of expressions separated by comma. """
@@ -837,13 +845,17 @@ class TemplateParser(object):
 
         if splits:
             items = []
-            for (start, end) in splits:
-                if start is None or end is None:
+            for (split_start, split_end) in splits:
+                if split_start is None or split_end is None:
                     items.append(None)
                 elif allow_assign:
-                    items.append(self._parse_expr_or_assign(start, end))
+                    items.append(self._parse_expr_or_assign(
+                        split_start, split_end
+                    ))
                 else:
-                    items.append(self._parse_expr(start, end))
+                    items.append(self._parse_expr(
+                        split_start, split_end
+                    ))
             return items
 
         raise ParserError(
@@ -870,8 +882,10 @@ class TemplateParser(object):
         splits = self._split_tokens(start, end, Token.TYPE_COMMA)
         if splits:
             assigns = []
-            for (start, end) in splits:
-                assigns.append(self._parse_assign(start, end, allow_type=allow_type))
+            for (split_start, split_end) in splits:
+                assigns.append(self._parse_assign(
+                    split_start, split_end, allow_type=allow_type
+                ))
 
             return assigns
 
@@ -887,9 +901,11 @@ class TemplateParser(object):
         splits = self._split_tokens(start, end, Token.TYPE_COMMA)
         if splits:
             varlist = []
-            for (start, end) in splits:
-                varlist.append(self._get_token_var(start, end, allow_type=allow_type))
-                self._get_no_more_tokens(start + 1, end)
+            for (split_start, split_end) in splits:
+                varlist.append(self._get_token_var(
+                    split_start, split_end, allow_type=allow_type
+                    ))
+                self._get_no_more_tokens(split_start + 1, split_end)
 
             return varlist
 
@@ -928,7 +944,7 @@ class TemplateParser(object):
                     if first_nl == -1:
                         text = text.lstrip()
                     else:
-                        nl = 1 if pre_ws_control == Token.WS_TRIMTONL else 0
+                        nl = 1 if pre_ws_control == Token.WS_TRIMTONL else 0 # pylint: disable=invalid-name
                         text = text[:first_nl + nl].lstrip() + text[first_nl + nl:]
 
                 if post_ws_control in (Token.WS_TRIMTONL, Token.WS_TRIMTONL_PRESERVENL):
@@ -940,7 +956,7 @@ class TemplateParser(object):
                     if last_nl == -1:
                         text = text.rstrip()
                     else:
-                        nl = 0 if post_ws_control == Token.WS_TRIMTONL else 1
+                        nl = 0 if post_ws_control == Token.WS_TRIMTONL else 1 # pylint: disable=invalid-name
                         text = text[:last_nl + nl] + text[last_nl + nl:].rstrip()
 
         if pre_ws_control == Token.WS_ADDNL:

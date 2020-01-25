@@ -5,7 +5,7 @@ __copyright__ = "Copyright 2016"
 __license__ = "Apache License 2.0"
 
 
-class Renderer(object):
+class Renderer:
     """ A renderer takes content and renders it in some fashion. """
 
     def __init__(self):
@@ -19,8 +19,8 @@ class Renderer(object):
             section = self.cursection[-1]
             self.sections[section].append(content)
             return True
-        else:
-            return False
+
+        return False
 
     def push_section(self, name):
         """ Set a named section to render to. """

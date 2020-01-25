@@ -4,6 +4,25 @@ Unreleased
 Changed
 -------
 
+* The include and code tags now only return a dictionary for the return variable
+  instead of wrapping the dictionary into an attribute wrapper.  This way there
+  is no ambiguity if an accessed attribute exists which would prevent __getattr__
+  being called to retrieve the value.
+
+    {% include "..." ; return result %}
+    {{ result["update"] }}
+
+* Expand now allows expanding into any specific compartment:
+
+    {% expand expr ; into global %}
+
+  Supported values are "local", "global", "private", and "return". If no value
+  is specified, it defaults to local.
+
+* Return variables are now accessible just like any other variable compartment.
+  They must be prefixed with "r@" to be accessed, and can be set, retrieved,
+  and cleared.
+
 * Overhauled how variables are accessed.  Originally, global variables were
   just local variables set in the upper-most scope.  Since access to a variable
   would walk up the scope, any variable set in the upper-most scope without a
@@ -43,10 +62,6 @@ Changed
   of <type>@<name>.  Type can be "l" for local, "g" for global, and "p" for
   private.
 
-* Added pylintrc configuration file in the project directory containing common
-  disabled messages so they don't  need to be added to the top of every other
-  file needing them.
-
 * Parser changes will require some template changes. In particular expression
   sections may now require a semicolon separator to define more information
   such as on include between the path expression, with and return segments
@@ -69,6 +84,17 @@ Changed
 
 Added
 -----
+
+* Added action tag to clear all variables from a given compartment
+
+    {% clear return %}
+
+  Value values are "local", "global", "private" and "return". If no value is
+  specified, it defaults to local.
+
+* Added pylintrc configuration file in the project directory containing common
+  disabled messages so they don't  need to be added to the top of every other
+  file needing them.
 
 * New parser supports more natural operators such as +, -, ==, /, <, >
 

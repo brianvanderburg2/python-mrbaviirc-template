@@ -128,50 +128,64 @@ class Environment(object):
     def load_file(self, filename, parent=None):
         """ Load a template from a file.
 
-        Args:
-            filename (str): The filename of the template to load.  This value
-                depends on the template loader used.
-            parent (template.Template): The parent template this is loading
-                the new template. Default value is None.  This is used mainly
-                if the template is being included within the context of another
-                template, so the parent template's path is used for for any
-                relative paths specified in the filename.
+        Parameters
+        ----------
+        filename : str
+            The filename of the template to load.  This value depends on the
+            template loader used.
+        parent : template.Template, default=None
+            The parent template this is loading the new template. This is used
+            mainly if the template is being included within the context of
+            another template, so the parent template's path is used for for any
+            relative paths specified in the filename.
 
-        Returns:
-            template.Template: The loaded or cached template.
+        Returns
+        -------
+        template.Template:
+            The loaded or cached template.
 
-        Raises:
-            template.RestrictedError: A template loader restricted the load.
-            template.ParserError: An error occurred during parsing.
-            Exception: Any other exceptions such as IO/OS errors.
+        Raises
+        ------
+        template.RestrictedError:
+            A template loader restricted the load.
+        template.ParserError:
+            An error occurred during parsing.
+        Exception:
+            Any other exceptions such as IO/OS errors.
         """
         return self._loader.load_template(self, filename, parent)
 
     def load_text(self, text, filename="", allow_code=False):
         """ Load a template direct from text.
 
-        Args:
-            text (str): The text of the template to load.
-            filename (str,optional): The value to set as the template filename.
-                Default is an empty string. Some loaders may use this for
-                relative includes.  It is also used in error reporting.
-            allow_code (bool,optional) The value to set for the template's
-                local allow code flag. Default is False
+        Parameters
+        ----------
+        text : str
+            The text of the template to load.
+        filename : str, default=""
+            The value to set as the template filename. Some loaders may use this
+            for relative includes.  It is also used in error reporting.
+        allow_code : bool, default=False
+            The value to set for the template's local allow code flag.
 
-        Returns:
-            template.Template: The loaded template. Results from loading from
-                text are never cached.
+        Returns
+        -------
+        template.Template:
+            The loaded template. Results from loading from text are not cached.
 
-        Raises:
-            template.ParserError: An error occurred during parsing.
-            Exception: Another exception occurred
+        Raises
+        ------
+        template.ParserError:
+            An error occurred during parsing.
+        Exception:
+            Another exception occurred
         """
         template = Template(self, text, filename, allow_code)
         self._loader.fix_load_text(template)
         return template
 
     def load_import(self, name):
-        """ Internal API only.  Load an import by name and cache the value.
+        """ Internal use only.  Load an import by name and cache the value.
 
         Parameters
         ----------
@@ -198,7 +212,7 @@ class Environment(object):
             return self._imported[name]
 
     def call_hook(self, hook, state, params, reverse):
-        """ Internal API only.  Call hooks from a template.
+        """ Internal use only.  Call hooks from a template.
 
         This method calls a hook of a given name in forward or reverse order.
         It is not an error for the hook to not exists.  Various state paremters

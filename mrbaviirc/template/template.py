@@ -18,7 +18,7 @@ from .parser import TemplateParser
 from .state import RenderState
 
 
-class Template(object):
+class Template:
     """ Represent a loaded template.
 
     Attributes
@@ -85,6 +85,7 @@ class Template(object):
 
     @property
     def env(self):
+        """ Get the environment object or None. """
         return self._env()
 
     def render(self, renderer, context=None, user_data=None, abort_fn=None):

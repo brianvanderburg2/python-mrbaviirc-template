@@ -34,7 +34,7 @@ class RenderState:
     def __init__(self):
         """ Initialize the render context. """
         # May be accesed outside the template API in hook functions/etc as read only
-        self.env = None 
+        self.env = None
         self.template = None
         self.line = 0
         self.renderer = None
@@ -46,8 +46,8 @@ class RenderState:
         self._template_stack = []
 
     def set_var(self, name, value, where=LOCAL_VAR):
-        """ Set a variable. 
-        
+        """ Set a variable.
+
         Parameters
         ----------
         name : str
@@ -59,7 +59,7 @@ class RenderState:
         """
 
         self._vars[where][name] = value
-            
+
     def update_vars(self, values, where=LOCAL_VAR):
         """ Update variables.
 

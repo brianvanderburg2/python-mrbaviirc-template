@@ -10,7 +10,7 @@ __all__ = ["Token", "Tokenizer"]
 from .errors import ParserError
 
 
-class Token(object):
+class Token:
     """ Represent a token. """
     (
         TYPE_TEXT,
@@ -58,14 +58,14 @@ class Token(object):
         WS_ADDSP
     ) = range(5)
 
-    def __init__(self, type, line, value=None):
+    def __init__(self, token_type, line, value=None):
         """ Initialize a token. """
-        self.type = type
+        self.type = token_type
         self.line = line
         self.value = value
 
 
-class Tokenizer(object):
+class Tokenizer:
     """ Parse text into some tokens. """
     MODE_TEXT = 1
     MODE_COMMENT = 2
@@ -156,10 +156,10 @@ class Tokenizer(object):
         wscontrol = self.WS_MAP.get(self.text[pos + 2:pos + 3], Token.WS_NONE)
 
         # Create token
-        type = self.TAG_MAP[tag]
-        token = Token(type, self.line, wscontrol)
+        token_type = self.TAG_MAP[tag]
+        token = Token(token_type, self.line, wscontrol)
         self.tokens.append(token)
-        if type == Token.TYPE_START_COMMENT:
+        if token_type == Token.TYPE_START_COMMENT:
             self.mode = self.MODE_COMMENT
         else:
             self.mode = self.MODE_OTHER
@@ -167,8 +167,7 @@ class Tokenizer(object):
         # Return next position
         if wscontrol != Token.WS_NONE:
             return pos + 3
-        else:
-            return pos + 2
+        return pos + 2
 
     def _parse_mode_comment(self, start):
         """ Parse a comment tag. """
@@ -182,15 +181,14 @@ class Tokenizer(object):
             self.mode = self.MODE_TEXT
             return len(self.text)
 
-        else:
-            wscontrol = self.WS_MAP.get(self.text[pos - 1], Token.WS_NONE)
+        wscontrol = self.WS_MAP.get(self.text[pos - 1], Token.WS_NONE)
 
-            self.line += self.text[start:pos].count("\n")
-            token = Token(Token.TYPE_END_COMMENT, self.line, wscontrol)
+        self.line += self.text[start:pos].count("\n")
+        token = Token(Token.TYPE_END_COMMENT, self.line, wscontrol)
 
-            self.tokens.append(token)
-            self.mode = self.MODE_TEXT
-            return pos + 2
+        self.tokens.append(token)
+        self.mode = self.MODE_TEXT
+        return pos + 2
 
     def _parse_mode_other(self, start):
         """ Parse other stuff. """
@@ -249,17 +247,18 @@ class Tokenizer(object):
                     self.tokens.append(Token(Token.TYPE_EQUAL, self.line))
                     pos += 2
                     continue
-                else:
-                    self.tokens.append(Token(Token.TYPE_ASSIGN, self.line))
-                    pos += 1
-                    continue
+
+                self.tokens.append(Token(Token.TYPE_ASSIGN, self.line))
+                pos += 1
+                continue
 
             # + and +<number>
             if char == "+":
                 if self.text[pos + 1:pos + 2] in self.DIGIT + ".":
                     pos = self._parse_number(pos)
                     continue
-                elif self.text[pos + 1:pos + 3] not in ("#}", "%}", "}}"):
+
+                if self.text[pos + 1:pos + 3] not in ("#}", "%}", "}}"):
                     self.tokens.append(Token(Token.TYPE_PLUS, self.line))
                     pos += 1
                     continue
@@ -269,7 +268,8 @@ class Tokenizer(object):
                 if self.text[pos + 1:pos + 2] in self.DIGIT + ".":
                     pos = self._parse_number(pos)
                     continue
-                elif self.text[pos + 1:pos + 3] not in ("#}", "%}", "}}"):
+
+                if self.text[pos + 1:pos + 3] not in ("#}", "%}", "}}"):
                     self.tokens.append(Token(Token.TYPE_MINUS, self.line))
                     pos += 1
                     continue
@@ -287,10 +287,10 @@ class Tokenizer(object):
                     self.tokens.append(Token(Token.TYPE_FLOORDIV, self.line))
                     pos += 2
                     continue
-                else:
-                    self.tokens.append(Token(Token.TYPE_DIVIDE, self.line))
-                    pos += 1
-                    continue
+
+                self.tokens.append(Token(Token.TYPE_DIVIDE, self.line))
+                pos += 1
+                continue
 
             # %
             if char == "%":
@@ -305,10 +305,10 @@ class Tokenizer(object):
                     self.tokens.append(Token(Token.TYPE_GREATER_EQUAL, self.line))
                     pos += 2
                     continue
-                else:
-                    self.tokens.append(Token(Token.TYPE_GREATER, self.line))
-                    pos += 1
-                    continue
+
+                self.tokens.append(Token(Token.TYPE_GREATER, self.line))
+                pos += 1
+                continue
 
             # < and <=
             if char == "<":
@@ -316,10 +316,10 @@ class Tokenizer(object):
                     self.tokens.append(Token(Token.TYPE_LESS_EQUAL, self.line))
                     pos += 2
                     continue
-                else:
-                    self.tokens.append(Token(Token.TYPE_LESS, self.line))
-                    pos += 1
-                    continue
+
+                self.tokens.append(Token(Token.TYPE_LESS, self.line))
+                pos += 1
+                continue
 
             # ;
             if char == ";":
@@ -332,10 +332,10 @@ class Tokenizer(object):
                 if self.text[pos + 1:pos + 2] in self.DIGIT:
                     pos = self._parse_number(pos)
                     continue
-                else:
-                    self.tokens.append(Token(Token.TYPE_DOT, self.line))
-                    pos += 1
-                    continue
+
+                self.tokens.append(Token(Token.TYPE_DOT, self.line))
+                pos += 1
+                continue
 
             # ! and !=
             if char == "!":
@@ -343,10 +343,10 @@ class Tokenizer(object):
                     self.tokens.append(Token(Token.TYPE_NOT_EQUAL, self.line))
                     pos += 2
                     continue
-                else:
-                    self.tokens.append(Token(Token.TYPE_NOT, self.line))
-                    pos += 1
-                    continue
+
+                self.tokens.append(Token(Token.TYPE_NOT, self.line))
+                pos += 1
+                continue
 
             # &&
             if self.text[pos:pos + 2] == "&&":
@@ -377,8 +377,8 @@ class Tokenizer(object):
 
             # Ending tag, no whitespace control
             if self.text[pos:pos + 2] in ("#}", "%}", "}}"):
-                type = self.TAG_MAP[self.text[pos:pos + 2]]
-                self.tokens.append(Token(type, self.line, Token.WS_NONE))
+                token_type = self.TAG_MAP[self.text[pos:pos + 2]]
+                self.tokens.append(Token(token_type, self.line, Token.WS_NONE))
                 self.mode = self.MODE_TEXT
                 pos += 2
                 break
@@ -386,9 +386,9 @@ class Tokenizer(object):
             # Ending tag, with whitespace control
             if char in self.WS_MAP:
                 if self.text[pos + 1:pos + 3] in ("#}", "%}", "}}"):
-                    type = self.TAG_MAP[self.text[pos + 1:pos + 3]]
+                    token_type = self.TAG_MAP[self.text[pos + 1:pos + 3]]
                     wscontrol = self.WS_MAP[char]
-                    self.tokens.append(Token(type, self.line, wscontrol))
+                    self.tokens.append(Token(token_type, self.line, wscontrol))
                     self.mode = self.MODE_TEXT
                     pos += 3
                     break
@@ -500,8 +500,8 @@ class Tokenizer(object):
             if char in self.ALPHA or char in self.DIGIT or char in "_@":
                 result.append(char)
                 continue
-            else:
-                break
+
+            break
 
         token = Token(Token.TYPE_WORD, self.line, "".join(result))
         self.tokens.append(token)

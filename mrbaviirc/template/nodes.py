@@ -12,7 +12,7 @@ import weakref
 from .errors import AbortError
 
 
-class Node(object):
+class Node:
     """ A node is a part of the expression that is rendered. """
 
     RENDER_BREAK = 1
@@ -26,10 +26,12 @@ class Node(object):
 
     @property
     def env(self):
+        """ Return the environment object or None """
         return self._env()
 
     @property
     def template(self):
+        """ Return the template object or None """
         return self._template()
 
     def render(self, state):
@@ -42,7 +44,7 @@ class Node(object):
         raise NotImplementedError
 
 
-class NodeList(object):
+class NodeList:
     """ A list of nodes. """
 
     def __init__(self):
@@ -66,6 +68,8 @@ class NodeList(object):
             result = node.render(state)
             if result in (Node.RENDER_BREAK, Node.RENDER_CONTINUE):
                 return result
+
+        return None
 
     def __getitem__(self, index):
         return self.nodes[index]

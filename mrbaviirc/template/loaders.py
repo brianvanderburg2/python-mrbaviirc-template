@@ -14,18 +14,19 @@ from .template import Template
 from .errors import RestrictedError
 
 
-class Loader(object):
+class Loader:
     """ A loader loads and caches templates. """
 
     def __init__(self):
         """ Initialize the loader. """
-        pass
+        # pass
 
     def load_template(self, env, filename, parent=None):
         """ Load and return a template. """
         raise NotImplementedError
 
     def fix_load_text(self, template):
+        # pylint: disable=unused-argument,no-self-use
         """ Perform fixup on a template loaded with env.load_text. """
         return
 
@@ -166,17 +167,18 @@ class PrefixLoader(Loader):
                 template.private["normalized"] = {}
                 self.cache[cache_name] = template
                 return template
-            elif parent:
+
+            if parent:
                 raise RestrictedError(
                     "Template not found along prefix paths: {0}, Included from: {1}".format(
                         filename, # We use filename so user can tell which include cause the problem
                         "/".join(parent.private["path"])
                     )
                 )
-            else:
-                raise RestrictedError(
-                    "Template not found along prefix paths: {0}".format(filename)
-                )
+
+            raise RestrictedError(
+                "Template not found along prefix paths: {0}".format(filename)
+            )
 
     def fix_load_text(self, template):
         """ Perform fixup on directly loaded text templates. """
@@ -184,7 +186,8 @@ class PrefixLoader(Loader):
         template.private["index"] = 0
         template.private["normalized"] = {}
 
-    def _normalize(self, filename, path):
+    @staticmethod
+    def _normalize(filename, path):
         """ Normalize the path and return the path tuple """
 
         # Convert filename to tuple first
@@ -201,19 +204,20 @@ class PrefixLoader(Loader):
         for part in filepath:
             if part == ".":
                 continue
-            elif part == "..":
+
+            if part == "..":
                 if len(newpath) == 0:
                     if path:
                         raise RestrictedError("Relative include error: {0}, From: {1}".format(
                             filename,
                             "/".join(path)
                         ))
-                    else:
-                        raise RestrictedError("Relative load error: {0}".format(
-                            filename
-                        ))
-                else:
-                    newpath.pop()
+
+                    raise RestrictedError("Relative load error: {0}".format(
+                        filename
+                    ))
+
+                newpath.pop()
             else:
                 newpath.append(part)
 
@@ -225,7 +229,7 @@ class PrefixLoader(Loader):
             self.cache = {}
 
 
-class PrefixSubLoader(object):
+class PrefixSubLoader:
     """ A subloader added to a PrefixLoader. """
 
     def __init__(self, allow_code=False):

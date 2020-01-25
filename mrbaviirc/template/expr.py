@@ -1,4 +1,4 @@
-""" Internal use only.  Provide expression notes for the templates. """
+""" Internal use only.  Provide expression nodes for the templates. """
 
 __author__ = "Brian Allen Vanderburg II"
 __copyright__ = "Copyright 2016-2019"

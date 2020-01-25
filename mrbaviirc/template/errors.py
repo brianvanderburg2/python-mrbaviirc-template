@@ -46,12 +46,10 @@ class RestrictedError(Error):
     accessing a template outside of the template path or using a code section
     when code usage is disabled.
     """
-    pass
 
 
 class AbortError(Error):
     """ Represent an aborted template render. """
-    pass
 
 
 class TemplateError(Error):
@@ -88,22 +86,19 @@ class TemplateError(Error):
 
 class ParserError(TemplateError):
     """ Represent a parsing syntax error in the template. """
-    pass
 
 
 class UnknownVariableError(TemplateError):
     """ Represent an unknown variable access. """
-    pass
 
 
 class UnknownIndexError(TemplateError):
     """ Represent an unknown index into a variable. """
-    pass
+
 
 class UnknownImportError(TemplateError):
     """ Represent an import of an unknown name. """
-    pass
+
 
 class RaisedError(TemplateError):
     """ Represent an error raised from the template itself. """
-    pass

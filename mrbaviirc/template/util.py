@@ -8,12 +8,11 @@ __license__ = "Apache License 2.0"
 __all__ = ["specialfunction", "DictToAttr"]
 
 
-class specialfunction:
+class specialfunction: # pylint: disable=invalid-name
     """ A base class for a sepcial special function which receives expression nodes. """
 
     def __init__(self):
         """ Initialize  the function. """
-        pass
 
     def __call__(self, state, params):
         """ Call the special function. """
