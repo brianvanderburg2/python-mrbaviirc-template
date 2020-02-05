@@ -29,7 +29,9 @@ class RenderState:
     LOCAL_VAR = 0
     GLOBAL_VAR = 1
     PRIVATE_VAR = 2
-    RETURN_VAR = 3
+    INTERNAL_VAR = 3
+    RETURN_VAR = 4
+    APP_VAR = 5
 
     def __init__(self):
         """ Initialize the render context. """
@@ -42,7 +44,8 @@ class RenderState:
 
         # Should only be accessed within the API or this class
         self.abort_fn = None
-        self._vars = [{}, {}, {}, {}] # Indexed via the type of variable
+        self._vars = [{}, {}, {}, {}, {}, None] # Indexed via the type of variable
+        self._vars[self.APP_VAR] = self._vars[self.RETURN_VAR] # APP always refs top RETURN
         self._template_stack = []
 
     def set_var(self, name, value, where=LOCAL_VAR):
@@ -129,13 +132,18 @@ class RenderState:
 
         self._template_stack.append((
             self.template,
-            self._vars[self.LOCAL_VAR].copy(), # Copy local vars to restore them later
+            self._vars[self.LOCAL_VAR],
             self._vars[self.PRIVATE_VAR],
+            self._vars[self.INTERNAL_VAR],
             self._vars[self.RETURN_VAR]
         ))
         # Private and return are new dictionaries
+        self._vars[self.LOCAL_VAR] = self._vars[self.LOCAL_VAR].copy()
+        # GLOBAL_VAR no change
         self._vars[self.PRIVATE_VAR] = {}
+        self._vars[self.INTERNAL_VAR] = {}
         self._vars[self.RETURN_VAR] = {}
+        # APP_VAR continues to reference original RETURN_VAR dict
         self.template = template
         self.line = 0
 
@@ -146,6 +154,7 @@ class RenderState:
             self.template,
             self._vars[self.LOCAL_VAR],
             self._vars[self.PRIVATE_VAR],
+            self._vars[self.INTERNAL_VAR],
             self._vars[self.RETURN_VAR]
         ) = self._template_stack.pop()
 
