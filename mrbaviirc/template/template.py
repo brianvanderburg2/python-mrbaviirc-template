@@ -121,10 +121,7 @@ class Template:
         state.abort_fn = abort_fn
         state.renderer = renderer
 
-        if context:
-            state.update_vars(context)
-
-        return self.nested_render(state, None)
+        return self.nested_render(state, context)
 
     def nested_render(self, state, context):
         """ Render the template from within another template/state.

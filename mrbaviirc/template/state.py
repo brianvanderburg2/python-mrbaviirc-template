@@ -44,8 +44,8 @@ class RenderState:
 
         # Should only be accessed within the API or this class
         self.abort_fn = None
-        self._vars = [{}, {}, {}, {}, {}, None] # Indexed via the type of variable
-        self._vars[self.APP_VAR] = self._vars[self.RETURN_VAR] # APP always refs top RETURN
+        self._vars = [None] * 6 # Indexed via the type of variable
+        self._first = True
         self._template_stack = []
 
     def set_var(self, name, value, where=LOCAL_VAR):
@@ -137,13 +137,20 @@ class RenderState:
             self._vars[self.INTERNAL_VAR],
             self._vars[self.RETURN_VAR]
         ))
-        # Private and return are new dictionaries
-        self._vars[self.LOCAL_VAR] = self._vars[self.LOCAL_VAR].copy()
-        # GLOBAL_VAR no change
-        self._vars[self.PRIVATE_VAR] = {}
-        self._vars[self.INTERNAL_VAR] = {}
-        self._vars[self.RETURN_VAR] = {}
-        # APP_VAR continues to reference original RETURN_VAR dict
+
+        if self._first:
+            # This is the top template
+            self._first = False
+            self._vars = [{}, {}, {}, {}, {}, None] # Indexed via the type of variable
+            self._vars[self.APP_VAR] = self._vars[self.RETURN_VAR] # APP always refs top RETURN
+        else:
+            self._vars[self.LOCAL_VAR] = self._vars[self.LOCAL_VAR].copy()
+            # GLOBAL_VAR no change
+            self._vars[self.PRIVATE_VAR] = {}
+            self._vars[self.INTERNAL_VAR] = {}
+            self._vars[self.RETURN_VAR] = {}
+            # APP_VAR continues to reference original RETURN_VAR dict
+
         self.template = template
         self.line = 0
 
