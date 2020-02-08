@@ -7,6 +7,7 @@ __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
 
+from . import ActionHandler
 from ..nodes import Node
 
 
@@ -24,13 +25,16 @@ class AssignNode(Node):
             state.set_var(var[0], expr.eval(state), var[1])
 
 
-def set_handler(parser, template, line, action, start, end):
-    """ Parse the action """
-    assigns = parser._parse_multi_assign(start, end, allow_type=True)
+class SetActionHandler(ActionHandler):
+    """ Handle set """
 
-    node = AssignNode(template, line, assigns)
-    parser.add_node(node)
+    def handle_action_set(self, line, start, end):
+        """ Handle set. """
+        assigns = self.parser._parse_multi_assign(start, end, allow_type=True)
+
+        node = AssignNode(self.template, line, assigns)
+        self.parser.add_node(node)
 
 ACTION_HANDLERS = {
-    "set": set_handler,
+    "set": SetActionHandler,
 }

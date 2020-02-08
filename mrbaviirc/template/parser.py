@@ -13,7 +13,7 @@ from .nodes import * # pylint: disable=wildcard-import
 from .expr import * # pylint: disable=wildcard-import
 from .state import RenderState
 from .tokenizer import * # pylint: disable=wildcard-import
-from .actions import ACTION_HANDLERS
+from .actions import DefaultActionHandler
 
 
 class TemplateParser:
@@ -51,12 +51,14 @@ class TemplateParser:
 
         # Handlers
         self.action_line = 0
-        self.action_handlers = ACTION_HANDLERS
-        self.action_handler_stack = [(0, self.handle_action)] # tuple of (line, handler)
+        self.action_handler_stack = [DefaultActionHandler(self, template)]
 
     def push_handler(self, handler):
         """ Push a handler onto the handler stack. """
-        self.action_handler_stack.append((self.action_line, handler))
+        handler.next = self.action_handler_stack[-1]
+        handler.line = self.action_line
+        self.action_handler_stack.append(handler)
+
 
     def pop_handler(self):
         """ Pop a handler off the stack. """
@@ -68,20 +70,6 @@ class TemplateParser:
                 "Unexpected handler pop",
                 self.template.filename,
                 self.action_line
-            )
-
-    def handle_action(self, parser, template, line, action, start, end):
-        """ Handle the main actions. """
-        assert self is parser
-
-        handler = self.action_handlers.get(action, None)
-        if handler:
-            handler(parser, template, line, action, start, end)
-        else:
-            raise ParserError(
-                "Unknown action: {0}".format(action),
-                template.filename,
-                line
             )
 
     def add_node(self, node):
@@ -360,8 +348,10 @@ class TemplateParser:
         # Parse our body
         pre_ws_control = None
         pos = 0
+        line = 1
         while pos < len(self.tokens):
             token = self.tokens[pos]
+            line = token.line
 
             if token.type == Token.TYPE_TEXT:
                 self.buffer.append(token.value)
@@ -374,7 +364,7 @@ class TemplateParser:
                     Token.TYPE_START_EMITTER
             ):
                 # Flush the buffer
-                self._flush_buffer(pre_ws_control, token.value)
+                self._flush_buffer(line, pre_ws_control, token.value)
 
                 # Find the ending
                 if token.type == Token.TYPE_START_COMMENT:
@@ -397,60 +387,55 @@ class TemplateParser:
                 end_token = self.tokens[endpos]
                 pre_ws_control = end_token.value
 
-                # Parse the insides
-                if token.type == Token.TYPE_START_ACTION:
-                    self._parse_tag_action(pos + 1, endpos - 1)
-
-                elif token.type == Token.TYPE_START_EMITTER:
-                    self._parse_tag_emitter(pos + 1, endpos - 1)
-
-                # comment is skipped entirely
+                self._parse_tag(token, pos + 1, endpos - 1)
 
                 # Move past it
                 pos = endpos + 1
+                line = end_token.line
 
-        self._flush_buffer(pre_ws_control, None)
+        self._flush_buffer(line, pre_ws_control, None)
 
         if len(self.action_handler_stack) > 1:
             raise ParserError(
                 "Unmatched action tag",
                 self.template.filename,
-                self.action_handler_stack[-1][0]
+                self.action_handler_stack[-1].line
             )
 
         return self.nodes
 
-    def _parse_tag_action(self, start, end):
-        """ Parse some action tag. """
+    def _parse_tag(self, token, start, end):
+        """ Parse a tag based on type of tag. """
+        handler = self.action_handler_stack[-1]
+        if token.type == Token.TYPE_START_ACTION:
+            action_token = self._get_token(start, end, "Expected action")
 
-        # Determine the action
-        token = self._get_token(start, end, "Expected action")
-        self.action_line = token.line
+            action = action_token.value
+            line = action_token.line
+            self.action_line = line # remember for push_handler
 
-        action = token.value
-        start += 1
+            # Handle spectial case actions first
+            if action == "break":
+                handler.handle_break(line)
+            elif action == "continue":
+                handler.handle_continue(line)
+            else:
+                handler.handle_action(
+                    line,
+                    action,
+                    start + 1,
+                    end
+                )
 
-        # Use the current handler
-        handler = self.action_handler_stack[-1][1]
-        handler(
-            self,
-            self.template,
-            self.action_line,
-            action,
-            start,
-            end
-        )
+        elif token.type == Token.TYPE_START_EMITTER:
+            handler.handle_emitter(
+                token.line,
+                start,
+                end
+            )
 
-    def _parse_tag_emitter(self, start, end):
-        """ Parse an emitter tag. """
-        expr = self._parse_expr(start, end)
-        line = self.tokens[start].line
-
-        if isinstance(expr, ValueExpr):
-            node = TextNode(self.template, line, str(expr.eval(None)))
-        else:
-            node = EmitNode(self.template, line, expr)
-        self.stack[-1].append(node)
+        elif token.type == Token.TYPE_START_COMMENT:
+            handler.handle_comment(token.line)
 
     def _parse_expr_or_assign(self, start, end):
         """ Parse an expression or an assignment. """
@@ -917,7 +902,7 @@ class TemplateParser:
             self.tokens[start - 1].line if start > 0 else 0
         )
 
-    def _flush_buffer(self, pre_ws_control, post_ws_control):
+    def _flush_buffer(self, line, pre_ws_control, post_ws_control):
         """ Flush the buffer to output. """
         text = ""
         if self.buffer:
@@ -975,7 +960,7 @@ class TemplateParser:
             # Use line 0 b/c we don't report errors on TextNodes
             # Other solution would be to append the text tokens instead of
             # values, then have access to the line
-            node = TextNode(self.template, 0, text)
-            self.stack[-1].append(node)
+            handler = self.action_handler_stack[-1]
+            handler.handle_text(line, text)
 
         self.buffer = []

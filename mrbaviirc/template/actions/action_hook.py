@@ -6,6 +6,7 @@ __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
 
+from . import ActionHandler
 from ..nodes import Node
 from ..tokenizer import Token
 from ..errors import ParserError
@@ -33,45 +34,46 @@ class HookNode(Node):
         self.env.call_hook(hook, state, params, self.reverse)
 
 
-def _hook_handler(parser, template, line, action, start, end, reverse):
-    """ Parse the action. """
-    hook = None
-    assigns = []
-    segments = parser._find_tag_segments(start, end)
+class HookActionHandler(ActionHandler):
+    """ Handle hook and rhook """
 
-    # First item should be expression
-    if len(segments) > 0:
-        (start, end) = segments[0]
-        hook = parser._parse_expr(start, end)
+    def handle_action_hook(self, line, start, end):
+        """ Handle hook """
+        self._handle_action_hook(line, start, end, False)
 
-    for segment in segments[1:]:
-        (start, end) = segment
+    def handle_action_rhook(self, line, start, end):
+        """ Handle rhook """
+        self._handle_action_hook(line, start, end, True)
 
-        # Only support "with"
-        token = parser._get_expected_token(start, end, Token.TYPE_WORD, values="with")
-        start += 1
+    def _handle_action_hook(self, line, start, end, reverse):
+        """ Handle the actual parsing """
+        hook = None
+        assigns = []
+        segments = self.parser._find_tag_segments(start, end)
 
-        assigns = parser._parse_multi_assign(start, end)
+        # First item should be expression
+        if len(segments) > 0:
+            (start, end) = segments[0]
+            hook = self.parser._parse_expr(start, end)
 
-    if hook is None:
-        raise ParserError(
-            "Hook expecting name expression",
-            template.filename,
-            line
-        )
+        for segment in segments[1:]:
+            (start, end) = segment
 
-    node = HookNode(template, line, hook, assigns, reverse)
-    parser.add_node(node)
+            # Only support "with"
+            token = self.parser._get_expected_token(start, end, Token.TYPE_WORD, values="with")
+            start += 1
+
+            assigns = self.parser._parse_multi_assign(start, end)
+
+        if hook is None:
+            raise ParserError(
+                "Hook expecting name expression",
+                self.template.filename,
+                line
+            )
+
+        node = HookNode(self.template, line, hook, assigns, reverse)
+        self.parser.add_node(node)
 
 
-def hook_handler(parser, template, line, action, start, end):
-    """ Parse the action """
-    return _hook_handler(parser, template, line, action, start, end, False)
-
-
-def rhook_handler(parser, template, line, action, start, end):
-    """ Parse the action """
-    return _hook_handler(parser, template, line, action, start, end, True)
-
-
-ACTION_HANDLERS = {"hook": hook_handler, "rhook": rhook_handler}
+ACTION_HANDLERS = {"hook": HookActionHandler, "rhook": HookActionHandler}

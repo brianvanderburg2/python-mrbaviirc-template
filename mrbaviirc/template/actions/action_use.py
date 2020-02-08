@@ -6,6 +6,7 @@ __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
 
+from . import ActionHandler
 from ..nodes import Node
 
 
@@ -24,12 +25,15 @@ class UseSectionNode(Node):
         state.renderer.render(state.renderer.get_section(section))
 
 
-def use_handler(parser, template, line, action, start, end):
-    """ Parse the action """
-    expr = parser._parse_expr(start, end)
+class UseActionHandler(ActionHandler):
+    """ Handle the use action """
 
-    node = UseSectionNode(template, line, expr)
-    parser.add_node(node)
+    def handle_action_use(self, line, start, end):
+        """ Handle use """
+        expr = self.parser._parse_expr(start, end)
+
+        node = UseSectionNode(self.template, line, expr)
+        self.parser.add_node(node)
 
 
-ACTION_HANDLERS = {"use": use_handler}
+ACTION_HANDLERS = {"use": UseActionHandler}

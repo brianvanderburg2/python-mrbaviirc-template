@@ -6,6 +6,7 @@ __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
 
+from . import ActionHandler
 from ..nodes import Node
 from ..state import RenderState
 from ..tokenizer import Token
@@ -24,29 +25,34 @@ class ClearNode(Node):
         state.clear_vars(self.where)
 
 
-def clear_handler(parser, template, line, action, start, end):
-    """ Parse the action """
-    where = RenderState.LOCAL_VAR
-    if end >= start:
-        token = parser._get_expected_token(
-            start, 
-            end,
-            Token.TYPE_WORD,
-            values=["local", "global", "private", "return"]
-        )
-        start += 1
-        
-        where = {
-            "local": RenderState.LOCAL_VAR,
-            "global": RenderState.GLOBAL_VAR,
-            "private": RenderState.PRIVATE_VAR,
-            "return": RenderState.RETURN_VAR
-        }.get(token.value, RenderState.LOCAL_VAR)
+class ClearActionHandler(ActionHandler):
+    """ Action handler for clear. """
 
-        parser._get_no_more_tokens(start, end)
+    def handle_action_clear(self, line, start, end):
+        """ Parse the action for clear """
+        parser = self.parser
+        where = RenderState.LOCAL_VAR
 
-    node = ClearNode(template, line, where)
-    parser.add_node(node)
+        if end >= start:
+            token = parser._get_expected_token(
+                start,
+                end,
+                Token.TYPE_WORD,
+                values=["local", "global", "private", "return"]
+            )
+            start += 1
+
+            where = {
+                "local": RenderState.LOCAL_VAR,
+                "global": RenderState.GLOBAL_VAR,
+                "private": RenderState.PRIVATE_VAR,
+                "return": RenderState.RETURN_VAR
+            }.get(token.value, RenderState.LOCAL_VAR)
+
+            parser._get_no_more_tokens(start, end)
+
+        node = ClearNode(self.template, line, where)
+        parser.add_node(node)
 
 
-ACTION_HANDLERS = {"clear": clear_handler}
+ACTION_HANDLERS = {"clear": ClearActionHandler}

@@ -6,6 +6,7 @@ __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
 
+from . import ActionHandler
 from ..nodes import Node
 
 
@@ -23,12 +24,15 @@ class UnsetNode(Node):
             state.unset_var(item[0], item[1])
 
 
-def unset_handler(parser, template, line, action, start, end):
-    """ Parse the action """
-    varlist = parser._parse_multi_var(start, end, allow_type=True)
+class UnsetActionHandler(ActionHandler):
+    """ Handle unset """
 
-    node = UnsetNode(template, line, varlist)
-    parser.add_node(node)
+    def handle_action_unset(self, line, start, end):
+        """ Handle unset """
+        varlist = self.parser._parse_multi_var(start, end, allow_type=True)
+
+        node = UnsetNode(self.template, line, varlist)
+        self.parser.add_node(node)
 
 
-ACTION_HANDLERS = {"unset": unset_handler}
+ACTION_HANDLERS = {"unset": UnsetActionHandler}

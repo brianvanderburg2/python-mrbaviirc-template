@@ -7,6 +7,7 @@ __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
 
+from . import ActionHandler
 from ..nodes import Node, NodeList
 from ..tokenizer import Token
 from ..errors import ParserError, TemplateError
@@ -76,57 +77,85 @@ class CodeNode(Node):
             state.set_var(self.retvar, data)
 
 
-def code_handler(parser, template, line, action, start, end):
-    """ Parse the action """
-    retvar = None
-    assigns = []
-    segments = parser._find_tag_segments(start, end)
-    for segment in segments:
-        (start, end) = segment
+class CodeSubHandler(ActionHandler):
+    """ Handler for the code tag internals. """
 
-        token = parser._get_token(start, end)
-        start += 1
 
-        # expecting either return or with
-        if token.type == Token.TYPE_WORD and token.value == "return":
-            retvar = parser._get_token_var(start, end)
+    def handle_emitter(self, line, start, end):
+        raise ParserError(
+            self.template.filename,
+            line,
+            "No tags allowed in code section"
+        )
+
+    def handle_comment(self, line):
+        raise ParserError(
+            self.template.filename,
+            line,
+            "No tags allowed in code section"
+        )
+
+    def handle_break(self, line):
+        raise ParserError(
+            self.template.filename,
+            line,
+            "No tags allowed in code section"
+        )
+
+    def handle_continue(self, line):
+        raise ParserError(
+            self.template.filename,
+            line,
+            "No tags allowed in code section"
+        )
+
+    def handle_action_endcode(self, line, start, end):
+        """ Handle end code. """
+        self.parser._get_no_more_tokens(start, end)
+        self.parser.pop_autostrip()
+        self.parser.pop_nodestack()
+        self.parser.pop_handler()
+
+
+class CodeActionHandler(ActionHandler):
+    """ Handler for code tag. """
+
+    def handle_action_code(self, line, start, end):
+        """ Handler for code tag. """
+        parser = self.parser
+
+        retvar = None
+        assigns = []
+        segments = parser._find_tag_segments(start, end)
+        for segment in segments:
+            (start, end) = segment
+
+            token = parser._get_token(start, end)
             start += 1
 
-            parser._get_no_more_tokens(start, end)
-            continue
+            # expecting either return or with
+            if token.type == Token.TYPE_WORD and token.value == "return":
+                retvar = parser._get_token_var(start, end)
+                start += 1
 
-        if token.type == Token.TYPE_WORD and token.value == "with":
-            assigns = parser._parse_multi_assign(start, end)
-            continue
+                parser._get_no_more_tokens(start, end)
+                continue
 
-        raise ParserError(
-            "Unexpected token",
-            template.filename,
-            line
-        )
+            if token.type == Token.TYPE_WORD and token.value == "with":
+                assigns = parser._parse_multi_assign(start, end)
+                continue
 
-    node = CodeNode(template, line, assigns, retvar)
-    parser.add_node(node)
-    parser.push_nodestack(node.nodes)
-    parser.push_handler(code_subhandler)
-    parser.push_autostrip(parser.AUTOSTRIP_NONE)
+            raise ParserError(
+                "Unexpected token",
+                template.filename,
+                line
+            )
 
-
-def code_subhandler(parser, template, line, action, start, end):
-    """ Handle nested action tags """
-
-    if action == "endcode":
-        parser._get_no_more_tokens(start, end)
-        parser.pop_nodestack()
-        parser.pop_handler()
-        parser.pop_autostrip()
-
-    else:
-        raise ParserError(
-            "Nested tags not allowed in code",
-            template.filename,
-            line
-        )
+        node = CodeNode(self.template, line, assigns, retvar)
+        parser.add_node(node)
+        parser.push_nodestack(node.nodes)
+        parser.push_handler(CodeSubHandler(self.parser, self.template))
+        parser.push_autostrip(parser.AUTOSTRIP_NONE)
 
 
-ACTION_HANDLERS = {"code": code_handler}
+ACTION_HANDLERS = {"code": CodeActionHandler}

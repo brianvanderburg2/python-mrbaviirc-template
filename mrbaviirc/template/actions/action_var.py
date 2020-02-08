@@ -6,6 +6,7 @@ __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
 
+from . import ActionHandler, DefaultActionHandler
 from ..nodes import Node, NodeList
 from ..renderers import StringRenderer
 
@@ -31,29 +32,30 @@ class VarNode(Node):
             state.renderer = original_renderer
 
 
-def var_handler(parser, template, line, action, start, end):
-    """ Parse the action """
-    var = parser._get_token_var(start, end, allow_type=True)
-    start += 1
+class VarActionHandler(ActionHandler):
+    """ Handle var """
 
-    parser._get_no_more_tokens(start, end)
+    def handle_action_var(self, line, start, end):
+        """ Handle var """
+        var = self.parser._get_token_var(start, end, allow_type=True)
+        start += 1
 
-    node = VarNode(template, line, var)
-    parser.add_node(node)
-    parser.push_nodestack(node.nodes)
-    parser.push_handler(var_subhandler)
+        self.parser._get_no_more_tokens(start, end)
 
-
-def var_subhandler(parser, template, line, action, start, end):
-    """ Handle nested action tags """
-
-    if action == "endvar":
-        parser._get_no_more_tokens(start, end)
-        parser.pop_nodestack()
-        parser.pop_handler()
-
-    else:
-        parser.handle_action(parser, template, line, action, start, end)
+        node = VarNode(self.template, line, var)
+        self.parser.add_node(node)
+        self.parser.push_nodestack(node.nodes)
+        self.parser.push_handler(VarSubHandler(self.parser, self.template))
 
 
-ACTION_HANDLERS = {"var": var_handler}
+class VarSubHandler(DefaultActionHandler):
+    """ Handle items under var """
+
+    def handle_action_endvar(self, line, start, end):
+        """ endvar """
+        self.parser._get_no_more_tokens(start, end)
+        self.parser.pop_nodestack()
+        self.parser.pop_handler()
+
+
+ACTION_HANDLERS = {"var": VarActionHandler}

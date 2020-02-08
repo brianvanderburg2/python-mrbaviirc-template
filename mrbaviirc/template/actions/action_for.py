@@ -6,7 +6,8 @@ __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
 
-from ..nodes import Node, NodeList
+from . import ActionHandler, DefaultActionHandler
+from ..nodes import Node, NodeList, BreakNode, ContinueNode
 from ..tokenizer import Token
 
 
@@ -97,94 +98,100 @@ class ForIncrNode(Node):
             return self.else_nodes.render(state)
 
 
-def _for_iter_handler(parser, template, line, start, end):
-    """ Parse the action """
-    var = parser._get_token_var(start, end, allow_type=True)
-    start += 1
+class ForActionHandler(ActionHandler):
+    """ Handle the for actions. """
 
-    token = parser._get_expected_token(
-        start,
-        end,
-        [Token.TYPE_COMMA, Token.TYPE_WORD],
-        "Expected 'in' or ','",
-        "in"
-    )
-    start += 1
+    def handle_action_for(self, line, start, end):
+        """ Handle the for action. """
+        parser = self.parser
 
-    cvar = None
-    if token.type == Token.TYPE_COMMA:
+        segments = parser._find_tag_segments(start, end)
+        if len(segments) == 3:
+            self._handle_action_for_incr(line, segments)
+        else:
+            self._handle_action_for_iter(line, start, end)
 
-        cvar = parser._get_token_var(start, end, allow_type=True)
+    def _handle_action_for_iter(self, line, start, end):
+        """ Parse the action for a for iterator """
+        parser = self.parser
+        var = parser._get_token_var(start, end, allow_type=True)
         start += 1
 
         token = parser._get_expected_token(
             start,
             end,
-            Token.TYPE_WORD,
-            "Expected 'in'",
+            [Token.TYPE_COMMA, Token.TYPE_WORD],
+            "Expected 'in' or ','",
             "in"
         )
         start += 1
 
-    expr = parser._parse_expr(start, end)
-    node = ForIterNode(template, line, var, cvar, expr)
+        cvar = None
+        if token.type == Token.TYPE_COMMA:
 
-    parser.add_node(node)
-    parser.push_nodestack(node.nodes)
-    parser.push_handler(for_subhandler)
+            cvar = parser._get_token_var(start, end, allow_type=True)
+            start += 1
 
+            token = parser._get_expected_token(
+                start,
+                end,
+                Token.TYPE_WORD,
+                "Expected 'in'",
+                "in"
+            )
+            start += 1
 
-def _for_incr_handler(parser, template, line, segments):
-    """ Parse the action """
-    # Init
-    (start, end) = segments[0]
-    init = parser._parse_multi_assign(start, end, allow_type=True)
+        expr = parser._parse_expr(start, end)
+        node = ForIterNode(self.template, line, var, cvar, expr)
 
-    # Test
-    (start, end) = segments[1]
-    test = parser._parse_expr(start, end)
-
-    # Incr
-    (start, end) = segments[2]
-    incr = parser._parse_multi_assign(start, end, allow_type=True)
-
-    node = ForIncrNode(template, line, init, test, incr)
-    parser.add_node(node)
-    parser.push_nodestack(node.nodes)
-    parser.push_handler(for_subhandler)
-
-
-
-def for_handler(parser, template, line, action, start, end):
-    """ Parse the action """
-
-    # Two types of for
-    # for var,var in expr (only one segment)
-    # for init ; test ; incr (three segments)
-
-    segments = parser._find_tag_segments(start, end)
-    if len(segments) == 3:
-        return _for_incr_handler(parser, template, line, segments)
-    else:
-        return _for_iter_handler(parser, template, line, start, end)
-
-
-def for_subhandler(parser, template, line, action, start, end):
-    """ Handle nested action tags """
-
-    if action == "else":
-        parser._get_no_more_tokens(start, end)
-        node = parser.pop_nodestack()
-        node.add_else()
+        parser.add_node(node)
         parser.push_nodestack(node.nodes)
+        parser.push_handler(ForSubHandler(self.parser, self.template))
 
-    elif action == "endfor":
-        parser._get_no_more_tokens(start, end)
-        parser.pop_nodestack()
-        parser.pop_handler()
+    def _handle_action_for_incr(self, line, segments):
+        """ Handle a for incrementer """
+        parser = self.parser
+        # Init
+        (start, end) = segments[0]
+        init = parser._parse_multi_assign(start, end, allow_type=True)
 
-    else:
-        parser.handle_action(parser, template, line, action, start, end)
+        # Test
+        (start, end) = segments[1]
+        test = parser._parse_expr(start, end)
+
+        # Incr
+        (start, end) = segments[2]
+        incr = parser._parse_multi_assign(start, end, allow_type=True)
+
+        node = ForIncrNode(self.template, line, init, test, incr)
+        parser.add_node(node)
+        parser.push_nodestack(node.nodes)
+        parser.push_handler(ForSubHandler(self.parser, self.template))
 
 
-ACTION_HANDLERS = {"for": for_handler}
+class ForSubHandler(DefaultActionHandler):
+    """ Handle the tags inside for """
+
+    def handle_action_endfor(self, line, start, end):
+        """ End the for loop """
+        self.parser._get_no_more_tokens(start, end)
+        self.parser.pop_nodestack()
+        self.parser.pop_handler()
+
+    def handle_action_else(self, line, start, end):
+        """ Handle if no items iterated over. """
+        self.parser._get_no_more_tokens(start, end)
+        node = self.parser.pop_nodestack()
+        node.add_else()
+        self.parser.push_nodestack(node.nodes)
+
+    def handle_break(self, line):
+        """ Allow break. """
+        self.parser.add_node(BreakNode(self.template, line))
+
+    def handle_continue(self, line):
+        """ Allow continue. """
+        self.parser.add_node(ContinueNode(self.template, line))
+
+
+ACTION_HANDLERS = {"for": ForActionHandler}
