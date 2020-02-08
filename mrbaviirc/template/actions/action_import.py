@@ -6,6 +6,7 @@ __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
 
+from . import ActionHandler
 from ..errors import UnknownImportError
 from ..nodes import Node
 
@@ -33,12 +34,15 @@ class ImportNode(Node):
                 )
 
 
-def import_handler(parser, template, line, action, start, end):
-    """ Parse the action """
-    assigns = parser._parse_multi_assign(start, end, allow_type=True)
+class ImportActionHandler(ActionHandler):
+    """ Handle import """
 
-    node = ImportNode(template, line, assigns)
-    parser.add_node(node)
+    def handle_action_import(self, line, start, end):
+        """ Handle import """
+        assigns = self.parser._parse_multi_assign(start, end, allow_type=True)
+
+        node = ImportNode(self.template, line, assigns)
+        self.parser.add_node(node)
 
 
-ACTION_HANDLERS = {"import": import_handler}
+ACTION_HANDLERS = {"import": ImportActionHandler}

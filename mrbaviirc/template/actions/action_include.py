@@ -6,6 +6,7 @@ __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
 
+from . import ActionHandler
 from ..nodes import Node
 from ..tokenizer import Token
 from ..errors import ParserError, TemplateError, RestrictedError
@@ -44,53 +45,58 @@ class IncludeNode(Node):
             state.set_var(self.retvar[0], retval, self.retvar[1])
 
 
-def include_handler(parser, template, line, action, start, end):
-    """ Parse the action """
-    expr = None
-    retvar = None
-    assigns = []
-    segments = parser._find_tag_segments(start, end)
+class IncludeActionHandler(ActionHandler):
+    """ Handle the include action """
 
-    # filename expr is first
-    if len(segments) > 0:
-        (start, end) = segments[0]
-        expr = parser._parse_expr(start, end)
+    def handle_action_include(self, line, start, end):
+        """ Handle the include action """
+        parser = self.parser
 
-    for segment in segments[1:]:
-        (start, end) = segment
+        expr = None
+        retvar = None
+        assigns = []
+        segments = parser._find_tag_segments(start, end)
 
-        token = parser._get_expected_token(
-            start,
-            end,
-            Token.TYPE_WORD,
-            values=["return", "with"]
-        )
-        start += 1
+        # filename expr is first
+        if len(segments) > 0:
+            (start, end) = segments[0]
+            expr = parser._parse_expr(start, end)
 
-        if token.value == "return":
-            retvar = parser._get_token_var(start, end, allow_type=True)
+        for segment in segments[1:]:
+            (start, end) = segment
+
+            token = parser._get_expected_token(
+                start,
+                end,
+                Token.TYPE_WORD,
+                values=["return", "with"]
+            )
             start += 1
 
-            parser._get_no_more_tokens(start, end)
-            continue
+            if token.value == "return":
+                retvar = parser._get_token_var(start, end, allow_type=True)
+                start += 1
 
-        if token.value == "with":
-            assigns = parser._parse_multi_assign(start, end)
-            continue
+                parser._get_no_more_tokens(start, end)
+                continue
 
-        # neither return or with, so expression
-        start -= 1
-        expr = parser._parse_expr(start, end)
+            if token.value == "with":
+                assigns = parser._parse_multi_assign(start, end)
+                continue
 
-    if expr is None:
-        raise ParserError(
-            "Include expecting path expression",
-            template.filename,
-            line
-        )
+            # neither return or with, so expression
+            start -= 1
+            expr = parser._parse_expr(start, end)
 
-    node = IncludeNode(template, line, expr, assigns, retvar)
-    parser.add_node(node)
+        if expr is None:
+            raise ParserError(
+                "Include expecting path expression",
+                self.template.filename,
+                line
+            )
+
+        node = IncludeNode(self.template, line, expr, assigns, retvar)
+        parser.add_node(node)
 
 
-ACTION_HANDLERS = {"include": include_handler}
+ACTION_HANDLERS = {"include": IncludeActionHandler}

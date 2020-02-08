@@ -6,6 +6,7 @@ __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
 
+from . import ActionHandler
 from ..errors import RaisedError
 from ..nodes import Node
 
@@ -27,12 +28,14 @@ class ErrorNode(Node):
         )
 
 
-def error_handler(parser, template, line, action, start, end):
-    """ Parse the action """
-    expr = parser._parse_expr(start, end)
+class ErrorActionHandler(ActionHandler):
+    """ Handle the error action. """
 
-    node = ErrorNode(template, line, expr)
-    parser.add_node(node)
+    def handle_action_error(self, line, start, end):
+        expr = self.parser._parse_expr(start, end)
+
+        node = ErrorNode(self.template, line, expr)
+        self.parser.add_node(node)
 
 
-ACTION_HANDLERS = {"error": error_handler}
+ACTION_HANDLERS = {"error": ErrorActionHandler}

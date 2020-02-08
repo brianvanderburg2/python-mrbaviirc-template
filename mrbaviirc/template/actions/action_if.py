@@ -6,6 +6,7 @@ __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
 
+from . import ActionHandler, DefaultActionHandler
 from ..nodes import Node, NodeList
 
 
@@ -41,38 +42,48 @@ class IfNode(Node):
             return self.else_nodes.render(state)
 
 
-def if_handler(parser, template, line, action, start, end):
-    """ Parse the action """
-    expr = parser._parse_expr(start, end)
-    node = IfNode(template, line, expr)
+class IfActionHandler(ActionHandler):
+    """ Handle the if action """
 
-    parser.add_node(node)
-    parser.push_nodestack(node.nodes)
-    parser.push_handler(if_subhandler)
+    def handle_action_if(self, line, start, end):
+        expr = self.parser._parse_expr(start, end)
+        node = IfNode(self.template, line, expr)
+
+        self.parser.add_node(node)
+        self.parser.push_nodestack(node.nodes)
+        self.parser.push_handler(IfSubHandler(self.parser, self.template))
 
 
-def if_subhandler(parser, template, line, action, start, end):
-    """ Handle nested action tags """
+class IfSubHandler(DefaultActionHandler):
+    """ Handle stuff under if """
 
-    if action == "elif":
-        expr = parser._parse_expr(start, end)
-        node = parser.pop_nodestack()
+    def handle_action_elif(self, line, start, end):
+        """ elif """
+        expr = self.parser._parse_expr(start, end)
+        node = self.parser.pop_nodestack()
         node.add_elif(expr)
-        parser.push_nodestack(node.nodes)
+        self.parser.push_nodestack(node.nodes)
 
-    elif action == "else":
-        parser._get_no_more_tokens(start, end)
-        node = parser.pop_nodestack()
+    def handle_action_else(self, line, start, end):
+        """ else """
+        self.parser._get_no_more_tokens(start, end)
+        node = self.parser.pop_nodestack()
         node.add_else()
-        parser.push_nodestack(node.nodes)
+        self.parser.push_nodestack(node.nodes)
 
-    elif action == "endif":
-        parser._get_no_more_tokens(start, end)
-        parser.pop_nodestack()
-        parser.pop_handler()
+    def handle_action_endif(self, line, start, end):
+        """ endif """
+        self.parser._get_no_more_tokens(start, end)
+        self.parser.pop_nodestack()
+        self.parser.pop_handler()
 
-    else:
-        parser.handle_action(parser, template, line, action, start, end)
+    def handle_break(self, line):
+        """ pass break """
+        self.next.handle_break(line)
+
+    def handle_continue(self, line):
+        """ pass continue """
+        self.next.handle_continue(line)
 
 
-ACTION_HANDLERS = {"if": if_handler}
+ACTION_HANDLERS = {"if": IfActionHandler}

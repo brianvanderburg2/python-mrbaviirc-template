@@ -5,6 +5,7 @@ __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
 
+from . import ActionHandler, DefaultActionHandler
 from ..nodes import Node, NodeList
 from ..errors import ParserError
 
@@ -27,26 +28,27 @@ class SectionNode(Node):
         state.renderer.pop_section()
 
 
-def section_handler(parser, template, line, action, start, end):
-    """ Parse the action """
-    expr = parser._parse_expr(start, end)
+class SectionActionHandler(ActionHandler):
+    """ Handle section """
 
-    node = SectionNode(template, line, expr)
-    parser.add_node(node)
-    parser.push_nodestack(node.nodes)
-    parser.push_handler(section_subhandler)
+    def handle_action_section(self, line, start, end):
+        """ Handle section """
+        expr = self.parser._parse_expr(start, end)
 
-
-def section_subhandler(parser, template, line, action, start, end):
-    """ Handle nested action tags """
-    
-    if action == "endsection":
-        parser._get_no_more_tokens(start, end)
-        parser.pop_nodestack()
-        parser.pop_handler()
-
-    else:
-        parser.handle_action(parser, template, line, action, start, end)
+        node = SectionNode(self.template, line, expr)
+        self.parser.add_node(node)
+        self.parser.push_nodestack(node.nodes)
+        self.parser.push_handler(SectionSubHandler(self.parser, self.template))
 
 
-ACTION_HANDLERS = {"section": section_handler}
+class SectionSubHandler(DefaultActionHandler):
+    """ Handle inside of section. """
+
+    def handle_action_endsection(self, line, start, end):
+        """ End section """
+        self.parser._get_no_more_tokens(start, end)
+        self.parser.pop_nodestack()
+        self.parser.pop_handler()
+
+
+ACTION_HANDLERS = {"section": SectionActionHandler}

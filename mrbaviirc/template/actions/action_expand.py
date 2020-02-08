@@ -6,6 +6,7 @@ __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
 
+from . import ActionHandler
 from ..nodes import Node
 from ..errors import TemplateError
 from ..state import RenderState
@@ -35,52 +36,56 @@ class ExpandNode(Node):
             )
 
 
-def expand_handler(parser, template, line, action, start, end):
-    """ Parse the action """
-    segments = parser._find_tag_segments(start, end)
+class ExpandActionHandler(ActionHandler):
+    """ Handle the expand action """
 
-    expr = None
-    where = RenderState.LOCAL_VAR
+    def handle_action_expand(self, line, start, end):
+        """ Handle the expand action """
+        parser = self.parser
+        segments = parser._find_tag_segments(start, end)
 
-    # Expression is always first
-    if len(segments) > 0:
-        (start, end) = segments[0]
-        expr = parser._parse_expr(start, end)
+        expr = None
+        where = RenderState.LOCAL_VAR
 
-    for segment in segments[1:]:
-        (start, end) = segment
+        # Expression is always first
+        if len(segments) > 0:
+            (start, end) = segments[0]
+            expr = parser._parse_expr(start, end)
 
-        # Only support "into"
-        parser._get_expected_token(start, end, Token.TYPE_WORD, values="into")
-        start += 1
+        for segment in segments[1:]:
+            (start, end) = segment
 
-        # Get variable type
-        token = parser._get_expected_token(
-            start,
-            end,
-            Token.TYPE_WORD,
-            values=["local", "global", "private", "return"]
-        )
-        start += 1
+            # Only support "into"
+            parser._get_expected_token(start, end, Token.TYPE_WORD, values="into")
+            start += 1
 
-        where = {
-            "local": RenderState.LOCAL_VAR,
-            "global": RenderState.GLOBAL_VAR,
-            "private": RenderState.PRIVATE_VAR,
-            "return": RenderState.RETURN_VAR
-        }.get(token.value, RenderState.LOCAL_VAR)
+            # Get variable type
+            token = parser._get_expected_token(
+                start,
+                end,
+                Token.TYPE_WORD,
+                values=["local", "global", "private", "return"]
+            )
+            start += 1
 
-        parser._get_no_more_tokens(start, end)
+            where = {
+                "local": RenderState.LOCAL_VAR,
+                "global": RenderState.GLOBAL_VAR,
+                "private": RenderState.PRIVATE_VAR,
+                "return": RenderState.RETURN_VAR
+            }.get(token.value, RenderState.LOCAL_VAR)
 
-    if expr is None:
-        raise ParserError(
-            "Expand expecting expression",
-            template.filename,
-            line
-        )
+            parser._get_no_more_tokens(start, end)
 
-    node = ExpandNode(template, line, expr, where)
-    parser.add_node(node)
+        if expr is None:
+            raise ParserError(
+                "Expand expecting expression",
+                self.template.filename,
+                line
+            )
+
+        node = ExpandNode(self.template, line, expr, where)
+        parser.add_node(node)
 
 
-ACTION_HANDLERS = {"expand": expand_handler}
+ACTION_HANDLERS = {"expand": ExpandActionHandler}

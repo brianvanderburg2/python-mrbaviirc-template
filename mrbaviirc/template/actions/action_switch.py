@@ -6,6 +6,7 @@ __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
 
+from . import ActionHandler, DefaultActionHandler
 from ..nodes import Node, NodeList
 from ..errors import ParserError
 
@@ -49,42 +50,51 @@ class SwitchNode(Node):
         return self.default_nodes.render(state)
 
 
-def switch_handler(parser, template, line, action, start, end):
-    """ Parse the action """
-    expr = parser._parse_expr(start, end)
+class SwitchActionHandler(ActionHandler):
+    """ Handle switch """
 
-    node = SwitchNode(template, line, expr)
-    parser.add_node(node)
-    parser.push_nodestack(node.nodes)
-    parser.push_handler(switch_subhandler)
+    def handle_action_switch(self, line, start, end):
+        """ Handle switch """
+        expr = self.parser._parse_expr(start, end)
 
-def switch_subhandler(parser, template, line, action, start, end):
-    """ Handle nested action tags """
-
-    if action in SwitchNode.types:
-        offset = SwitchNode.types.index(action)
-        argc = SwitchNode.argc[offset]
-
-        exprs = parser._parse_multi_expr(start, end)
-
-        if len(exprs) != argc:
-            raise ParserError(
-                "Switch clause {0} takes {1} argument".format(action, argc),
-                template.filename,
-                line
-            )
-
-        node = parser.pop_nodestack()
-        node.add_case(SwitchNode.cbs[offset], exprs)
-        parser.push_nodestack(node.nodes)
-
-    elif action == "endswitch":
-        parser._get_no_more_tokens(start, end)
-        parser.pop_nodestack()
-        parser.pop_handler()
-
-    else:
-        parser.handle_action(parser, template, line, action, start, end)
+        node = SwitchNode(self.template, line, expr)
+        self.parser.add_node(node)
+        self.parser.push_nodestack(node.nodes)
+        self.parser.push_handler(SwitchSubHandler(self.parser, self.template))
 
 
-ACTION_HANDLERS = {"switch": switch_handler}
+class SwitchSubHandler(DefaultActionHandler):
+    """ Handle inside of switch. """
+
+    def handle_unknown_action(self, line, action, start, end):
+        # override handle_action
+        """ Handle nested tags """
+
+        if action in SwitchNode.types:
+            offset = SwitchNode.types.index(action)
+            argc = SwitchNode.argc[offset]
+
+            exprs = self.parser._parse_multi_expr(start, end)
+
+            if len(exprs) != argc:
+                raise ParserError(
+                    "Switch clause {0} takes {1} argument".format(action, argc),
+                    self.template.filename,
+                    line
+                )
+
+            node = self.parser.pop_nodestack()
+            node.add_case(SwitchNode.cbs[offset], exprs)
+            self.parser.push_nodestack(node.nodes)
+
+        else:
+            DefaultActionHandler.handle_unknown_action(self, line, action, start, end)
+
+    def handle_action_endswitch(self, line, start, end):
+        """ Handle endswitch """
+        self.parser._get_no_more_tokens(start, end)
+        self.parser.pop_nodestack()
+        self.parser.pop_handler()
+
+
+ACTION_HANDLERS = {"switch": SwitchActionHandler}

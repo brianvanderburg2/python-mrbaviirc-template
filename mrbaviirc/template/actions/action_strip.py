@@ -6,66 +6,77 @@ __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
 
+from . import ActionHandler, DefaultActionHandler
 from ..tokenizer import Token
 
 
-def strip_handler(parser, template, line, action, start, end):
-    """ Parse the action """
-    if start <= end:
-        token = parser._get_expected_token(
-            start,
-            end,
-            Token.TYPE_WORD,
-            "Expected on, off, or trim",
-            ["on", "off", "trim"]
-        )
-        start += 1
+class StripActionHandler(ActionHandler):
+    """ Handle strip actions. """
 
-        if token.value == "on":
-            value = parser.AUTOSTRIP_STRIP
-        elif token.value == "trim":
-            value = parser.AUTOSTRIP_TRIM
+    def handle_action_strip(self, line, start, end):
+        """ Handle the strip action. """
+        parser = self.parser
+
+        if start <= end:
+            token = parser._get_expected_token(
+                start,
+                end,
+                Token.TYPE_WORD,
+                "Expected on, off, or trim",
+                ["on", "off", "trim"]
+            )
+            start += 1
+
+            if token.value == "on":
+                value = parser.AUTOSTRIP_STRIP
+            elif token.value == "trim":
+                value = parser.AUTOSTRIP_TRIM
+            else:
+                value = parser.AUTOSTRIP_NONE
         else:
-            value = parser.AUTOSTRIP_NONE
-    else:
-        value = None
+            value = None
 
-    parser.push_autostrip(value)
-    parser.push_handler(strip_subhandler)
+        parser.push_autostrip(value)
+        parser.push_handler(StripSubHandler(self.parser, self.template))
 
+    def handle_action_autostrip(self, line, start, end):
+        """ Handle autostrip """
+        self.parser._get_no_more_tokens(start, end)
+        self.parser.set_autostrip(self.parser.AUTOSTRIP_STRIP)
 
-def strip_subhandler(parser, template, line, action, start, end):
-    """ Handle nested action tags """
+    def handle_action_autotrim(self, line, start, end):
+        """ Handle autotrim """
+        self.parser._get_no_more_tokens(start, end)
+        self.parser.set_autostrip(self.parser.AUTOSTRIP_TRIM)
 
-    if action == "endstrip":
-        parser._get_no_more_tokens(start, end)
-        parser.pop_autostrip()
-        parser.pop_handler()
-
-    else:
-        parser.handle_action(parser, template, line, action, start, end)
-
-
-def autostrip_handler(parser, template, line, action, start, end):
-    """ Parse the action. """
-    parser._get_no_more_tokens(start, end)
-    parser.set_autostrip(parser.AUTOSTRIP_STRIP)
+    def handle_action_no_autostrip(self, line, start, end):
+        """ Handle no_autostrip """
+        self.parser._get_no_more_tokens(start, end)
+        self.parser.set_autostrip(self.parser.AUTOSTRIP_NONE)
 
 
-def autotrim_handler(parser, template, line, action, start, end):
-    """ Parse the action. """
-    parser._get_no_more_tokens(start, end)
-    parser.set_autostrip(parser.AUTOSTRIP_TRIM)
+class StripSubHandler(DefaultActionHandler):
+    """ Handle items under strip """
 
-def noautostrip_handler(parser, template, line, action, start, end):
-    """ Parse the action. """
-    parser._get_no_more_tokens(start, end)
-    parser.set_autostrip(parser.AUTOSTRIP_NONE)
+    def handle_action_endstrip(self, line, start, end):
+        """ Handle nested action tags """
+
+        self.parser._get_no_more_tokens(start, end)
+        self.parser.pop_autostrip()
+        self.parser.pop_handler()
+
+    def handle_break(self, line):
+        """ Allow break from within a strip block. """
+        self.next.handle_break(line)
+
+    def handle_continue(self, line):
+        """ Allow continue from within a strip block. """
+        self.next.handle_continue(line)
 
 
 ACTION_HANDLERS = {
-    "strip": strip_handler,
-    "autostrip": autostrip_handler,
-    "autotrim": autotrim_handler,
-    "no_autostrip": noautostrip_handler
+    "strip": StripActionHandler,
+    "autostrip": StripActionHandler,
+    "autotrim": StripActionHandler,
+    "no_autostrip": StripActionHandler
 }

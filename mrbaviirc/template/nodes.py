@@ -4,7 +4,9 @@ __author__ = "Brian Allen Vanderburg II"
 __copyright__ = "Copyright 2016"
 __license__ = "Apache License 2.0"
 
-__all__ = ["Node", "NodeList", "TextNode", "EmitNode"]
+__all__ = [
+    "Node", "NodeList", "TextNode", "EmitNode", "BreakNode", "ContinueNode"
+]
 
 
 import weakref
@@ -99,3 +101,17 @@ class EmitNode(Node):
     def render(self, state):
         """ Render the output. """
         state.renderer.render(str(self.expr.eval(state)))
+
+
+class BreakNode(Node):
+    """ Return RENDER_BREAK. """
+
+    def render(self, state):
+        return Node.RENDER_BREAK
+
+
+class ContinueNode(Node):
+    """ Return RENDER_CONTINUE. """
+
+    def render(self, state):
+        return Node.RENDER_CONTINUE
