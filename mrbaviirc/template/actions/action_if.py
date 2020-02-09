@@ -46,7 +46,7 @@ class IfActionHandler(ActionHandler):
     """ Handle the if action """
 
     def handle_action_if(self, line, start, end):
-        expr = self.parser._parse_expr(start, end)
+        expr = self.parser.parse_expr(start, end)
         node = IfNode(self.template, line, expr)
 
         self.parser.add_node(node)
@@ -59,21 +59,21 @@ class IfSubHandler(DefaultActionHandler):
 
     def handle_action_elif(self, line, start, end):
         """ elif """
-        expr = self.parser._parse_expr(start, end)
+        expr = self.parser.parse_expr(start, end)
         node = self.parser.pop_nodestack()
         node.add_elif(expr)
         self.parser.push_nodestack(node.nodes)
 
     def handle_action_else(self, line, start, end):
         """ else """
-        self.parser._get_no_more_tokens(start, end)
+        self.parser.get_no_more_tokens(start, end)
         node = self.parser.pop_nodestack()
         node.add_else()
         self.parser.push_nodestack(node.nodes)
 
     def handle_action_endif(self, line, start, end):
         """ endif """
-        self.parser._get_no_more_tokens(start, end)
+        self.parser.get_no_more_tokens(start, end)
         self.parser.pop_nodestack()
         self.parser.pop_handler()
 

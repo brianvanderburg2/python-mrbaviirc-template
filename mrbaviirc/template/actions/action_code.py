@@ -111,7 +111,7 @@ class CodeSubHandler(ActionHandler):
 
     def handle_action_endcode(self, line, start, end):
         """ Handle end code. """
-        self.parser._get_no_more_tokens(start, end)
+        self.parser.get_no_more_tokens(start, end)
         self.parser.pop_autostrip()
         self.parser.pop_nodestack()
         self.parser.pop_handler()
@@ -126,23 +126,23 @@ class CodeActionHandler(ActionHandler):
 
         retvar = None
         assigns = []
-        segments = parser._find_tag_segments(start, end)
+        segments = parser.find_tag_segments(start, end)
         for segment in segments:
             (start, end) = segment
 
-            token = parser._get_token(start, end)
+            token = parser.get_token(start, end)
             start += 1
 
             # expecting either return or with
             if token.type == Token.TYPE_WORD and token.value == "return":
-                retvar = parser._get_token_var(start, end)
+                retvar = parser.get_token_var(start, end)
                 start += 1
 
-                parser._get_no_more_tokens(start, end)
+                parser.get_no_more_tokens(start, end)
                 continue
 
             if token.type == Token.TYPE_WORD and token.value == "with":
-                assigns = parser._parse_multi_assign(start, end)
+                assigns = parser.parse_multi_assign(start, end)
                 continue
 
             raise ParserError(

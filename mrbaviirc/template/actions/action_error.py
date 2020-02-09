@@ -32,7 +32,7 @@ class ErrorActionHandler(ActionHandler):
     """ Handle the error action. """
 
     def handle_action_error(self, line, start, end):
-        expr = self.parser._parse_expr(start, end)
+        expr = self.parser.parse_expr(start, end)
 
         node = ErrorNode(self.template, line, expr)
         self.parser.add_node(node)

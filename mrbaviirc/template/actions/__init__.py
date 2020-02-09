@@ -31,7 +31,7 @@ class ActionHandler:
 
     def handle_emitter(self, line, start, end):
         """ Add an emitter node. """
-        expr = self.parser._parse_expr(start, end)
+        expr = self.parser.parse_expr(start, end)
         line = self.parser.tokens[start].line
 
         if isinstance(expr, ValueExpr):

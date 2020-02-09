@@ -33,7 +33,7 @@ class ReturnActionHandler(ActionHandler):
 
     def handle_action_return(self, line, start, end):
         """ Handle return """
-        assigns = self.parser._parse_multi_assign(start, end)
+        assigns = self.parser.parse_multi_assign(start, end)
 
         node = ReturnNode(self.template, line, assigns)
         self.parser.add_node(node)

@@ -33,7 +33,7 @@ class SectionActionHandler(ActionHandler):
 
     def handle_action_section(self, line, start, end):
         """ Handle section """
-        expr = self.parser._parse_expr(start, end)
+        expr = self.parser.parse_expr(start, end)
 
         node = SectionNode(self.template, line, expr)
         self.parser.add_node(node)
@@ -46,7 +46,7 @@ class SectionSubHandler(DefaultActionHandler):
 
     def handle_action_endsection(self, line, start, end):
         """ End section """
-        self.parser._get_no_more_tokens(start, end)
+        self.parser.get_no_more_tokens(start, end)
         self.parser.pop_nodestack()
         self.parser.pop_handler()
 

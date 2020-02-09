@@ -30,7 +30,7 @@ class SetActionHandler(ActionHandler):
 
     def handle_action_set(self, line, start, end):
         """ Handle set. """
-        assigns = self.parser._parse_multi_assign(start, end, allow_type=True)
+        assigns = self.parser.parse_multi_assign(start, end, allow_type=True)
 
         node = AssignNode(self.template, line, assigns)
         self.parser.add_node(node)

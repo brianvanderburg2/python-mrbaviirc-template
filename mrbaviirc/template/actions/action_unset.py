@@ -29,7 +29,7 @@ class UnsetActionHandler(ActionHandler):
 
     def handle_action_unset(self, line, start, end):
         """ Handle unset """
-        varlist = self.parser._parse_multi_var(start, end, allow_type=True)
+        varlist = self.parser.parse_multi_var(start, end, allow_type=True)
 
         node = UnsetNode(self.template, line, varlist)
         self.parser.add_node(node)

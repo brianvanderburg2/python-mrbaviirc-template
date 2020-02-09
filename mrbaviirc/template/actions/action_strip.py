@@ -18,7 +18,7 @@ class StripActionHandler(ActionHandler):
         parser = self.parser
 
         if start <= end:
-            token = parser._get_expected_token(
+            token = parser.get_expected_token(
                 start,
                 end,
                 Token.TYPE_WORD,
@@ -41,17 +41,17 @@ class StripActionHandler(ActionHandler):
 
     def handle_action_autostrip(self, line, start, end):
         """ Handle autostrip """
-        self.parser._get_no_more_tokens(start, end)
+        self.parser.get_no_more_tokens(start, end)
         self.parser.set_autostrip(self.parser.AUTOSTRIP_STRIP)
 
     def handle_action_autotrim(self, line, start, end):
         """ Handle autotrim """
-        self.parser._get_no_more_tokens(start, end)
+        self.parser.get_no_more_tokens(start, end)
         self.parser.set_autostrip(self.parser.AUTOSTRIP_TRIM)
 
     def handle_action_no_autostrip(self, line, start, end):
         """ Handle no_autostrip """
-        self.parser._get_no_more_tokens(start, end)
+        self.parser.get_no_more_tokens(start, end)
         self.parser.set_autostrip(self.parser.AUTOSTRIP_NONE)
 
 
@@ -61,7 +61,7 @@ class StripSubHandler(DefaultActionHandler):
     def handle_action_endstrip(self, line, start, end):
         """ Handle nested action tags """
 
-        self.parser._get_no_more_tokens(start, end)
+        self.parser.get_no_more_tokens(start, end)
         self.parser.pop_autostrip()
         self.parser.pop_handler()
 

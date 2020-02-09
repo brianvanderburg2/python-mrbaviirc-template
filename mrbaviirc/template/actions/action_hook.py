@@ -49,21 +49,21 @@ class HookActionHandler(ActionHandler):
         """ Handle the actual parsing """
         hook = None
         assigns = []
-        segments = self.parser._find_tag_segments(start, end)
+        segments = self.parser.find_tag_segments(start, end)
 
         # First item should be expression
         if len(segments) > 0:
             (start, end) = segments[0]
-            hook = self.parser._parse_expr(start, end)
+            hook = self.parser.parse_expr(start, end)
 
         for segment in segments[1:]:
             (start, end) = segment
 
             # Only support "with"
-            token = self.parser._get_expected_token(start, end, Token.TYPE_WORD, values="with")
+            token = self.parser.get_expected_token(start, end, Token.TYPE_WORD, values="with")
             start += 1
 
-            assigns = self.parser._parse_multi_assign(start, end)
+            assigns = self.parser.parse_multi_assign(start, end)
 
         if hook is None:
             raise ParserError(

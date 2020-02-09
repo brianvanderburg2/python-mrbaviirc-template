@@ -55,7 +55,7 @@ class SwitchActionHandler(ActionHandler):
 
     def handle_action_switch(self, line, start, end):
         """ Handle switch """
-        expr = self.parser._parse_expr(start, end)
+        expr = self.parser.parse_expr(start, end)
 
         node = SwitchNode(self.template, line, expr)
         self.parser.add_node(node)
@@ -74,7 +74,7 @@ class SwitchSubHandler(DefaultActionHandler):
             offset = SwitchNode.types.index(action)
             argc = SwitchNode.argc[offset]
 
-            exprs = self.parser._parse_multi_expr(start, end)
+            exprs = self.parser.parse_multi_expr(start, end)
 
             if len(exprs) != argc:
                 raise ParserError(
@@ -92,7 +92,7 @@ class SwitchSubHandler(DefaultActionHandler):
 
     def handle_action_endswitch(self, line, start, end):
         """ Handle endswitch """
-        self.parser._get_no_more_tokens(start, end)
+        self.parser.get_no_more_tokens(start, end)
         self.parser.pop_nodestack()
         self.parser.pop_handler()
 

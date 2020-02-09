@@ -34,7 +34,7 @@ class ClearActionHandler(ActionHandler):
         where = RenderState.LOCAL_VAR
 
         if end >= start:
-            token = parser._get_expected_token(
+            token = parser.get_expected_token(
                 start,
                 end,
                 Token.TYPE_WORD,
@@ -49,7 +49,7 @@ class ClearActionHandler(ActionHandler):
                 "return": RenderState.RETURN_VAR
             }.get(token.value, RenderState.LOCAL_VAR)
 
-            parser._get_no_more_tokens(start, end)
+            parser.get_no_more_tokens(start, end)
 
         node = ClearNode(self.template, line, where)
         parser.add_node(node)

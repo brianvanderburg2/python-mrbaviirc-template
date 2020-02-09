@@ -28,7 +28,7 @@ class DoActionHandler(ActionHandler):
 
     def handle_action_do(self, line, start, end):
         """ Handle the do action. """
-        nodes = self.parser._parse_multi_expr(start, end)
+        nodes = self.parser.parse_multi_expr(start, end)
 
         node = DoNode(self.template, line, nodes)
         self.parser.add_node(node)

@@ -113,7 +113,7 @@ class TemplateParser:
         """ Set the autostrip value. """
         self.autostrip = value
 
-    def _get_token(self, pos, end, errmsg="Expected token"):
+    def get_token(self, pos, end, errmsg="Expected token"):
         """ Get a token at a position, raise error if not found/out of bound """
 
         if pos <= end:
@@ -125,10 +125,10 @@ class TemplateParser:
             self.tokens[pos - 1].line if pos > 0 else 0
         )
 
-    def _get_expected_token(self, pos, end, types, errmsg="Unexpected token", values=None):
+    def get_expected_token(self, pos, end, types, errmsg="Unexpected token", values=None):
         """ Expect a specific type of token. """
 
-        token = self._get_token(pos, end, errmsg)
+        token = self.get_token(pos, end, errmsg)
         if not isinstance(types, (list, tuple)):
             types = [types]
 
@@ -152,7 +152,7 @@ class TemplateParser:
 
         return token
 
-    def _get_no_more_tokens(self, pos, end, errmsg="Unexpected token"):
+    def get_no_more_tokens(self, pos, end, errmsg="Unexpected token"):
         """ Expect the end of the range. """
 
         if pos <= end:
@@ -162,10 +162,10 @@ class TemplateParser:
                 self.tokens[pos].line
             )
 
-    def _get_token_var(self, pos, end, allow_type=False, errmsg="Expected variable."):
+    def get_token_var(self, pos, end, allow_type=False, errmsg="Expected variable."):
         """ Parse a variable and return var """
 
-        token = self._get_expected_token(pos, end, Token.TYPE_WORD, errmsg)
+        token = self.get_expected_token(pos, end, Token.TYPE_WORD, errmsg)
         match = re.match("([lgpra]@)?([a-zA-Z_][a-zA-Z0-9_]*)", token.value)
 
         if match:
@@ -203,7 +203,7 @@ class TemplateParser:
             token.line
         )
 
-    def _find_level0_token(self, start, end, tokens=None):
+    def find_level0_token(self, start, end, tokens=None):
         """ Find a token at level 0 nesting. """
 
         token_stack = []
@@ -248,7 +248,7 @@ class TemplateParser:
 
         return None
 
-    def _find_level0_closing(self, start, end):
+    def find_level0_closing(self, start, end):
         """ Find the matching closing token. """
 
         token = self.tokens[start]
@@ -291,7 +291,7 @@ class TemplateParser:
             self.tokens[start].line
         )
 
-    def _split_tokens(self, start, end, sep, allow_blank=False, errmsg="Expected Token"):
+    def split_tokens(self, start, end, sep, allow_blank=False, errmsg="Expected Token"):
         """ Split a stream of tokens by another token.
             If allow_blank is True, allow for blank items in the result
             (if the seperator token is at the start, end, or back to back) """
@@ -303,7 +303,7 @@ class TemplateParser:
         # First find all ranges before any separators
         result = []
         while start <= end:
-            pos = self._find_level0_token(start, end, sep)
+            pos = self.find_level0_token(start, end, sep)
             if pos is None:
                 break
 
@@ -334,9 +334,9 @@ class TemplateParser:
 
         return result
 
-    def _find_tag_segments(self, start, end):
+    def find_tag_segments(self, start, end):
         """ Return list of (start, end) for any tag segments. """
-        return self._split_tokens(start, end, Token.TYPE_SEMICOLON)
+        return self.split_tokens(start, end, Token.TYPE_SEMICOLON)
 
     def parse(self):
         """ Parse the template and return the node list. """
@@ -408,7 +408,7 @@ class TemplateParser:
         """ Parse a tag based on type of tag. """
         handler = self.action_handler_stack[-1]
         if token.type == Token.TYPE_START_ACTION:
-            action_token = self._get_token(start, end, "Expected action")
+            action_token = self.get_token(start, end, "Expected action")
 
             action = action_token.value
             line = action_token.line
@@ -437,15 +437,15 @@ class TemplateParser:
         elif token.type == Token.TYPE_START_COMMENT:
             handler.handle_comment(token.line)
 
-    def _parse_expr_or_assign(self, start, end):
+    def parse_expr_or_assign(self, start, end):
         """ Parse an expression or an assignment. """
 
         if end > start and self.tokens[start + 1].type == Token.TYPE_ASSIGN:
-            return self._parse_assign(start, end)
+            return self.parse_assign(start, end)
 
-        return (None, self._parse_expr(start, end))
+        return (None, self.parse_expr(start, end))
 
-    def _parse_expr(self, start, end):
+    def parse_expr(self, start, end):
         # pylint: disable=too-many-locals
         """ Parse the expression. """
 
@@ -459,7 +459,7 @@ class TemplateParser:
         pos = start
         while pos <= end:
             # Find the token
-            pos = self._find_level0_token(pos, end)
+            pos = self.find_level0_token(pos, end)
             if pos is None:
                 break
 
@@ -538,8 +538,8 @@ class TemplateParser:
         # Split on and/or first
         if andor is not None:
             token = self.tokens[andor]
-            expr1 = self._parse_expr(start, andor - 1)
-            expr2 = self._parse_expr(andor + 1, end)
+            expr1 = self.parse_expr(start, andor - 1)
+            expr2 = self.parse_expr(andor + 1, end)
 
             if token.type == Token.TYPE_AND:
                 return AndExpr(
@@ -558,8 +558,8 @@ class TemplateParser:
         # Split on comparison next
         if compare is not None:
             token = self.tokens[compare]
-            expr1 = self._parse_expr(start, compare - 1)
-            expr2 = self._parse_expr(compare + 1, end)
+            expr1 = self.parse_expr(start, compare - 1)
+            expr2 = self.parse_expr(compare + 1, end)
 
             if token.type == Token.TYPE_EQUAL:
                 oper = operator.eq
@@ -585,8 +585,8 @@ class TemplateParser:
         # Add/sub next
         if addsub is not None:
             token = self.tokens[addsub]
-            expr1 = self._parse_expr(start, addsub - 1)
-            expr2 = self._parse_expr(addsub + 1, end)
+            expr1 = self.parse_expr(start, addsub - 1)
+            expr2 = self.parse_expr(addsub + 1, end)
 
             if token.type == Token.TYPE_PLUS:
                 oper = operator.add
@@ -604,8 +604,8 @@ class TemplateParser:
         # Mul/div/mod next
         if muldivmod is not None:
             token = self.tokens[muldivmod]
-            expr1 = self._parse_expr(start, muldivmod - 1)
-            expr2 = self._parse_expr(muldivmod + 1, end)
+            expr1 = self.parse_expr(start, muldivmod - 1)
+            expr2 = self.parse_expr(muldivmod + 1, end)
 
             if token.type == Token.TYPE_MULTIPLY:
                 oper = operator.mul
@@ -634,7 +634,7 @@ class TemplateParser:
                     self.template,
                     token.line,
                     lambda a: not a,
-                    self._parse_expr(nott + 1, end)
+                    self.parse_expr(nott + 1, end)
                 )
             raise ParserError(
                 "Unexpected token: !",
@@ -647,13 +647,13 @@ class TemplateParser:
             token = self.tokens[posneg]
             if posneg == start:
                 if token.type == Token.TYPE_PLUS:
-                    return self._parse_expr(posneg + 1, end)
+                    return self.parse_expr(posneg + 1, end)
 
                 return UnaryExpr(
                     self.template,
                     token.line,
                     lambda a: -a,
-                    self._parse_expr(posneg + 1, end)
+                    self.parse_expr(posneg + 1, end)
                 )
 
             raise ParserError(
@@ -669,8 +669,8 @@ class TemplateParser:
 
         if token.type == Token.TYPE_OPEN_PAREN:
             # Find closing paren, treat all as expression
-            closing = self._find_level0_closing(start, end)
-            expr = self._parse_expr(start + 1, closing - 1)
+            closing = self.find_level0_closing(start, end)
+            expr = self.parse_expr(start + 1, closing - 1)
 
             if closing < end:
                 expr = self._parse_continuation(expr, closing + 1, end)
@@ -679,8 +679,8 @@ class TemplateParser:
 
         if token.type == Token.TYPE_OPEN_BRACKET:
             # Find closing bracket
-            closing = self._find_level0_closing(start, end)
-            expr = self._parse_expr_list_dict(start + 1, closing - 1)
+            closing = self.find_level0_closing(start, end)
+            expr = self.parse_expr_list_dict(start + 1, closing - 1)
 
             if closing < end:
                 expr = self._parse_continuation(expr, closing + 1, end)
@@ -689,7 +689,7 @@ class TemplateParser:
 
         if token.type == Token.TYPE_WORD:
             # Variable
-            var = self._get_token_var(start, end, allow_type=True)
+            var = self.get_token_var(start, end, allow_type=True)
             expr = VarExpr(self.template, token.line, var)
 
             if start < end:
@@ -720,7 +720,7 @@ class TemplateParser:
             if token.type == Token.TYPE_DOT:
                 start += 1
                 if start <= end:
-                    var = self._get_token_var(start, end)
+                    var = self.get_token_var(start, end)
                     expr = LookupAttrExpr(self.template, token.line, expr, var)
                     start += 1
                     continue
@@ -732,9 +732,9 @@ class TemplateParser:
                 )
 
             if token.type == Token.TYPE_OPEN_PAREN:
-                closing = self._find_level0_closing(start, end)
+                closing = self.find_level0_closing(start, end)
                 if start < closing - 1:
-                    exprs = self._parse_multi_expr(start + 1, closing - 1, allow_assign=True)
+                    exprs = self.parse_multi_expr(start + 1, closing - 1, allow_assign=True)
                 else:
                     exprs = []
                 expr = FuncExpr(self.template, token.line, expr, exprs)
@@ -742,8 +742,8 @@ class TemplateParser:
                 continue
 
             if token.type == Token.TYPE_OPEN_BRACKET:
-                closing = self._find_level0_closing(start, end)
-                expr1 = self._parse_multi_expr(start + 1, closing - 1, allow_blank=True)
+                closing = self.find_level0_closing(start, end)
+                expr1 = self.parse_multi_expr(start + 1, closing - 1, allow_blank=True)
                 if len(expr1) == 1 and expr1[0] is not None:
                     expr = LookupItemExpr(self.template, token.line, expr, expr1[0])
                 elif len(expr1) == 2 or len(expr1) == 3:
@@ -765,7 +765,7 @@ class TemplateParser:
 
         return expr
 
-    def _parse_expr_list_dict(self, start, end):
+    def parse_expr_list_dict(self, start, end):
         """ Pare an expression that's a list or dictionary. """
         line = self.tokens[start - 1].line if start > 0 else 0
         keys = []
@@ -781,20 +781,20 @@ class TemplateParser:
             return DictExpr(self.template, line, [], [])
 
         # Process the parts
-        splits = self._split_tokens(start, end, Token.TYPE_COMMA)
+        splits = self.split_tokens(start, end, Token.TYPE_COMMA)
         is_dict = None
 
         for (split_start, split_end) in splits:
             # Determine if we are a dictionary, if we don't already know
             if is_dict is None:
-                pos = self._find_level0_token(
+                pos = self.find_level0_token(
                     split_start, split_end, Token.TYPE_COLON
                 )
                 is_dict = pos is not None
 
             # If dict, get the key
             if is_dict:
-                pos = self._find_level0_token(
+                pos = self.find_level0_token(
                     split_start, split_end, Token.TYPE_COLON
                 )
                 if pos is None:
@@ -804,7 +804,7 @@ class TemplateParser:
                         line
                     )
 
-                keys.append(self._parse_expr(
+                keys.append(self.parse_expr(
                     split_start, pos - 1
                 ))
                 value_start = pos + 1
@@ -812,7 +812,7 @@ class TemplateParser:
                 value_start = split_start
 
             # Get the value
-            values.append(self._parse_expr(value_start, split_end))
+            values.append(self.parse_expr(value_start, split_end))
 
 
         # We no longer return ValueExpr even if the list is all ValueExpr
@@ -825,10 +825,10 @@ class TemplateParser:
 
         return ListExpr(self.template, line, values)
 
-    def _parse_multi_expr(self, start, end, allow_blank=False, allow_assign=False):
+    def parse_multi_expr(self, start, end, allow_blank=False, allow_assign=False):
         """ Parse a list of expressions separated by comma. """
 
-        splits = self._split_tokens(start, end, Token.TYPE_COMMA, allow_blank=allow_blank)
+        splits = self.split_tokens(start, end, Token.TYPE_COMMA, allow_blank=allow_blank)
 
         if splits:
             items = []
@@ -836,11 +836,11 @@ class TemplateParser:
                 if split_start is None or split_end is None:
                     items.append(None)
                 elif allow_assign:
-                    items.append(self._parse_expr_or_assign(
+                    items.append(self.parse_expr_or_assign(
                         split_start, split_end
                     ))
                 else:
-                    items.append(self._parse_expr(
+                    items.append(self.parse_expr(
                         split_start, split_end
                     ))
             return items
@@ -851,26 +851,26 @@ class TemplateParser:
             self.tokens[start - 1] if start > 0 else 0
         )
 
-    def _parse_assign(self, start, end, allow_type=False):
+    def parse_assign(self, start, end, allow_type=False):
         """ Parse a var = expr assignment, return (var, expr) """
-        var = self._get_token_var(start, end, allow_type=allow_type)
+        var = self.get_token_var(start, end, allow_type=allow_type)
         start += 1
 
-        self._get_expected_token(start, end, Token.TYPE_ASSIGN, "Expected '='")
+        self.get_expected_token(start, end, Token.TYPE_ASSIGN, "Expected '='")
         start += 1
 
-        expr = self._parse_expr(start, end)
+        expr = self.parse_expr(start, end)
 
         return (var, expr)
 
-    def _parse_multi_assign(self, start, end, allow_type=False):
+    def parse_multi_assign(self, start, end, allow_type=False):
         """ Parse multiple var = expr statemetns, return [(var, expr)] """
 
-        splits = self._split_tokens(start, end, Token.TYPE_COMMA)
+        splits = self.split_tokens(start, end, Token.TYPE_COMMA)
         if splits:
             assigns = []
             for (split_start, split_end) in splits:
-                assigns.append(self._parse_assign(
+                assigns.append(self.parse_assign(
                     split_start, split_end, allow_type=allow_type
                 ))
 
@@ -882,17 +882,17 @@ class TemplateParser:
             self.tokens[start - 1].line if start > 0 else 0
         )
 
-    def _parse_multi_var(self, start, end, allow_type=False):
+    def parse_multi_var(self, start, end, allow_type=False):
         """ Parse multiple variables and return [var] """
 
-        splits = self._split_tokens(start, end, Token.TYPE_COMMA)
+        splits = self.split_tokens(start, end, Token.TYPE_COMMA)
         if splits:
             varlist = []
             for (split_start, split_end) in splits:
-                varlist.append(self._get_token_var(
+                varlist.append(self.get_token_var(
                     split_start, split_end, allow_type=allow_type
                     ))
-                self._get_no_more_tokens(split_start + 1, split_end)
+                self.get_no_more_tokens(split_start + 1, split_end)
 
             return varlist
 

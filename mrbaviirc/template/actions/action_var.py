@@ -37,10 +37,10 @@ class VarActionHandler(ActionHandler):
 
     def handle_action_var(self, line, start, end):
         """ Handle var """
-        var = self.parser._get_token_var(start, end, allow_type=True)
+        var = self.parser.get_token_var(start, end, allow_type=True)
         start += 1
 
-        self.parser._get_no_more_tokens(start, end)
+        self.parser.get_no_more_tokens(start, end)
 
         node = VarNode(self.template, line, var)
         self.parser.add_node(node)
@@ -53,7 +53,7 @@ class VarSubHandler(DefaultActionHandler):
 
     def handle_action_endvar(self, line, start, end):
         """ endvar """
-        self.parser._get_no_more_tokens(start, end)
+        self.parser.get_no_more_tokens(start, end)
         self.parser.pop_nodestack()
         self.parser.pop_handler()
 

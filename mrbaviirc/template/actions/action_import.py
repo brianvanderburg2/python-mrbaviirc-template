@@ -39,7 +39,7 @@ class ImportActionHandler(ActionHandler):
 
     def handle_action_import(self, line, start, end):
         """ Handle import """
-        assigns = self.parser._parse_multi_assign(start, end, allow_type=True)
+        assigns = self.parser.parse_multi_assign(start, end, allow_type=True)
 
         node = ImportNode(self.template, line, assigns)
         self.parser.add_node(node)

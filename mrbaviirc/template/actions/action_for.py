@@ -105,7 +105,7 @@ class ForActionHandler(ActionHandler):
         """ Handle the for action. """
         parser = self.parser
 
-        segments = parser._find_tag_segments(start, end)
+        segments = parser.find_tag_segments(start, end)
         if len(segments) == 3:
             self._handle_action_for_incr(line, segments)
         else:
@@ -114,10 +114,10 @@ class ForActionHandler(ActionHandler):
     def _handle_action_for_iter(self, line, start, end):
         """ Parse the action for a for iterator """
         parser = self.parser
-        var = parser._get_token_var(start, end, allow_type=True)
+        var = parser.get_token_var(start, end, allow_type=True)
         start += 1
 
-        token = parser._get_expected_token(
+        token = parser.get_expected_token(
             start,
             end,
             [Token.TYPE_COMMA, Token.TYPE_WORD],
@@ -129,10 +129,10 @@ class ForActionHandler(ActionHandler):
         cvar = None
         if token.type == Token.TYPE_COMMA:
 
-            cvar = parser._get_token_var(start, end, allow_type=True)
+            cvar = parser.get_token_var(start, end, allow_type=True)
             start += 1
 
-            token = parser._get_expected_token(
+            token = parser.get_expected_token(
                 start,
                 end,
                 Token.TYPE_WORD,
@@ -141,7 +141,7 @@ class ForActionHandler(ActionHandler):
             )
             start += 1
 
-        expr = parser._parse_expr(start, end)
+        expr = parser.parse_expr(start, end)
         node = ForIterNode(self.template, line, var, cvar, expr)
 
         parser.add_node(node)
@@ -153,15 +153,15 @@ class ForActionHandler(ActionHandler):
         parser = self.parser
         # Init
         (start, end) = segments[0]
-        init = parser._parse_multi_assign(start, end, allow_type=True)
+        init = parser.parse_multi_assign(start, end, allow_type=True)
 
         # Test
         (start, end) = segments[1]
-        test = parser._parse_expr(start, end)
+        test = parser.parse_expr(start, end)
 
         # Incr
         (start, end) = segments[2]
-        incr = parser._parse_multi_assign(start, end, allow_type=True)
+        incr = parser.parse_multi_assign(start, end, allow_type=True)
 
         node = ForIncrNode(self.template, line, init, test, incr)
         parser.add_node(node)
@@ -174,13 +174,13 @@ class ForSubHandler(DefaultActionHandler):
 
     def handle_action_endfor(self, line, start, end):
         """ End the for loop """
-        self.parser._get_no_more_tokens(start, end)
+        self.parser.get_no_more_tokens(start, end)
         self.parser.pop_nodestack()
         self.parser.pop_handler()
 
     def handle_action_else(self, line, start, end):
         """ Handle if no items iterated over. """
-        self.parser._get_no_more_tokens(start, end)
+        self.parser.get_no_more_tokens(start, end)
         node = self.parser.pop_nodestack()
         node.add_else()
         self.parser.push_nodestack(node.nodes)

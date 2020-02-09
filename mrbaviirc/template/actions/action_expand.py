@@ -42,7 +42,7 @@ class ExpandActionHandler(ActionHandler):
     def handle_action_expand(self, line, start, end):
         """ Handle the expand action """
         parser = self.parser
-        segments = parser._find_tag_segments(start, end)
+        segments = parser.find_tag_segments(start, end)
 
         expr = None
         where = RenderState.LOCAL_VAR
@@ -50,17 +50,17 @@ class ExpandActionHandler(ActionHandler):
         # Expression is always first
         if len(segments) > 0:
             (start, end) = segments[0]
-            expr = parser._parse_expr(start, end)
+            expr = parser.parse_expr(start, end)
 
         for segment in segments[1:]:
             (start, end) = segment
 
             # Only support "into"
-            parser._get_expected_token(start, end, Token.TYPE_WORD, values="into")
+            parser.get_expected_token(start, end, Token.TYPE_WORD, values="into")
             start += 1
 
             # Get variable type
-            token = parser._get_expected_token(
+            token = parser.get_expected_token(
                 start,
                 end,
                 Token.TYPE_WORD,
@@ -75,7 +75,7 @@ class ExpandActionHandler(ActionHandler):
                 "return": RenderState.RETURN_VAR
             }.get(token.value, RenderState.LOCAL_VAR)
 
-            parser._get_no_more_tokens(start, end)
+            parser.get_no_more_tokens(start, end)
 
         if expr is None:
             raise ParserError(

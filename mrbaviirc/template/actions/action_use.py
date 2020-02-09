@@ -30,7 +30,7 @@ class UseActionHandler(ActionHandler):
 
     def handle_action_use(self, line, start, end):
         """ Handle use """
-        expr = self.parser._parse_expr(start, end)
+        expr = self.parser.parse_expr(start, end)
 
         node = UseSectionNode(self.template, line, expr)
         self.parser.add_node(node)
