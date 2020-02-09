@@ -96,7 +96,7 @@ def do_test_compare(env, search_path_loader):
 
         tmpl = env.load_file(filename=source)
         rndr = StringRenderer()
-        tmpl.render(rndr, data, user_data)
+        result = tmpl.render(rndr, data, user_data)
 
         target = path[:-5] + ".txt"
         contents = rndr.get()
@@ -111,10 +111,10 @@ def do_test_compare(env, search_path_loader):
         #    "render compare failed: {0}".format(os.path.basename(path))
         #)
 
-        sections = rndr.get_sections()
+        sections = result.sections.keys()
         for section in sections:
             target = path[:-5] + "_" + section + ".txt"
-            contents = rndr.get_section(section)
+            contents = result.sections[section]
 
             with open(target, "r", newline=None) as handle:
                 target_contents = handle.read()

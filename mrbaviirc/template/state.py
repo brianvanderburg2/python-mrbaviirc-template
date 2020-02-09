@@ -26,6 +26,7 @@ class RenderState:
         The current renderer
     """
 
+    # LOCAl, PRIVATE, INTERNAL, and RETURN are per nested_render
     LOCAL_VAR = 0
     GLOBAL_VAR = 1
     PRIVATE_VAR = 2
@@ -40,12 +41,12 @@ class RenderState:
         self.template = None
         self.line = 0
         self.renderer = None
+        self.sections = {}
         self.user_data = None
 
         # Should only be accessed within the API or this class
         self.abort_fn = None
-        self._vars = [None] * 6 # Indexed via the type of variable
-        self._first = True
+        self._vars = [{}, {}, {}, {}, {}, {}] # Indexed via the type of variable
         self._template_stack = []
 
     def set_var(self, name, value, where=LOCAL_VAR):
@@ -138,18 +139,12 @@ class RenderState:
             self._vars[self.RETURN_VAR]
         ))
 
-        if self._first:
-            # This is the top template
-            self._first = False
-            self._vars = [{}, {}, {}, {}, {}, None] # Indexed via the type of variable
-            self._vars[self.APP_VAR] = self._vars[self.RETURN_VAR] # APP always refs top RETURN
-        else:
-            self._vars[self.LOCAL_VAR] = self._vars[self.LOCAL_VAR].copy()
-            # GLOBAL_VAR no change
-            self._vars[self.PRIVATE_VAR] = {}
-            self._vars[self.INTERNAL_VAR] = {}
-            self._vars[self.RETURN_VAR] = {}
-            # APP_VAR continues to reference original RETURN_VAR dict
+        self._vars[self.LOCAL_VAR] = self._vars[self.LOCAL_VAR].copy()
+        # GLOBAL_VAR no change
+        self._vars[self.PRIVATE_VAR] = {}
+        self._vars[self.INTERNAL_VAR] = {}
+        self._vars[self.RETURN_VAR] = {}
+        # APP_VAR no change
 
         self.template = template
         self.line = 0
@@ -176,3 +171,31 @@ class RenderState:
             used or manipulated until after leave_template has been called.
         """
         return self._vars[self.RETURN_VAR]
+
+    def get_result(self):
+        """ Get the render result. """
+
+        result = RenderResult()
+
+        result.user_data = self.user_data
+        result.renderer = self.renderer
+        result.vars = self._vars[self.APP_VAR]
+
+        # Sections
+        result.sections = {
+            section : "".join(contents)
+            for (section, contents) in self.sections.items()
+        }
+
+        return result
+
+class RenderResult:
+    """ Represent information about the result of a render. """
+
+    def __init__(self):
+        """ Initialize the results. """
+
+        self.user_data = None
+        self.renderer = None
+        self.vars = {}
+        self.sections = {}

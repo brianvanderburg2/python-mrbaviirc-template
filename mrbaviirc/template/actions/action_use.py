@@ -22,7 +22,9 @@ class UseSectionNode(Node):
         """ Render the section to the output. """
 
         section = str(self.expr.eval(state))
-        state.renderer.render(state.renderer.get_section(section))
+        state.renderer.render(
+            "".join(state.sections.get(section, []))
+        )
 
 
 class UseActionHandler(ActionHandler):

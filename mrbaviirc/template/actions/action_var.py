@@ -23,13 +23,13 @@ class VarNode(Node):
     def render(self, state):
         """ Render the results and capture into a variable. """
 
+        state.renderer.start_capture()
         try:
-            original_renderer = state.renderer
-            state.renderer = StringRenderer()
             self.nodes.render(state)
-            state.set_var(self.var[0], state.renderer.get(), self.var[1])
+            contents = state.renderer.get_capture()
+            state.set_var(self.var[0], contents, self.var[1])
         finally:
-            state.renderer = original_renderer
+            state.renderer.stop_capture()
 
 
 class VarActionHandler(ActionHandler):

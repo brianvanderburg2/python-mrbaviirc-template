@@ -20,12 +20,21 @@ class SectionNode(Node):
         self.nodes = NodeList()
 
     def render(self, state):
-        """ Redirect output to a section. """
+        """ Capture output to a section.
+
+            Multiple outputs to the same section append the results
+        """
 
         section = str(self.expr.eval(state))
-        state.renderer.push_section(section)
-        self.nodes.render(state)
-        state.renderer.pop_section()
+        state.renderer.start_capture()
+        try:
+            self.nodes.render(state)
+            contents = state.renderer.get_capture()
+
+            section_parts = state.sections.setdefault(section, [])
+            section_parts.append(contents)
+        finally:
+            state.renderer.stop_capture()
 
 
 class SectionActionHandler(ActionHandler):

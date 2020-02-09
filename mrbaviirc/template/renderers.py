@@ -10,37 +10,35 @@ class Renderer:
 
     def __init__(self):
         """ Initialize the renderer. """
-        self.sections = {}
-        self.cursection = []
+        self._captures = []
+        self._captures_stack = []
 
     def render(self, content):
         """ Render the content. """
-        if self.cursection:
-            section = self.cursection[-1]
-            self.sections[section].append(content)
-            return True
+        if self._captures:
+            self._captures[-1].append(content)
+        else:
+            self.do_render(content)
 
-        return False
+    def start_capture(self):
+        """ Start capturing rendered content. """
+        self._captures.append([])
 
-    def push_section(self, name):
-        """ Set a named section to render to. """
-        self.sections.setdefault(name, [])
-        self.cursection.append(name)
+    def get_capture(self):
+        """ Get the captured rendered content. """
+        return "".join(self._captures[-1])
 
-    def pop_section(self):
-        """ Return rendering to the previous section or default. """
-        self.cursection.pop()
+    def stop_capture(self):
+        """ Stop capturing rendered content. """
+        return self._captures.pop()
 
-    def get_sections(self):
-        """ Return all known sections. """
-        return list(self.sections.keys())
+    def save_captures(self):
+        """ Save the current captures stack (not the contents). """
+        self._captures_stack.append(list(self._captures))
 
-    def get_section(self, name):
-        """ Return the contents of a particular section. """
-        if name in self.sections:
-            return "".join(self.sections[name])
-
-        return ""
+    def restore_captures(self):
+        """ Restore the current captures statck (not the contents). """
+        self._captures = self._captures_stack.pop()
 
 
 class StreamRenderer(Renderer):
@@ -51,10 +49,9 @@ class StreamRenderer(Renderer):
         Renderer.__init__(self)
         self.stream = stream
 
-    def render(self, content):
+    def do_render(self, content):
         """ Render to the stream. """
-        if not Renderer.render(self, content):
-            self.stream.write(content)
+        self.stream.write(content)
 
 
 class StringRenderer(Renderer):
@@ -65,10 +62,9 @@ class StringRenderer(Renderer):
         Renderer.__init__(self)
         self.buffer = []
 
-    def render(self, content):
+    def do_render(self, content):
         """ Render the content to the buffer. """
-        if not Renderer.render(self, content):
-            self.buffer.append(content)
+        self.buffer.append(content)
 
     def get(self):
         """ Get the buffer. """

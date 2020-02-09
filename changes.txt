@@ -4,6 +4,10 @@ Unreleased
 Changed
 -------
 
+* Added an application variable compartment.  The app variable compartment is
+  accessed via the "a@" prefix and allows the template to set variables which
+  will be returned to the application via the RenderResult.
+
 * The for tag has been refactored into a for tag used for counter-based loops
   and a foreach tag used for iterator-based loops.
 

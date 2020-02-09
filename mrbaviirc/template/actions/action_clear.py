@@ -38,7 +38,7 @@ class ClearActionHandler(ActionHandler):
                 start,
                 end,
                 Token.TYPE_WORD,
-                values=["local", "global", "private", "return"]
+                values=["local", "global", "private", "return", "app"]
             )
             start += 1
 
@@ -46,7 +46,8 @@ class ClearActionHandler(ActionHandler):
                 "local": RenderState.LOCAL_VAR,
                 "global": RenderState.GLOBAL_VAR,
                 "private": RenderState.PRIVATE_VAR,
-                "return": RenderState.RETURN_VAR
+                "return": RenderState.RETURN_VAR,
+                "app": RenderState.APP_VAR
             }.get(token.value, RenderState.LOCAL_VAR)
 
             parser.get_no_more_tokens(start, end)
