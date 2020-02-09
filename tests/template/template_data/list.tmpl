@@ -6,10 +6,10 @@
 {{ l[0] +}}
 
 {# Test to ensure each iteration sets the same value +#}
-{% for i in [1,2,3] %}
+{% foreach i in [1,2,3] %}
 {% set k = [1,2,3,4] %}
 {% do k.append(5) %}
-{% for j in k %}
+{% foreach j in k %}
 {{ j }}
 {% endfor +%}
 {% endfor %}

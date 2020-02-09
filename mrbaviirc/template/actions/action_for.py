@@ -101,17 +101,7 @@ class ForIncrNode(Node):
 class ForActionHandler(ActionHandler):
     """ Handle the for actions. """
 
-    def handle_action_for(self, line, start, end):
-        """ Handle the for action. """
-        parser = self.parser
-
-        segments = parser.find_tag_segments(start, end)
-        if len(segments) == 3:
-            self._handle_action_for_incr(line, segments)
-        else:
-            self._handle_action_for_iter(line, start, end)
-
-    def _handle_action_for_iter(self, line, start, end):
+    def handle_action_foreach(self, line, start, end):
         """ Parse the action for a for iterator """
         parser = self.parser
         var = parser.get_token_var(start, end, allow_type=True)
@@ -148,9 +138,18 @@ class ForActionHandler(ActionHandler):
         parser.push_nodestack(node.nodes)
         parser.push_handler(ForSubHandler(self.parser, self.template))
 
-    def _handle_action_for_incr(self, line, segments):
+    def handle_action_for(self, line, start, end):
         """ Handle a for incrementer """
         parser = self.parser
+        segments = parser.find_tag_segments(start, end)
+
+        if len(segments) != 3:
+            raise ParserError(
+                self.template.filename,
+                line,
+                "Expecting init, test, and increment segments in for action"
+            )
+
         # Init
         (start, end) = segments[0]
         init = parser.parse_multi_assign(start, end, allow_type=True)
@@ -194,4 +193,4 @@ class ForSubHandler(DefaultActionHandler):
         self.parser.add_node(ContinueNode(self.template, line))
 
 
-ACTION_HANDLERS = {"for": ForActionHandler}
+ACTION_HANDLERS = {"for": ForActionHandler, "foreach": ForActionHandler}

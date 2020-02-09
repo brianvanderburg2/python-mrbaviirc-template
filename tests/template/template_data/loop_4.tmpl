@@ -1,5 +1,5 @@
-{% for day in weekdays %}
-{% for person in people %}
+{% foreach day in weekdays %}
+{% foreach person in people %}
 {{ day }}:{{ person["name"] }}:{{person["age"]}}
 {% endfor %}
 {% endfor %}

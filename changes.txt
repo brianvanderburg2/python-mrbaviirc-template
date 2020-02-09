@@ -4,6 +4,9 @@ Unreleased
 Changed
 -------
 
+* The for tag has been refactored into a for tag used for counter-based loops
+  and a foreach tag used for iterator-based loops.
+
 * The include and code tags now only return a dictionary for the return variable
   instead of wrapping the dictionary into an attribute wrapper.  This way there
   is no ambiguity if an accessed attribute exists which would prevent __getattr__
