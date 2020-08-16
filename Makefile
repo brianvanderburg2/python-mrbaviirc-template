@@ -17,5 +17,7 @@ tarball:
 	mkdir -p $(OUTDIR)
 	git archive --format=tar --prefix=$(NAME)/ HEAD | xz > $(OUTDIR)/$(NAME).tar.xz
 
-
+.PHONY: test
+test:
+	python3 -m pytest
 

@@ -8,7 +8,7 @@ __license__ = "Apache License 2.0"
 
 from . import ActionHandler
 from ..nodes import Node
-from ..errors import TemplateError
+from ..errors import TemplateError, ParserError
 from ..state import RenderState
 from ..tokenizer import Token
 

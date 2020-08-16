@@ -7,6 +7,7 @@ __license__ = "Apache License 2.0"
 
 
 from . import ActionHandler, DefaultActionHandler
+from ..errors import ParserError
 from ..nodes import Node, NodeList, BreakNode, ContinueNode
 from ..tokenizer import Token
 
