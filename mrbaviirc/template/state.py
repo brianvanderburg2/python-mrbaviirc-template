@@ -5,6 +5,9 @@ __copyright__ = "Copyright (C) 2019 Brian Allen Vanderburg II"
 __license__ = "Apache License 2.0"
 
 
+from .renderers import StringRenderer
+
+
 class RenderState:
     """ Represent the state of information during a render cycle.
 
@@ -48,6 +51,7 @@ class RenderState:
         self.abort_fn = None
         self._vars = [{}, {}, {}, {}, {}, {}] # Indexed via the type of variable
         self._template_stack = []
+        self._renderer_stack = []
 
     def set_var(self, name, value, where=LOCAL_VAR):
         """ Set a variable.
@@ -150,7 +154,15 @@ class RenderState:
         self.line = 0
 
     def leave_template(self):
-        """ Leaving a template render, restore the state needed. """
+        """ Leaving a template render, restore the state needed.
+
+        Returns
+        -------
+        dict
+            The return dictionary of values to be set in the calling template.
+        """
+
+        result = self._vars[self.RETURN_VAR]
 
         (
             self.template,
@@ -160,17 +172,61 @@ class RenderState:
             self._vars[self.RETURN_VAR]
         ) = self._template_stack.pop()
 
-    def get_return(self):
-        """ Get the return results.
+        return result
+
+    def push_renderer(self, renderer=None):
+        """ Change the current renderer.
+
+        Parameters
+        ----------
+        renderer :
+            The render to use. This defaults to None, which will result in using
+            a new instance of a StringRenderer.
 
         Returns
         -------
-        dict
-            This returns the return dictionary. This is only a reference
-            to the internal dictionary so the returned value should not be
-            used or manipulated until after leave_template has been called.
+        Renderer
+            Returns the new renderer
         """
-        return self._vars[self.RETURN_VAR]
+        if renderer is None:
+            renderer = StringRenderer()
+
+        self._renderer_stack.append(self.renderer)
+        self.renderer = renderer
+        return renderer
+
+    def pop_renderer(self):
+        """ Restore the previous renderer. """
+        self.renderer = self._renderer_stack.pop()
+
+    def append_section(self, name, contents):
+        """ Append content to a section.
+
+        Parameters
+        ----------
+        name : str
+            The name of the section to append to
+
+        contents : str
+            The contents to append to the section
+        """
+        section = self.sections.setdefault(name, [])
+        section.append(contents)
+
+    def get_section(self, name):
+        """ Get the contents of a section.
+
+        Parameters
+        ----------
+        name : str
+            The name of the section to retrieve
+
+        Returns
+        -------
+        str
+            The contents of the section
+        """
+        return "".join(self.sections.get(name, []))
 
     def get_result(self):
         """ Get the render result. """

@@ -26,15 +26,14 @@ class SectionNode(Node):
         """
 
         section = str(self.expr.eval(state))
-        state.renderer.start_capture()
+        new_renderer = state.push_renderer()
         try:
             self.nodes.render(state)
-            contents = state.renderer.get_capture()
+            contents = new_renderer.get()
 
-            section_parts = state.sections.setdefault(section, [])
-            section_parts.append(contents)
+            state.append_section(section, contents)
         finally:
-            state.renderer.stop_capture()
+            state.pop_renderer()
 
 
 class SectionActionHandler(ActionHandler):

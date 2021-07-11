@@ -40,12 +40,12 @@ class CodeNode(Node):
         # TODO: does this need lock for threading
         if not self.code:
             # Get the code
-            state.renderer.start_capture()
+            new_renderer = state.push_renderer()
             try:
                 self.nodes.render(state)
-                code = state.renderer.get_capture()
+                code = new_renderer.get()
             finally:
-                state.renderer.stop_capture()
+                state.pop_renderer()
 
             # Compile it
             try:

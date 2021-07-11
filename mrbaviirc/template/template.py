@@ -153,9 +153,7 @@ class Template:
             state.set_var("__filename__", self.filename) # Note this is local
 
             self.nodes.render(state)
-
-            # Return any template return values.
-            retval = state.get_return()
         finally:
-            state.leave_template()
+            retval = state.leave_template()
+
         return retval

@@ -10,36 +10,11 @@ class Renderer:
 
     def __init__(self):
         """ Initialize the renderer. """
-        self._captures = []
-        self._captures_stack = []
+        pass
 
     def render(self, content):
         """ Render the content. """
-        if self._captures:
-            self._captures[-1].append(content)
-        else:
-            self.do_render(content)
-
-    def start_capture(self):
-        """ Start capturing rendered content. """
-        self._captures.append([])
-
-    def get_capture(self):
-        """ Get the captured rendered content. """
-        return "".join(self._captures[-1])
-
-    def stop_capture(self):
-        """ Stop capturing rendered content. """
-        return self._captures.pop()
-
-    def save_captures(self):
-        """ Save the current captures stack (not the contents). """
-        self._captures_stack.append(list(self._captures))
-
-    def restore_captures(self):
-        """ Restore the current captures statck (not the contents). """
-        self._captures = self._captures_stack.pop()
-
+        raise NotImplementedError("Not yet implemented")
 
 class StreamRenderer(Renderer):
     """ Render to a given stream. """
@@ -49,7 +24,7 @@ class StreamRenderer(Renderer):
         Renderer.__init__(self)
         self.stream = stream
 
-    def do_render(self, content):
+    def render(self, content):
         """ Render to the stream. """
         self.stream.write(content)
 
@@ -62,7 +37,7 @@ class StringRenderer(Renderer):
         Renderer.__init__(self)
         self.buffer = []
 
-    def do_render(self, content):
+    def render(self, content):
         """ Render the content to the buffer. """
         self.buffer.append(content)
 
