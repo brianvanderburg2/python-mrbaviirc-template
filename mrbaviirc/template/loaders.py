@@ -66,7 +66,7 @@ class UnrestrictedLoader(Loader):
             with open(filename, "r", encoding="utf8", newline=None) as handle:
                 text = handle.read()
 
-            self.cache[filename] = Template(env, text, filename, allow_code=True)
+            self.cache[filename] = Template(env, text, filename)
             return self.cache[filename]
 
     def clear_cache(self):
@@ -232,9 +232,9 @@ class PrefixLoader(Loader):
 class PrefixSubLoader:
     """ A subloader added to a PrefixLoader. """
 
-    def __init__(self, allow_code=False):
+    def __init__(self):
         """ Initialize the loader. """
-        self.allow_code = allow_code
+        pass
 
     def load_template(self, env, subpath, fullpath):
         """ Load the template specified by the subpath. """
@@ -244,9 +244,9 @@ class PrefixSubLoader:
 class PrefixPathLoader(PrefixSubLoader):
     """ Load from a path. """
 
-    def __init__(self, path, allow_code=False):
+    def __init__(self, path):
         """ Initialize the loader with a given path. """
-        PrefixSubLoader.__init__(self, allow_code)
+        PrefixSubLoader.__init__(self)
         self.path = os.path.realpath(path)
 
     def load_template(self, env, subpath, fullpath):
@@ -264,7 +264,7 @@ class PrefixPathLoader(PrefixSubLoader):
             with open(filename, "r", encoding="utf8", newline=None) as handle:
                 text = handle.read()
 
-            return Template(env, text, filename, self.allow_code)
+            return Template(env, text, filename)
 
         return None
 
@@ -272,9 +272,9 @@ class PrefixPathLoader(PrefixSubLoader):
 class PrefixMemoryLoader(PrefixSubLoader):
     """ Load from an in-memory template. """
 
-    def __init__(self, allow_code=False):
+    def __init__(self):
         """ Initialize the loader. """
-        PrefixSubLoader.__init__(self, allow_code)
+        PrefixSubLoader.__init__(self)
         self.memory = {}
 
     def add_template(self, path, contents):
@@ -289,8 +289,7 @@ class PrefixMemoryLoader(PrefixSubLoader):
             return Template(
                 env,
                 self.memory[subpath],
-                ":memory:{0}".format("/".join(fullpath)),
-                self.allow_code
+                ":memory:{0}".format("/".join(fullpath))
             )
 
         return None
@@ -307,7 +306,7 @@ class SearchPathLoader(PrefixLoader):
             path = [path]
 
         for part in path:
-            self.add_prefix("", PrefixPathLoader(part, allow_code=True))
+            self.add_prefix("", PrefixPathLoader(part))
 
 
 class MemoryLoader(PrefixLoader):
@@ -316,7 +315,7 @@ class MemoryLoader(PrefixLoader):
     def __init__(self):
         """ Initialize the loader. """
         PrefixLoader.__init__(self)
-        self.memory = PrefixMemoryLoader(allow_code=True)
+        self.memory = PrefixMemoryLoader()
         self.add_prefix("", self.memory)
 
     def add_template(self, name, contents):

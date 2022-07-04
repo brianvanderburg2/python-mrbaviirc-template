@@ -22,7 +22,7 @@ class Environment(object):
     storing the loaders, imports, registered hooks, etc.
     """
 
-    def __init__(self, loader=None, importers=None, allow_code=False):
+    def __init__(self, loader=None, importers=None):
         """ Initialize the template environment.
 
         Parameters
@@ -36,11 +36,6 @@ class Environment(object):
             to be assigned in the template.  The result of the function is
             cached.  An initial name of "mrbaviirc.template" maps to the
             StandardLib class.
-        allow_code : bool, default=False:
-            Enables or disables the use of code sections within a template.
-            If this flag is False, code sections in a template are not executed
-            but result in an exception.  If this flag is True, code sections
-            are executed if the template's allow_code flag is True.
         """
 
         self._importers = {
@@ -48,7 +43,6 @@ class Environment(object):
         }
         self._imported = {}
         self._hooks = {}
-        self._code_enabled = allow_code
         self._lock = threading.Lock()
 
         if loader:
@@ -58,17 +52,6 @@ class Environment(object):
 
         if importers:
             self._importers.update(importers)
-
-    @property
-    def code_enabled(self):
-        """ Test if the code section usage is globally enabled.
-
-        Returns
-        -------
-        bool
-            True if the code section usage is globally enabled, else False
-        """
-        return bool(self._code_enabled)
 
     def register_importer(self, name, importer):
         """ Register an importer.
@@ -115,16 +98,6 @@ class Environment(object):
         """
         self._hooks.setdefault(name, []).append(callback)
 
-    def allow_code(self, enabled=True):
-        """ Enable use of the code tag in templates.
-
-        Parameters
-        ----------
-        enabled : bool, default=True
-            The value to set the environment allow_code flag to.
-        """
-        self._code_enabled = enabled
-
     def load_file(self, filename, parent=None):
         """ Load a template from a file.
 
@@ -155,7 +128,7 @@ class Environment(object):
         """
         return self._loader.load_template(self, filename, parent)
 
-    def load_text(self, text, filename="", allow_code=False):
+    def load_text(self, text, filename=""):
         """ Load a template direct from text.
 
         Parameters
@@ -165,8 +138,6 @@ class Environment(object):
         filename : str, default=""
             The value to set as the template filename. Some loaders may use this
             for relative includes.  It is also used in error reporting.
-        allow_code : bool, default=False
-            The value to set for the template's local allow code flag.
 
         Returns
         -------
@@ -180,7 +151,7 @@ class Environment(object):
         Exception:
             Another exception occurred
         """
-        template = Template(self, text, filename, allow_code)
+        template = Template(self, text, filename)
         self._loader.fix_load_text(template)
         return template
 

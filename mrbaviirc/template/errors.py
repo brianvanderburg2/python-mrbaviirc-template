@@ -43,8 +43,7 @@ class RestrictedError(Error):
     """ Represent an restriction.
 
     This exception is raised when restriction-related errors occur such as
-    accessing a template outside of the template path or using a code section
-    when code usage is disabled.
+    accessing a template outside of the template path.
     """
 
 

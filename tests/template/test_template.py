@@ -38,7 +38,7 @@ DATADIR = os.path.join(os.path.dirname(__file__), "template_data")
 
 def test_compare_unrestricted_loader():
     loader = UnrestrictedLoader()
-    env = Environment(loader=loader, allow_code=True)
+    env = Environment(loader=loader)
     register_hooks(env)
 
     do_test_compare(env, False)
@@ -46,7 +46,7 @@ def test_compare_unrestricted_loader():
 
 def test_compare_search_path_loader():
     loader = SearchPathLoader(DATADIR)
-    env = Environment(loader=loader, allow_code=True)
+    env = Environment(loader=loader)
     register_hooks(env)
 
     do_test_compare(env, True)
@@ -54,17 +54,16 @@ def test_compare_search_path_loader():
 
 def test_compare_prefix_loader():
     loader = PrefixLoader()
-    loader.add_prefix("", PrefixPathLoader(DATADIR, allow_code=True))
+    loader.add_prefix("", PrefixPathLoader(DATADIR))
 
     env = Environment(loader=loader)
     register_hooks(env)
-    env.allow_code()
 
     do_test_compare(env, True)
 
 def test_abort_fn():
     loader = PrefixLoader()
-    loader.add_prefix("", PrefixPathLoader(DATADIR, allow_code=True))
+    loader.add_prefix("", PrefixPathLoader(DATADIR))
 
     env = Environment(loader=loader)
 

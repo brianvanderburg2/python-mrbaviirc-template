@@ -11,9 +11,9 @@ Changed
 * The for tag has been refactored into a for tag used for counter-based loops
   and a foreach tag used for iterator-based loops.
 
-* The include and code tags now only return a dictionary for the return variable
-  instead of wrapping the dictionary into an attribute wrapper.  This way there
-  is no ambiguity if an accessed attribute exists which would prevent __getattr__
+* The include tag now only return a dictionary for the return variable instead
+  of wrapping the dictionary into an attribute wrapper.  This way there is no
+  ambiguity if an accessed attribute exists which would prevent __getattr__
   being called to retrieve the value.
 
     {% include "..." ; return result %}
@@ -71,8 +71,7 @@ Changed
 
 * Parser changes will require some template changes. In particular expression
   sections may now require a semicolon separator to define more information
-  such as on include between the path expression, with and return segments
-  or on code segments
+  such as on include between the path expression, with and return segments.
 
 * Currently dot notation only performs attribute lookup and bracket notation
   performs item lookup.  Eventually a change may be added to allow
@@ -100,7 +99,7 @@ Added
   specified, it defaults to local.
 
 * Added pylintrc configuration file in the project directory containing common
-  disabled messages so they don't  need to be added to the top of every other
+  disabled messages so they don't need to be added to the top of every other
   file needing them.
 
 * New parser supports more natural operators such as +, -, ==, /, <, >
@@ -124,13 +123,6 @@ Added
     Userdata passed can then be passed on to hooks and in the future special
     functions. These hooks and functions can then access the userdata.
 
-* Support for special functions
-
-    Special functions take a list of env, template, line, scope, params and
-    instead of having the parameters automatically evaluated, they are the
-    expression nodes.  This allows special functions like defined and default
-    to exist which can evaluate a node when needed, check for errors, etc.
-
 * Support for dictionarys in the template.
 
     Dictionary syntax borrows from list syntax: [key:value, key:value, ...]
@@ -140,7 +132,7 @@ Added
 
     An iteration loop has the same syntax:
 
-        {% for var in items %} or {% for var,pos in items %}
+        {% foreach var in items %} or {% foreach var,pos in items %}
 
     An increment loop takes three segments, init, test, and incr.  The
     init and incr are multi-assign expressions segments while test is
@@ -157,3 +149,13 @@ Added
     A call to Template.render can now pass an abort function which gets called
     at the start of each node list's render.  If the abort function returns
     True, then an AbortError will be raised.
+
+Removed
+-------
+
+ * Code sections have been removed.
+
+    Applications using the template library can provide other ways for user
+    supplied code to be executed if desired.  This removed is intended to
+    simplify certain aspects of the library to prepare for other changes
+    later.

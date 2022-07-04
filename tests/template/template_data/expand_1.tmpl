@@ -1,11 +1,5 @@
 {% autostrip %}
 
-{% code return result %}
-
-value = "Hello"
-value2 = "Goodbye"
-
-{% endcode %}
-{% expand result %}
+{% expand ["value":  "Hello", "value2": "Goodbye"] %}
 {{ value +}}
 {{ value2 +}}

@@ -40,10 +40,6 @@ class Template:
 
     Internal API Attributes
     -----------------------
-    code_enabled : bool
-        The local code enabled flag indicating whether to allow code tags in
-        the template.  If this is True, then code is enabled if the environment
-        code enabled flag is also True. If this is False, code is disabled.
     private : dict
         A private dictionary for data to be added by the loaders.
     lock : threading.Lock
@@ -51,11 +47,11 @@ class Template:
 
     Internal API Methods
     --------------------
-    __init__(self, env, text, filename, allow_code=False)
+    __init__(self, env, text, filename)
         Create the template
     """
 
-    def __init__(self, env, text, filename, allow_code=False):
+    def __init__(self, env, text, filename):
         """ Initialize a template with context variables.
 
         Parameters
@@ -67,14 +63,11 @@ class Template:
         filename : str
             The value to store as the template filename.  This is used for
             error reporting and by some loaders for relative includes.
-        allow_code : bool, default=False
-            The local code enabled flag for the template.
         """
 
         # Initialize
         self._env = weakref.ref(env)
         self.filename = filename
-        self.code_enabled = allow_code
 
         self.private = {}
         self.lock = threading.Lock()
