@@ -159,3 +159,5 @@ Removed
     supplied code to be executed if desired.  This removed is intended to
     simplify certain aspects of the library to prepare for other changes
     later.
+
+ * Break and continue have been removed.

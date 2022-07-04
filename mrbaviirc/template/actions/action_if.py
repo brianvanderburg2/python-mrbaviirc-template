@@ -77,13 +77,5 @@ class IfSubHandler(DefaultActionHandler):
         self.parser.pop_nodestack()
         self.parser.pop_handler()
 
-    def handle_break(self, line):
-        """ pass break """
-        self.next.handle_break(line)
-
-    def handle_continue(self, line):
-        """ pass continue """
-        self.next.handle_continue(line)
-
 
 ACTION_HANDLERS = {"if": IfActionHandler}

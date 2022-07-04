@@ -5,7 +5,7 @@ __copyright__ = "Copyright 2016"
 __license__ = "Apache License 2.0"
 
 __all__ = [
-    "Node", "NodeList", "TextNode", "EmitNode", "BreakNode", "ContinueNode"
+    "Node", "NodeList", "TextNode", "EmitNode"
 ]
 
 
@@ -16,9 +16,6 @@ from .errors import AbortError
 
 class Node:
     """ A node is a part of the expression that is rendered. """
-
-    RENDER_BREAK = 1
-    RENDER_CONTINUE = 2
 
     def __init__(self, template, line):
         """ Initialize the node. """
@@ -37,12 +34,7 @@ class Node:
         return self._template()
 
     def render(self, state):
-        """ Render the node to a renderer.
-            If a value is returned other than None, then for most other
-            nodes it should return that value instantly.  Certain nodes
-            may use the value in a special manor, such as break and
-            continue nodes.
-        """
+        """ Render the node to a renderer. """
         raise NotImplementedError
 
 
@@ -67,9 +59,7 @@ class NodeList:
             raise AbortError("Nodelist render aborted")
 
         for node in self.nodes:
-            result = node.render(state)
-            if result in (Node.RENDER_BREAK, Node.RENDER_CONTINUE):
-                return result
+            node.render(state)
 
         return None
 
@@ -101,17 +91,3 @@ class EmitNode(Node):
     def render(self, state):
         """ Render the output. """
         state.renderer.render(str(self.expr.eval(state)))
-
-
-class BreakNode(Node):
-    """ Return RENDER_BREAK. """
-
-    def render(self, state):
-        return Node.RENDER_BREAK
-
-
-class ContinueNode(Node):
-    """ Return RENDER_CONTINUE. """
-
-    def render(self, state):
-        return Node.RENDER_CONTINUE

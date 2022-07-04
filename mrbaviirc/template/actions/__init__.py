@@ -21,7 +21,6 @@ class ActionHandler:
         self.parser = parser
         self.template = template
 
-        self.next = None # set when calling parser.push_handler
         self.line = 1 # current tag line when when calling parser.push_handler
 
     def handle_text(self, line, text):
@@ -44,22 +43,6 @@ class ActionHandler:
     def handle_comment(self, line):
         """ Allow for controlling whether a tag can contain comments. """
         pass
-
-    def handle_break(self, line):
-        """ Handle a break tag. """
-        raise ParserError(
-            self.template.filename,
-            line,
-            "Unexpected break"
-        )
-
-    def handle_continue(self, line):
-        """ Handle a break tag. """
-        raise ParserError(
-            self.template.filename,
-            line,
-            "Unexpected continue"
-        )
 
     def handle_action(self, line, action, start, end):
         """ Handle action tags. """

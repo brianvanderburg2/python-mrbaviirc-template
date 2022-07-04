@@ -8,7 +8,7 @@ __license__ = "Apache License 2.0"
 
 from . import ActionHandler, DefaultActionHandler
 from ..errors import ParserError
-from ..nodes import Node, NodeList, BreakNode, ContinueNode
+from ..nodes import Node, NodeList
 from ..tokenizer import Token
 
 
@@ -47,10 +47,6 @@ class ForIterNode(Node):
 
                 # Execute each sub-node
                 result = self.for_nodes.render(state)
-                if result == Node.RENDER_BREAK:
-                    break
-                elif result == Node.RENDER_CONTINUE:
-                    continue
 
         if do_else and self.else_nodes:
             return self.else_nodes.render(state)
@@ -88,8 +84,6 @@ class ForIncrNode(Node):
 
             # Render nodes
             result = self.for_nodes.render(state)
-            if result == Node.RENDER_BREAK:
-                break
 
             # Incr
             for (var, expr) in self.incr:
@@ -184,14 +178,6 @@ class ForSubHandler(DefaultActionHandler):
         node = self.parser.pop_nodestack()
         node.add_else()
         self.parser.push_nodestack(node.nodes)
-
-    def handle_break(self, line):
-        """ Allow break. """
-        self.parser.add_node(BreakNode(self.template, line))
-
-    def handle_continue(self, line):
-        """ Allow continue. """
-        self.parser.add_node(ContinueNode(self.template, line))
 
 
 ACTION_HANDLERS = {"for": ForActionHandler, "foreach": ForActionHandler}

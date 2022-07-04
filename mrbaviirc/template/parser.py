@@ -55,7 +55,6 @@ class TemplateParser:
 
     def push_handler(self, handler):
         """ Push a handler onto the handler stack. """
-        handler.next = self.action_handler_stack[-1]
         handler.line = self.action_line
         self.action_handler_stack.append(handler)
 
@@ -414,18 +413,12 @@ class TemplateParser:
             line = action_token.line
             self.action_line = line # remember for push_handler
 
-            # Handle spectial case actions first
-            if action == "break":
-                handler.handle_break(line)
-            elif action == "continue":
-                handler.handle_continue(line)
-            else:
-                handler.handle_action(
-                    line,
-                    action,
-                    start + 1,
-                    end
-                )
+            handler.handle_action(
+                line,
+                action,
+                start + 1,
+                end
+            )
 
         elif token.type == Token.TYPE_START_EMITTER:
             handler.handle_emitter(

@@ -65,14 +65,6 @@ class StripSubHandler(DefaultActionHandler):
         self.parser.pop_autostrip()
         self.parser.pop_handler()
 
-    def handle_break(self, line):
-        """ Allow break from within a strip block. """
-        self.next.handle_break(line)
-
-    def handle_continue(self, line):
-        """ Allow continue from within a strip block. """
-        self.next.handle_continue(line)
-
 
 ACTION_HANDLERS = {
     "strip": StripActionHandler,
