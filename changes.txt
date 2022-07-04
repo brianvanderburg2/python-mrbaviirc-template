@@ -4,6 +4,19 @@ Unreleased
 Changed
 -------
 
+* The set tag can now take an else segment that gets evaluated if an error
+  occurs in the set tag.  This is intended to replace the defined and default
+  special functions.  If there is an else segment, a template Error raised
+  from the set block is not passed out.
+
+  To set a default value:
+
+    {% set x = value ; else x = 12 %}
+
+  To test if a value is defined
+
+    {% set defined = 1, _ = value ; else defined = 0 %}
+
 * Added an application variable compartment.  The app variable compartment is
   accessed via the "a@" prefix and allows the template to set variables which
   will be returned to the application via the RenderResult.

@@ -1,0 +1,13 @@
+{% set items=["name": "value"], items2=[1,2,3], other=37 -%}
+{% set a=other ; else a=8 -%}
+{% set b=items["name"] ; else b=9 -%}
+{% set c=items2[2] ; else c=14 -%}
+{% set d=z ; else d=12 -%}
+{% set e=items["noname"] ; else e=13 -%}
+{% set f=items2[12] ; else f=14 -%}
+{{ a }}
+{{ b }}
+{{ c }}
+{{ d }}
+{{ e }}
+{{ f }}
