@@ -14,7 +14,6 @@ __all__ = [
 import weakref
 
 from .errors import UnknownVariableError, UnknownIndexError
-from .util import specialfunction
 
 
 class Expr:
@@ -160,10 +159,6 @@ class FuncExpr(Expr):
             variables, any exception may be raised from within those functions.
         """
         func = self.expr.eval(state)
-        if isinstance(func, specialfunction):
-            state.line = self.line
-            return func(state, self.nodes)
-
         params = [node.eval(state) for node in self.nodes]
         namedparams = {var: node.eval(state) for (var, node) in self.namednodes}
         return func(*params, **namedparams)

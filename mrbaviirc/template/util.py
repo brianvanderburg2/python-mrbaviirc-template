@@ -5,18 +5,7 @@ __author__ = "Brian Allen Vanderburg II"
 __copyright__ = "Copyright 2016-2019"
 __license__ = "Apache License 2.0"
 
-__all__ = ["specialfunction", "DictToAttr"]
-
-
-class specialfunction: # pylint: disable=invalid-name
-    """ A base class for a sepcial special function which receives expression nodes. """
-
-    def __init__(self):
-        """ Initialize  the function. """
-
-    def __call__(self, state, params):
-        """ Call the special function. """
-        return None
+__all__ = ["DictToAttr"]
 
 
 class DictToAttr(dict):

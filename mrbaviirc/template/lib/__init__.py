@@ -12,7 +12,6 @@ import sys
 import importlib
 
 from ..errors import UnknownVariableError, ParserError
-from ..util import specialfunction
 
 
 class Library:
@@ -35,41 +34,10 @@ class Library:
         raise AttributeError(name)
 
 
-class _Defined(specialfunction):
-    """ Special function to determine if an expression is defined. """
-    def __call__(self, scope, params):
-        """ Return true if all params evaluate successfully. """
-        try:
-            _ = [param.eval(scope) for param in params]
-            return True
-        except (KeyError, IndexError, AttributeError, TypeError, UnknownVariableError):
-            return False
-
-
-class _Default(specialfunction):
-    """ Special function to default to a value if an expression is not defined. """
-    def __call__(self, scope, params):
-        """ Return a default if the first parameter does not evaluate. """
-        if len(params) != 2:
-            raise ParserError(
-                "Template builting 'default' expects 2 arguments",
-                scope.template.filename,
-                scope.line
-            )
-
-        try:
-            return params[0].eval(scope)
-        except (KeyError, IndexError, AttributeError, TypeError, UnknownVariableError):
-            return params[1].eval(scope)
-
-
 class StandardLib(Library):
     """ Template library. """
 
     # Builtins
-    defined = _Defined()
-    default = _Default()
-
     @staticmethod
     def list(*args):
         return builtins.list(*args)

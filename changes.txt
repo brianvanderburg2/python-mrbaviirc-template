@@ -174,3 +174,8 @@ Removed
     later.
 
  * Break and continue have been removed.
+
+ * Removed defined and default special functions.
+
+    The set tag can now be used to set one set of variables if the initial
+    set causes a template Error.  The special function hack has been removed.

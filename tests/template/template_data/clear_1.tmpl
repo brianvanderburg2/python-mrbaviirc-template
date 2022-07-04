@@ -10,16 +10,29 @@
 {{ g@z +}}
 
 {% clear %}
-{% import lib="mrbaviirc.template" %}
 
-{{ lib.default(x, 0) +}}
-{{ lib.default(y, 1) +}}
-{{ lib.default(z, 2) +}}
-{{ lib.default(g@x, 0) +}}
-{{ lib.default(g@y, 1) +}}
-{{ lib.default(g@z, 2) +}}
+{% set a=x ; else a=0 %}
+{% set b=y ; else b=1 %}
+{% set c=z ; else c=2 %}
+{% set d=g@x ; else d=0 %}
+{% set e=g@y ; else e=1 %}
+{% set f=g@z ; else f=2 %}
+
+
+{{ a +}}
+{{ b +}}
+{{ c +}}
+{{ d +}}
+{{ e +}}
+{{ f +}}
 
 {% clear global %}
-{{ lib.default(g@x, 0) +}}
-{{ lib.default(g@y, 1) +}}
-{{ lib.default(g@z, 2) +}}
+
+
+{% set d=g@x ; else d=0 %}
+{% set e=g@y ; else e=1 %}
+{% set f=g@z ; else f=2 %}
+
+{{ d +}}
+{{ e +}}
+{{ f +}}
